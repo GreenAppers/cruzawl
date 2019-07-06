@@ -130,9 +130,9 @@ packages:
   ed25519_hd_key:
     dependency: "direct main"
     description:
-      path: dart-ed25519-hd-key
-      relative: true
-    source: path
+      name: ed25519_hd_key
+      url: "https://pub.dartlang.org"
+    source: hosted
     version: "1.0.1"
   fixnum:
     dependency: transitive
@@ -396,9 +396,9 @@ packages:
   tweetnacl:
     dependency: "direct main"
     description:
-      path: tweetnacl-dart
-      relative: true
-    source: path
+      name: tweetnacl
+      url: "https://pub.dartlang.org"
+    source: hosted
     version: "0.3.1"
   typed_data:
     dependency: transitive
