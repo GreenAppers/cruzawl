@@ -40,14 +40,6 @@ class CRUZ extends Currency {
       DateTime.fromMillisecondsSinceEpoch(time * 1000).toString();
 
   @override
-  String formatTarget(BlockId target) {
-    String v = target.toJson();
-    int i = v.length;
-    while (--i >= 0) if (v[i] != '0') break;
-    return v.substring(0, i+1);
-  }
-
-  @override
   num parse(String v) {
     num x = num.tryParse(v);
     return x != null ? (x * cruzbitsPerCruz).floor() : 0;

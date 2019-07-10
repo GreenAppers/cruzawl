@@ -44,7 +44,7 @@ class WebSocket {
       ws = io.WebSocket.fromUpgradedSocket(socket, serverSide: false);
       onConnected(ws);
     } on Exception catch (error) {
-      onError(error, null);
+      onError(error);
     }
   }
 

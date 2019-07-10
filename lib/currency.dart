@@ -22,7 +22,6 @@ abstract class Currency {
   String toJson() => ticker;
   String format(num v) => v.toString();
   String formatTime(int time) => time.toString();
-  String formatTarget(BlockId target) => target.toJson();
   num parse(String v) => num.tryParse(v) ?? 0;
 
   String get ticker;
