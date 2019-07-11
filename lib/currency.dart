@@ -97,7 +97,16 @@ abstract class Address {
     if (earliestSeen == null || height < earliestSeen) earliestSeen = height;
   }
 
-  static int compareBalance(dynamic a, dynamic b) => b.balance - a.balance;
+  static int compareIndex(dynamic a, dynamic b) {
+    int accountDiff = a.accountId - b.accountId;
+    return accountDiff != 0 ? accountDiff : a.chainIndex - b.chainIndex;
+  }
+
+  static int compareBalance(dynamic a, dynamic b) {
+    int balanceDiff = b.balance - a.balance;
+    return balanceDiff != 0 ? balanceDiff : compareIndex(a, b);
+  }
+
   static Address reduceBalance(Address a, Address b) =>
       b.balance > a.balance ? b : a;
 }
