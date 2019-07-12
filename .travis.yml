@@ -1,0 +1,28 @@
+os: linux
+
+addons:
+  apt:
+    # Flutter dependencies
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - libstdc++6
+      - fonts-droid
+
+before_install:
+  - echo $TRAVIS_OS_NAME
+  - echo ${HOME}
+  - echo ${TRAVIS_BUILD_DIR}
+  - git clone https://github.com/flutter/flutter.git -b stable --depth 1 ${HOME}/flutter
+  - ${HOME}/flutter/bin/flutter doctor -v
+  - ${HOME}/flutter/bin/flutter packages get
+  - pub get
+
+script:
+  - pub run test
+
+after_success:
+  - echo "success"
+
+after_failure:
+  - echo "failure"
