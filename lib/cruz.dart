@@ -439,7 +439,7 @@ class CruzPeer extends PersistentWebSocketClient {
       },
       (Map<String, dynamic> response) {
         if (response == null) return;
-        assert(response['type'] == 'tip_header');
+        checkEquals('tip_header', response['type']);
         tipId = CruzBlockId.fromJson(response['body']['block_id']);
         tip = CruzBlockHeader.fromJson(response['body']['header']);
         if (spec.debugPrint != null)
@@ -455,7 +455,7 @@ class CruzPeer extends PersistentWebSocketClient {
       },
       (Map<String, dynamic> response) {
         if (response == null) return;
-        assert(response['type'] == 'transaction_relay_policy');
+        checkEquals('transaction_relay_policy', response['type']);
         minAmount = response['body']['min_amount'];
         minFee = response['body']['min_fee'];
       },
@@ -473,8 +473,8 @@ class CruzPeer extends PersistentWebSocketClient {
         },
       },
       (Map<String, dynamic> response) {
-        if (response == null) completer.complete(null);
-        assert(response['type'] == 'balance');
+        if (response == null) { completer.complete(null); return; }
+        checkEquals('balance', response['type']);
         completer.complete(response['body']['balance']);
       },
     );
@@ -508,8 +508,8 @@ class CruzPeer extends PersistentWebSocketClient {
       'type': 'get_public_key_transactions',
       'body': body,
     }, (Map<String, dynamic> response) {
-      if (response == null) completer.complete(null);
-      assert(response['type'] == 'public_key_transactions');
+      if (response == null) { completer.complete(null); return; }
+      checkEquals('public_key_transactions', response['type']);
       List<dynamic> blocks = response['body']['filter_blocks'];
       TransactionIteratorResults ret = TransactionIteratorResults(
           response['body']['stop_height'],
@@ -541,8 +541,8 @@ class CruzPeer extends PersistentWebSocketClient {
         'transaction': transaction.toJson(),
       },
     }, (Map<String, dynamic> response) {
-      if (response == null) completer.complete(null);
-      assert(response['type'] == 'push_transaction_result');
+      if (response == null) { completer.complete(null); return; }
+      checkEquals('push_transaction_result', response['type']);
       Map<String, dynamic> result = response['body'];
       assert(result != null);
       if (result['error'] != null) {
@@ -571,8 +571,8 @@ class CruzPeer extends PersistentWebSocketClient {
         },
       },
       (Map<String, dynamic> response) {
-        if (response == null) completer.complete(null);
-        assert(response['type'] == 'filter_result');
+        if (response == null) { completer.complete(null); return; }
+        checkEquals('filter_result', response['type']);
         var body = response['body'];
         String error = body != null ? body['error'] : null;
         if (error != null && spec.debugPrint != null)
@@ -591,8 +591,8 @@ class CruzPeer extends PersistentWebSocketClient {
         'type': 'get_filter_transaction_queue',
       },
       (Map<String, dynamic> response) {
-        if (response == null) completer.complete(null);
-        assert(response['type'] == 'filter_transaction_queue');
+        if (response == null) { completer.complete(null); return; }
+        checkEquals('filter_transaction_queue', response['type']);
         var transactions = response['body']['transactions'];
         if (transactions != null)
           for (var transaction in transactions)
@@ -602,6 +602,7 @@ class CruzPeer extends PersistentWebSocketClient {
     );
     return completer.future;
   }
+
 
   @override
   Future<BlockHeaderMessage> getBlockHeader({BlockId id, int height}) {
@@ -621,8 +622,8 @@ class CruzPeer extends PersistentWebSocketClient {
               },
             },
       (Map<String, dynamic> response) {
-        if (response == null) completer.complete(null);
-        assert(response['type'] == 'block_header');
+        if (response == null) { completer.complete(null); return; }
+        checkEquals('block_header', response['type']);
         completer.complete(BlockHeaderMessage(
             CruzBlockId.fromJson(response['body']['block_id']),
             CruzBlockHeader.fromJson(response['body']['header'])));
@@ -650,7 +651,7 @@ class CruzPeer extends PersistentWebSocketClient {
             },
       (Map<String, dynamic> response) {
         if (response == null) completer.complete(null);
-        assert(response['type'] == 'block');
+        checkEquals('block', response['type']);
         completer.complete(BlockMessage(
             CruzBlockId.fromJson(response['body']['block_id']),
             CruzBlock.fromJson(response['body']['block'])));
@@ -671,7 +672,7 @@ class CruzPeer extends PersistentWebSocketClient {
       },
       (Map<String, dynamic> response) {
         if (response == null) completer.complete(null);
-        assert(response['type'] == 'transaction');
+        checkEquals('transaction', response['type']);
         CruzTransaction transaction =
             CruzTransaction.fromJson(response['body']['transaction']);
         transaction.height = response['body']['height'];

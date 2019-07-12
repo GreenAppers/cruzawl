@@ -9,6 +9,10 @@ import 'package:collection/collection.dart';
 
 Future<void> voidResult() async {}
 
+void checkEquals(String x, String y) {
+  assert(x == y, '$x != $y');
+}
+
 bool equalUint8List(Uint8List x, Uint8List y) {
   if (x.length != y.length) return false;
   for (int i = 0; i < x.length; ++i) if (x[i] != y[i]) return false;
