@@ -7,7 +7,7 @@ class WebSocket {
   void close() {}
 
   void connect(String address, Function onConnected, Function onError,
-      {int timeoutSeconds = 15}) {}
+      {int timeoutSeconds = 15, bool ignoreBadCert = false}) {}
 
   void handleError(Function errorHandler) {}
 

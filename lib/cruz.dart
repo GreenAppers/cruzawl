@@ -40,6 +40,9 @@ class CRUZ extends Currency {
       DateTime.fromMillisecondsSinceEpoch(time * 1000).toString();
 
   @override
+  String suggestedFee(Transaction t) => '0.01';
+
+  @override
   num parse(String v) {
     num x = num.tryParse(v);
     return x != null ? (x * cruzbitsPerCruz).floor() : 0;
