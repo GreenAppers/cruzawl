@@ -16,10 +16,10 @@ before_install:
   - git clone https://github.com/flutter/flutter.git -b stable --depth 1 ${HOME}/flutter
   - ${HOME}/flutter/bin/flutter doctor -v
   - ${HOME}/flutter/bin/flutter packages get
-  - pub get
+  - ${HOME}/flutter/bin/flutter pub get
 
 script:
-  - pub run test
+  - ${HOME}/flutter/bin/flutter pub run test
 
 after_success:
   - echo "success"
