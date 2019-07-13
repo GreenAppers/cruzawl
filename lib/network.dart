@@ -96,6 +96,14 @@ abstract class Peer {
     connectTimer = null;
   }
 
+  void handleProtocol(VoidCallback cb) {
+    try {
+      cb();
+    } catch (error, stacktrace) {
+      disconnect('protocol error: $error $stacktrace');
+    }
+  }
+
   void connect();
   void disconnect(String reason);
   Future<num> getBalance(PublicAddress address);

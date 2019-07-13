@@ -12,9 +12,11 @@ typedef VoidCallback = void Function();
 
 Future<void> voidResult() async {}
 
-void checkEquals(String x, String y, [StringCallback debugPrint]) {
-  if (debugPrint != null && x != y) debugPrint('assertion failure: $x != $y');
+bool checkEquals(dynamic x, dynamic y, [StringCallback debugPrint]) {
+  bool equals = x == y;
+  if (debugPrint != null && !equals) debugPrint('assertion failure: $x != $y');
   assert(x == y, '$x != $y');
+  return equals;
 }
 
 bool equalUint8List(Uint8List x, Uint8List y) {

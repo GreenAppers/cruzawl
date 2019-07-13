@@ -672,7 +672,10 @@ class CruzPeer extends PersistentWebSocketClient {
               },
             },
       (Map<String, dynamic> response) {
-        if (response == null) completer.complete(null);
+        if (response == null) {
+          completer.complete(null);
+          return;
+        }
         checkEquals('block', response['type'], spec.debugPrint);
         completer.complete(BlockMessage(
             CruzBlockId.fromJson(response['body']['block_id']),
@@ -693,7 +696,10 @@ class CruzPeer extends PersistentWebSocketClient {
         },
       },
       (Map<String, dynamic> response) {
-        if (response == null) completer.complete(null);
+        if (response == null) {
+          completer.complete(null);
+          return;
+        }
         checkEquals('transaction', response['type'], spec.debugPrint);
         CruzTransaction transaction =
             CruzTransaction.fromJson(response['body']['transaction']);
@@ -719,15 +725,18 @@ class CruzPeer extends PersistentWebSocketClient {
       case 'tip_header':
       case 'transaction':
       case 'transaction_relay_policy':
-        dispatchFromJsonResponseQueue(json);
+        handleProtocol(() => dispatchFromJsonResponseQueue(json));
         break;
       case 'filter_block':
       case 'filter_block_undo':
-        handleFilterBlock(CruzBlockId.fromJson(body['block_id']),
-            CruzBlock.fromJson(body), json['type'] == 'filter_block_undo');
+        handleProtocol(() => handleFilterBlock(
+            CruzBlockId.fromJson(body['block_id']),
+            CruzBlock.fromJson(body),
+            json['type'] == 'filter_block_undo'));
         break;
       case 'push_transaction':
-        handleNewTransaction(CruzTransaction.fromJson(body['transaction']));
+        handleProtocol(() => handleNewTransaction(
+            CruzTransaction.fromJson(body['transaction'])));
         break;
       default:
         break;
