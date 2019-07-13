@@ -1,6 +1,4 @@
-# cruzawl
-
-<img style="float:left" src="icon.png" />
+# cruzawl <img style="float:left" src="icon.png" />
 
 [![Build Status](https://travis-ci.org/GreenAppers/cruzawl.svg?branch=master)](https://travis-ci.org/GreenAppers/cruzawl)
 

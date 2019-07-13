@@ -10,6 +10,7 @@ import "package:convert/convert.dart";
 import 'package:ed25519_hd_key/ed25519_hd_key.dart';
 import 'package:json_annotation/json_annotation.dart';
 import "package:pointycastle/digests/sha256.dart";
+import "package:pointycastle/src/utils.dart";
 import 'package:tweetnacl/tweetnacl.dart' as tweetnacl;
 
 import 'package:cruzawl/sha3.dart';
@@ -374,6 +375,14 @@ class CruzBlockHeader extends BlockHeader {
   Map<String, dynamic> toJson() => _$CruzBlockHeaderToJson(this);
 
   CruzBlockId id() => CruzBlockId.compute(jsonEncode(this));
+
+  int deltaWork(BlockHeader x) =>
+      (decodeBigInt(chainWork.data) - decodeBigInt(x.chainWork.data)).toInt();
+
+  int hashRate(BlockHeader x) =>
+      ((decodeBigInt(chainWork.data) - decodeBigInt(x.chainWork.data)) /
+              (BigInt.from(time - x.time)))
+          .toInt();
 }
 
 @JsonSerializable()

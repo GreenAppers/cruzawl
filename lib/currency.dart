@@ -22,6 +22,11 @@ abstract class Currency {
   String toJson() => ticker;
   String format(num v) => v.toString();
   String formatTime(int time) => time.toString();
+  String formatHashRate(int hashesPerSec) {
+    if (hashesPerSec > 1000000000) return '${hashesPerSec~/1000000000} GH/s';
+    if (hashesPerSec > 1000000)    return '${hashesPerSec~/1000000} MH/s';
+    else return '$hashesPerSec H/S';
+  }
   String suggestedFee(Transaction t) => null;
   num parse(String v) => num.tryParse(v) ?? 0;
 
@@ -162,6 +167,7 @@ class TransactionIteratorResults extends TransactionIterator {
 }
 
 abstract class BlockId {
+  Uint8List data;
   String toJson();
 }
 
@@ -176,6 +182,8 @@ abstract class BlockHeader {
   int get transactionCount;
 
   Map<String, dynamic> toJson();
+  int deltaWork(BlockHeader x);
+  int hashRate(BlockHeader X);
 }
 
 abstract class Block {
