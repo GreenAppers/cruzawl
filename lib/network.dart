@@ -8,11 +8,10 @@ import 'dart:math';
 import 'package:json_annotation/json_annotation.dart';
 
 import 'package:cruzawl/currency.dart';
+import 'package:cruzawl/util.dart';
 
 part 'network.g.dart';
 
-typedef VoidCallback = void Function();
-typedef StringCallback = void Function(String);
 typedef PeerStateChangedCallback = void Function(Peer, PeerState, PeerState);
 
 enum PeerState { ready, connected, connecting, disconnected }

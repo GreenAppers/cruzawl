@@ -7,9 +7,13 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 
+typedef StringCallback = void Function(String);
+typedef VoidCallback = void Function();
+
 Future<void> voidResult() async {}
 
-void checkEquals(String x, String y) {
+void checkEquals(String x, String y, [StringCallback debugPrint]) {
+  if (debugPrint != null && x != y) debugPrint('assertion failure: $x != $y');
   assert(x == y, '$x != $y');
 }
 
