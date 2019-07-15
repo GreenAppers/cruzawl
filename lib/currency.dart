@@ -24,10 +24,29 @@ abstract class Currency {
   String format(num v) => v.toString();
   String formatTime(int time) => time.toString();
   String formatHashRate(int hashesPerSec) {
-    if (hashesPerSec > 1000000000) return '${hashesPerSec~/1000000000} GH/s';
-    if (hashesPerSec > 1000000)    return '${hashesPerSec~/1000000} MH/s';
-    else return '$hashesPerSec H/S';
+    if (hashesPerSec > 1000000000) return '${hashesPerSec ~/ 1000000000} GH/s';
+    if (hashesPerSec > 1000000)
+      return '${hashesPerSec ~/ 1000000} MH/s';
+    else
+      return '$hashesPerSec H/S';
   }
+
+  String formatDuration(Duration duration) {
+    if (duration.inDays >= 1)
+      return duration.inDays == 1 ? 'day' : '${duration.inDays} days';
+    if (duration.inHours >= 1)
+      return duration.inHours == 1 ? 'hour' : '${duration.inHours} hours';
+    if (duration.inMinutes >= 1)
+      return duration.inMinutes == 1
+          ? 'minute'
+          : '${duration.inMinutes} minutes';
+    if (duration.inSeconds >= 1)
+      return duration.inSeconds == 1
+          ? 'second'
+          : '${duration.inSeconds} seconds';
+    return duration.toString();
+  }
+
   String suggestedFee(Transaction t) => null;
   num parse(String v) => num.tryParse(v) ?? 0;
 
