@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:cruzawl/cruz.dart';
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/util.dart';
 
 abstract class Currency {
   const Currency();
@@ -30,9 +31,12 @@ abstract class Currency {
   PeerNetwork get network;
 
   String genesisBlockId();
-  Address deriveAddress(Uint8List seed, String path);
+  Address deriveAddress(Uint8List seed, String path,
+      [StringCallback debugPrint]);
+  Address fromPrivateKey(PrivateKey key);
   Address fromAddressJson(Map<String, dynamic> json);
   PublicAddress fromPublicAddressJson(String text);
+  PrivateKey fromPrivateKeyJson(String text);
   TransactionId fromTransactionIdJson(String text);
   Transaction fromTransactionJson(Map<String, dynamic> json);
   Transaction signedTransaction(Address from, PublicAddress to, num amount,
@@ -48,9 +52,13 @@ class LoadingCurrency extends Currency {
   PeerNetwork get network => null;
 
   String genesisBlockId() => null;
-  Address deriveAddress(Uint8List seed, String path) => null;
+  Address deriveAddress(Uint8List seed, String path,
+          [StringCallback debugPrint]) =>
+      null;
+  Address fromPrivateKey(PrivateKey key) => null;
   Address fromAddressJson(Map<String, dynamic> json) => null;
   PublicAddress fromPublicAddressJson(String text) => null;
+  PrivateKey fromPrivateKeyJson(String text) => null;
   TransactionId fromTransactionIdJson(String text) => null;
   Transaction fromTransactionJson(Map<String, dynamic> json) => null;
   Transaction signedTransaction(Address from, PublicAddress to, num amount,
@@ -65,6 +73,8 @@ abstract class PublicAddress {
 
 abstract class PrivateKey {
   String toJson();
+  CruzPublicKey getPublicKey();
+  CruzPublicKey derivePublicKey();
 }
 
 abstract class Signature {
@@ -92,6 +102,7 @@ abstract class Address {
   ChainCode get chainCode;
 
   Map<String, dynamic> toJson();
+  bool verify();
 
   void updateSeenHeight(int height) {
     if (latestSeen == null || height > latestSeen) latestSeen = height;

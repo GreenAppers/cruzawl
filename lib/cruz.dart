@@ -61,14 +61,20 @@ class CRUZ extends Currency {
       CruzBlock.fromJson(jsonDecode(genesisBlockJson)).id().toJson();
 
   @override
-  CruzAddress deriveAddress(Uint8List seed, String path) {
+  CruzAddress deriveAddress(Uint8List seed, String path,
+      [StringCallback debugPrint]) {
     KeyData data = ED25519_HD_KEY.derivePath(path, hex.encode(seed));
     Uint8List publicKey = ED25519_HD_KEY.getBublickKey(data.key, false);
+    if (debugPrint != null)
+      debugPrint('deriveAddress($path) = ${base64.encode(publicKey)}');
     return CruzAddress(
         CruzPublicKey(publicKey),
         CruzPrivateKey(Uint8List.fromList(data.key + publicKey)),
         CruzChainCode(data.chainCode));
   }
+
+  @override
+  CruzAddress fromPrivateKey(PrivateKey key) => CruzAddress.fromPrivateKey(key);
 
   @override
   CruzAddress fromAddressJson(Map<String, dynamic> json) =>
@@ -85,6 +91,9 @@ class CRUZ extends Currency {
     }
   }
 
+  @override
+  PrivateKey fromPrivateKeyJson(String text) => CruzPrivateKey.fromJson(text);
+
   TransactionId fromTransactionIdJson(String text) =>
       CruzTransactionId.fromJson(text);
 
@@ -96,8 +105,8 @@ class CRUZ extends Currency {
   Transaction signedTransaction(Address fromInput, PublicAddress toInput,
       num amount, num fee, String memo, int height,
       {int matures, int expires}) {
-    assert(fromInput is CruzAddress);
-    assert(toInput is CruzPublicKey);
+    if (!(fromInput is CruzAddress)) throw FormatException();
+    if (!(toInput is CruzPublicKey)) throw FormatException();
     CruzAddress from = fromInput;
     CruzPublicKey to = toInput;
     return CruzTransaction(from.publicKey, to, amount, fee, memo,
@@ -111,7 +120,7 @@ class CruzPublicKey extends PublicAddress {
   static const int size = 32;
 
   CruzPublicKey(this.data) {
-    assert(data.length == size);
+    if (data.length != size) throw FormatException();
   }
 
   CruzPublicKey.fromJson(String x) : this(base64.decode(x));
@@ -125,7 +134,7 @@ class CruzPrivateKey extends PrivateKey {
   static const int size = 64;
 
   CruzPrivateKey(this.data) {
-    assert(data.length == size);
+    if (data.length != size) throw FormatException();
   }
 
   CruzPrivateKey.fromJson(String x) : this(base64.decode(x));
@@ -135,6 +144,10 @@ class CruzPrivateKey extends PrivateKey {
 
   CruzPublicKey getPublicKey() =>
       CruzPublicKey(data.buffer.asUint8List(size - CruzPublicKey.size));
+
+  CruzPublicKey derivePublicKey() => CruzPublicKey(
+      tweetnacl.Signature.keyPair_fromSeed(data.buffer.asUint8List(0, 32))
+          .publicKey);
 }
 
 class CruzSignature extends Signature {
@@ -142,7 +155,7 @@ class CruzSignature extends Signature {
   static const int size = 64;
 
   CruzSignature(this.data) {
-    assert(data.length == size);
+    if (data.length != size) throw FormatException();
   }
 
   CruzSignature.fromJson(String x) : this(base64.decode(x));
@@ -155,7 +168,7 @@ class CruzChainCode extends ChainCode {
   static const int size = 32;
 
   CruzChainCode(this.data) {
-    assert(data.length == size);
+    if (data.length != size) throw FormatException();
   }
 
   CruzChainCode.fromJson(String x) : this(base64.decode(x));
@@ -169,7 +182,7 @@ class CruzTransactionId extends TransactionId {
   static const int size = 32;
 
   CruzTransactionId(this.data) {
-    assert(data.length == size);
+    if (data.length != size) throw FormatException();
   }
 
   CruzTransactionId.compute(String x)
@@ -291,7 +304,8 @@ class CruzAddress extends Address {
   num newMaturesBalance;
 
   CruzAddress(this.publicKey, this.privateKey, this.chainCode) {
-    assert(equalUint8List(publicKey.data, privateKey.getPublicKey().data));
+    if (!equalUint8List(publicKey.data, privateKey.getPublicKey().data))
+      throw FormatException();
   }
 
   CruzAddress.fromPrivateKey(this.privateKey) {
@@ -312,6 +326,9 @@ class CruzAddress extends Address {
 
   @override
   Map<String, dynamic> toJson() => _$CruzAddressToJson(this);
+
+  bool verify() => equalUint8List(
+      privateKey.getPublicKey().data, privateKey.derivePublicKey().data);
 }
 
 class CruzBlockId extends BlockId {
@@ -319,14 +336,14 @@ class CruzBlockId extends BlockId {
   static const int size = 32;
 
   CruzBlockId(this.data) {
-    assert(data.length == size);
+    if (data.length != size) throw FormatException();
   }
 
   CruzBlockId.compute(String x)
       : data = SHA3Digest(256).process(utf8.encode(x));
 
   CruzBlockId.fromJson(String x) : data = hex.decode(x) {
-    assert(data.length == size, 'input=${x}');
+    if (data.length != size) throw FormatException('input=${x}');
   }
 
   @override
