@@ -737,7 +737,8 @@ class CruzPeer extends PersistentWebSocketClient {
   }
 
   void handleMessage(String message) {
-    if (spec.debugPrint != null) spec.debugPrint('got message ' + message);
+    if (spec.debugPrint != null)
+      debugPrintLong('got message ' + message, spec.debugPrint);
     Map<String, dynamic> json = jsonDecode(message);
     Map<String, dynamic> body = json['body'];
     switch (json['type']) {

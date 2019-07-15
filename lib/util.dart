@@ -32,6 +32,24 @@ Uint8List randBytes(int n) {
   return random;
 }
 
+void debugPrintLong(Object object, StringCallback debugPrint) async {
+  const int maxPrintLength = 1000;
+  if (object == null || object.toString().length <= maxPrintLength) {
+    debugPrint(object);
+  } else {
+    final String text = object.toString();
+    int startIndex = 0, endIndex = maxPrintLength;
+    int remainingLength = text.length;
+    while (endIndex < text.length) {
+       debugPrint(text.substring(startIndex, endIndex));
+       endIndex += maxPrintLength;
+       startIndex += maxPrintLength;
+       remainingLength -= maxPrintLength;
+    }
+    if (remainingLength > 0) debugPrint(text.substring(startIndex));
+  }
+}
+
 class SortedListSet<T> {
   List<T> data;
   int Function(T, T) compare;
