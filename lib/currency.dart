@@ -24,9 +24,10 @@ abstract class Currency {
   String format(num v) => v.toString();
   String formatTime(int time) => time.toString();
   String formatHashRate(int hashesPerSec) {
-    if (hashesPerSec > 1000000000) return '${hashesPerSec ~/ 1000000000} GH/s';
+    if (hashesPerSec > 1000000000)
+      return '${(hashesPerSec / 1000000000).toStringAsFixed(1)} GH/s';
     if (hashesPerSec > 1000000)
-      return '${hashesPerSec ~/ 1000000} MH/s';
+      return '${(hashesPerSec ~/ 1000000).toStringAsFixed(1)} MH/s';
     else
       return '$hashesPerSec H/S';
   }
