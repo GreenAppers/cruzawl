@@ -23,7 +23,12 @@ abstract class Currency {
   String toJson() => ticker;
   String format(num v) => v.toString();
   String formatTime(int time) => time.toString();
-  String formatTarget(BlockId target) => target.toJson();
+  String formatHashRate(int hashesPerSec) {
+    if (hashesPerSec > 1000000000) return '${hashesPerSec~/1000000000} GH/s';
+    if (hashesPerSec > 1000000)    return '${hashesPerSec~/1000000} MH/s';
+    else return '$hashesPerSec H/S';
+  }
+  String suggestedFee(Transaction t) => null;
   num parse(String v) => num.tryParse(v) ?? 0;
 
   String get ticker;
@@ -109,7 +114,16 @@ abstract class Address {
     if (earliestSeen == null || height < earliestSeen) earliestSeen = height;
   }
 
-  static int compareBalance(dynamic a, dynamic b) => b.balance - a.balance;
+  static int compareIndex(dynamic a, dynamic b) {
+    int accountDiff = a.accountId - b.accountId;
+    return accountDiff != 0 ? accountDiff : a.chainIndex - b.chainIndex;
+  }
+
+  static int compareBalance(dynamic a, dynamic b) {
+    int balanceDiff = b.balance - a.balance;
+    return balanceDiff != 0 ? balanceDiff : compareIndex(a, b);
+  }
+
   static Address reduceBalance(Address a, Address b) =>
       b.balance > a.balance ? b : a;
 }
@@ -164,6 +178,7 @@ class TransactionIteratorResults extends TransactionIterator {
 }
 
 abstract class BlockId {
+  Uint8List data;
   String toJson();
 }
 
@@ -178,6 +193,8 @@ abstract class BlockHeader {
   int get transactionCount;
 
   Map<String, dynamic> toJson();
+  int deltaWork(BlockHeader x);
+  int hashRate(BlockHeader X);
 }
 
 abstract class Block {

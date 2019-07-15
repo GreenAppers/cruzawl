@@ -16,7 +16,7 @@ class WebSocket {
   }
 
   void connect(String address, Function onConnected, Function onError,
-      {int timeoutSeconds = 15, bool ignoreBadCert = true}) async {
+      {int timeoutSeconds = 15, bool ignoreBadCert = false}) async {
     if (!ignoreBadCert || !address.startsWith('wss://'))
       return io.WebSocket.connect(address)
           .timeout(Duration(seconds: timeoutSeconds))
@@ -43,7 +43,7 @@ class WebSocket {
       ws = io.WebSocket.fromUpgradedSocket(socket, serverSide: false);
       onConnected(ws);
     } on Exception catch (error) {
-      onError(error, null);
+      onError(error);
     }
   }
 

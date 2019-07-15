@@ -14,7 +14,8 @@ class WebSocket {
   void close() => ws.close();
 
   void connect(String address, Function onConnected, Function onError,
-      {int timeoutSeconds = 15}) {
+      {int timeoutSeconds = 15, bool ignoreBadCert = false}) {
+    assert(!ignoreBadCert);
     try {
       connectCallback = onConnected;
       ws = html.WebSocket(address);

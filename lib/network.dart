@@ -8,29 +8,38 @@ import 'dart:math';
 import 'package:json_annotation/json_annotation.dart';
 
 import 'package:cruzawl/currency.dart';
+import 'package:cruzawl/util.dart';
 
 part 'network.g.dart';
 
-typedef VoidCallback = void Function();
-typedef StringCallback = void Function(String);
 typedef PeerStateChangedCallback = void Function(Peer, PeerState, PeerState);
 
 enum PeerState { ready, connected, connecting, disconnected }
 
 @JsonSerializable()
 class PeerPreference {
-  String name, url, currency;
+  String name, url, currency, options;
   int priority = 100;
 
   @JsonKey(ignore: true)
   StringCallback debugPrint;
 
-  PeerPreference(this.name, this.url, this.currency, {this.debugPrint});
+  PeerPreference(this.name, this.url, this.currency, this.options,
+      {this.debugPrint});
 
   factory PeerPreference.fromJson(Map<String, dynamic> json) =>
       _$PeerPreferenceFromJson(json);
 
   Map<String, dynamic> toJson() => _$PeerPreferenceToJson(this);
+
+  bool get ignoreBadCert =>
+      options != null && options.contains(',ignoreBadCert,');
+
+  static String formatOptions({bool ignoreBadCert = false}) {
+    String options = ',';
+    if (ignoreBadCert) options += 'ignoreBadCert,';
+    return options;
+  }
 
   static int comparePriority(dynamic a, dynamic b) => b.priority - a.priority;
 }
@@ -85,6 +94,14 @@ abstract class Peer {
     if (state != PeerState.disconnected) disconnect('Peer close');
     if (connectTimer != null) connectTimer.cancel();
     connectTimer = null;
+  }
+
+  void handleProtocol(VoidCallback cb) {
+    try {
+      cb();
+    } catch (error, stacktrace) {
+      disconnect('protocol error: $error $stacktrace');
+    }
   }
 
   void connect();

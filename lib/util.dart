@@ -7,7 +7,17 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 
+typedef StringCallback = void Function(String);
+typedef VoidCallback = void Function();
+
 Future<void> voidResult() async {}
+
+bool checkEquals(dynamic x, dynamic y, [StringCallback debugPrint]) {
+  bool equals = x == y;
+  if (debugPrint != null && !equals) debugPrint('assertion failure: $x != $y');
+  assert(x == y, '$x != $y');
+  return equals;
+}
 
 bool equalUint8List(Uint8List x, Uint8List y) {
   if (x.length != y.length) return false;
