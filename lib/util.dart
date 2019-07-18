@@ -41,13 +41,19 @@ void debugPrintLong(Object object, StringCallback debugPrint) async {
     int startIndex = 0, endIndex = maxPrintLength;
     int remainingLength = text.length;
     while (endIndex < text.length) {
-       debugPrint(text.substring(startIndex, endIndex));
-       endIndex += maxPrintLength;
-       startIndex += maxPrintLength;
-       remainingLength -= maxPrintLength;
+      debugPrint(text.substring(startIndex, endIndex));
+      endIndex += maxPrintLength;
+      startIndex += maxPrintLength;
+      remainingLength -= maxPrintLength;
     }
     if (remainingLength > 0) debugPrint(text.substring(startIndex));
   }
+}
+
+class ErrorDetails {
+  dynamic exception;
+  StackTrace stack;
+  ErrorDetails({this.exception, this.stack});
 }
 
 class SortedListSet<T> {
