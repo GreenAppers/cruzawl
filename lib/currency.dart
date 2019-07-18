@@ -54,6 +54,7 @@ abstract class Currency {
   String get ticker;
   int get bip44CoinType;
   PeerNetwork get network;
+  PublicAddress get nullAddress;
 
   String genesisBlockId();
   Address deriveAddress(Uint8List seed, String path,
@@ -75,6 +76,7 @@ class LoadingCurrency extends Currency {
   String get ticker => 'CRUZ';
   int get bip44CoinType => 0;
   PeerNetwork get network => null;
+  PublicAddress get nullAddress => null;
 
   String genesisBlockId() => null;
   Address deriveAddress(Uint8List seed, String path,

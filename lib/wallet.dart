@@ -12,7 +12,6 @@ import 'package:collection/collection.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:sembast/sembast.dart' as sembast;
 import 'package:sembast/sembast_io.dart';
-import 'package:tweetnacl/tweetnacl.dart' as tweetnacl;
 
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/network.dart';

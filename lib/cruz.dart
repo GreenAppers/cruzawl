@@ -53,6 +53,9 @@ class CRUZ extends Currency {
   CruzPeerNetwork network = CruzPeerNetwork();
 
   @override
+  PublicAddress get nullAddress => CruzPublicKey(Uint8List(32));
+
+  @override
   String genesisBlockId() =>
       CruzBlock.fromJson(jsonDecode(genesisBlockJson)).id().toJson();
 
