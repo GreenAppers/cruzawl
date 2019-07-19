@@ -86,6 +86,7 @@ class WalletTest extends TestRunner {
     group('SLIP 0010 Test vector 1 for ed25519', () {
       Wallet wallet = Wallet.fromSeed(
           null,
+          null,
           'TestVector1',
           cruz,
           Seed(hex.decode(

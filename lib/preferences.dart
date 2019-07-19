@@ -12,10 +12,14 @@ import 'package:cruzawl/sembast.dart';
 
 class CruzawlPreferences extends SembastPreferences {
   String walletsPassword;
-  CruzawlPreferences(Database db) : super(db);
+  bool testing;
+  CruzawlPreferences(Database db, {this.testing=false}) : super(db);
 
   String get theme => data['theme'] ?? 'deepOrange';
   set theme(String value) => setPreference('theme', value);
+
+  int get minimumReserveAddress => data['minimumReserveAddress'] ?? 5;
+  set minimumReserveAddress(int value) => setPreference('minimumReserveAddress', value);
 
   bool get networkEnabled => data['networkEnabled'] ?? true;
   set networkEnabled(bool value) => setPreference('networkEnabled', value);

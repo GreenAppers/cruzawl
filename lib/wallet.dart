@@ -11,7 +11,6 @@ import 'package:bip39/bip39.dart';
 import 'package:collection/collection.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:sembast/sembast.dart' as sembast;
-import 'package:sembast/sembast_io.dart';
 
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/network.dart';
@@ -69,8 +68,7 @@ class Wallet {
   int activeAccountId = 0,
       pendingCount = 0,
       maturesHeight = 0,
-      nextAddressIndex,
-      minimumReserveAddress = 5;
+      nextAddressIndex;
   Map<int, Account> accounts = <int, Account>{0: Account(0)};
   Map<String, Address> addresses = <String, Address>{};
   PriorityQueue<Transaction> maturing =
@@ -84,37 +82,48 @@ class Wallet {
   StringCallback debugPrint;
   CruzawlPreferences preferences;
 
-  Wallet.generate(String filename, String name, Currency currency,
+  Wallet.generate(sembast.DatabaseFactory databaseFactory, String filename,
+      String name, Currency currency,
       [CruzawlPreferences prefs, StringCallback debug, WalletCallback loaded])
-      : this.fromSeedPhrase(
-            filename, name, currency, generateMnemonic(), prefs, debug, loaded);
+      : this.fromSeedPhrase(databaseFactory, filename, name, currency,
+            generateMnemonic(), prefs, debug, loaded);
 
-  Wallet.fromSeedPhrase(
+  Wallet.fromSeedPhrase(sembast.DatabaseFactory databaseFactory,
       String filename, String name, Currency currency, String seedPhrase,
       [CruzawlPreferences prefs, StringCallback debug, WalletCallback loaded])
-      : this.fromSeed(filename, name, currency,
+      : this.fromSeed(databaseFactory, filename, name, currency,
             Seed(mnemonicToSeed(seedPhrase)), seedPhrase, prefs, debug, loaded);
 
-  Wallet.fromSeed(String filename, this.name, this.currency, this.seed,
+  Wallet.fromSeed(sembast.DatabaseFactory databaseFactory, String filename,
+      this.name, this.currency, this.seed,
       [this.seedPhrase,
       this.preferences,
       this.debugPrint,
       WalletCallback loaded]) {
-    if (filename != null) openWalletStorage(filename, true, loaded);
-  }
-
-  Wallet.fromPrivateKeyList(String filename, this.name, this.currency,
-      this.seed, List<PrivateKey> privateKeys,
-      [this.preferences, this.debugPrint, WalletCallback loaded]) {
     if (filename != null)
-      openWalletStorage(filename, true, loaded, privateKeys);
+      openWalletStorage(databaseFactory, filename, true, loaded);
   }
 
-  Wallet.fromFile(String filename, this.seed,
+  Wallet.fromPrivateKeyList(
+      sembast.DatabaseFactory databaseFactory,
+      String filename,
+      this.name,
+      this.currency,
+      this.seed,
+      List<PrivateKey> privateKeys,
+      [this.preferences,
+      this.debugPrint,
+      WalletCallback loaded]) {
+    if (filename != null)
+      openWalletStorage(databaseFactory, filename, true, loaded, privateKeys);
+  }
+
+  Wallet.fromFile(
+      sembast.DatabaseFactory databaseFactory, String filename, this.seed,
       [this.preferences, this.debugPrint, WalletCallback loaded])
       : name = 'loading',
         currency = const LoadingCurrency() {
-    openWalletStorage(filename, false, loaded);
+    openWalletStorage(databaseFactory, filename, false, loaded);
   }
 
   bool get hdWallet => seedPhrase != null;
@@ -186,13 +195,15 @@ class Wallet {
     return x;
   }
 
-  Future<void> openWalletStorage(String filename, bool create,
+  Future<void> openWalletStorage(
+      sembast.DatabaseFactory databaseFactory, String filename, bool create,
       [WalletCallback opened, List<PrivateKey> privateKeys]) async {
+    bool testing = preferences != null && preferences.testing;
     try {
       debugPrint((create ? 'Creating' : 'Opening') + ' wallet $filename ...');
-      if (create && await File(filename).exists())
+      if (create && !testing && await File(filename).exists())
         throw FileSystemException('$filename already exists');
-      storage = await databaseFactoryIo.openDatabase(filename,
+      storage = await databaseFactory.openDatabase(filename,
           codec: getSalsa20SembastCodec(
               Uint8List.fromList(seed.data.sublist(32))));
       walletStore = sembast.StoreRef<String, dynamic>.main();
@@ -217,23 +228,19 @@ class Wallet {
     }
 
     if (hdWallet) {
-      await storage.transaction((txn) async {
-        for (Account account in accounts.values)
-          while (account.reserveAddress.length < minimumReserveAddress) {
-            addNextAddress(account: account, load: false, txn: txn);
-            await Future.delayed(Duration(seconds: 0));
-          }
-      });
+      for (Account account in accounts.values)
+        while (account.reserveAddress.length < (preferences.minimumReserveAddress ?? 5)) {
+          addNextAddress(account: account, load: false);
+          await Future.delayed(Duration(seconds: 0));
+        }
     }
 
     if (privateKeys != null) {
       if (privateKeys.length <= 0) return;
-      await storage.transaction((txn) async {
-        for (PrivateKey key in privateKeys) {
-          addAddress(currency.fromPrivateKey(key), load: false, txn: txn);
-          await Future.delayed(Duration(seconds: 0));
-        }
-      });
+      for (PrivateKey key in privateKeys) {
+        addAddress(currency.fromPrivateKey(key), load: false);
+        await Future.delayed(Duration(seconds: 0));
+      }
     }
 
     if (opened != null) opened(this);
