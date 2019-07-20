@@ -15,7 +15,7 @@ class CruzawlPreferences extends SembastPreferences {
   bool testing;
   CruzawlPreferences(Database db, {this.testing=false}) : super(db);
 
-  String get theme => data['theme'] ?? 'deepOrange';
+  String get theme => data['theme'] ?? 'teal';
   set theme(String value) => setPreference('theme', value);
 
   int get minimumReserveAddress => data['minimumReserveAddress'] ?? 5;
