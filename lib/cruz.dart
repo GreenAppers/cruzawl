@@ -73,6 +73,12 @@ class CRUZ extends Currency {
   }
 
   @override
+  CruzAddress fromPublicKey(PublicAddress addr) {
+    CruzPublicKey key = CruzPublicKey.fromJson(addr.toJson());
+    return CruzAddress.fromPublicKey(key);
+  }
+
+  @override
   CruzAddress fromPrivateKey(PrivateKey key) => CruzAddress.fromPrivateKey(key);
 
   @override
@@ -303,9 +309,13 @@ class CruzAddress extends Address {
   num newMaturesBalance;
 
   CruzAddress(this.publicKey, this.privateKey, this.chainCode) {
-    if (!equalUint8List(publicKey.data, privateKey.getPublicKey().data))
+    if (publicKey == null ||
+        (privateKey != null &&
+            !equalUint8List(publicKey.data, privateKey.getPublicKey().data)))
       throw FormatException();
   }
+
+  CruzAddress.fromPublicKey(this.publicKey);
 
   CruzAddress.fromPrivateKey(this.privateKey) {
     publicKey = privateKey.getPublicKey();
@@ -326,8 +336,10 @@ class CruzAddress extends Address {
   @override
   Map<String, dynamic> toJson() => _$CruzAddressToJson(this);
 
-  bool verify() => equalUint8List(
-      privateKey.getPublicKey().data, privateKey.derivePublicKey().data);
+  bool verify() =>
+      privateKey != null &&
+      equalUint8List(
+          privateKey.getPublicKey().data, privateKey.derivePublicKey().data);
 }
 
 class CruzBlockId extends BlockId {

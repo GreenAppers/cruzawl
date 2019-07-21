@@ -60,6 +60,7 @@ abstract class Currency {
   Address deriveAddress(Uint8List seed, String path,
       [StringCallback debugPrint]);
   Address fromPrivateKey(PrivateKey key);
+  Address fromPublicKey(PublicAddress key);
   Address fromAddressJson(Map<String, dynamic> json);
   PublicAddress fromPublicAddressJson(String text);
   PrivateKey fromPrivateKeyJson(String text);
@@ -83,6 +84,7 @@ class LoadingCurrency extends Currency {
           [StringCallback debugPrint]) =>
       null;
   Address fromPrivateKey(PrivateKey key) => null;
+  Address fromPublicKey(PublicAddress key) => null;
   Address fromAddressJson(Map<String, dynamic> json) => null;
   PublicAddress fromPublicAddressJson(String text) => null;
   PrivateKey fromPrivateKeyJson(String text) => null;

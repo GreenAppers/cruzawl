@@ -118,6 +118,21 @@ class Wallet {
       openWalletStorage(databaseFactory, filename, true, loaded, privateKeys);
   }
 
+  Wallet.fromPublicKeyList(
+      sembast.DatabaseFactory databaseFactory,
+      String filename,
+      this.name,
+      this.currency,
+      this.seed,
+      List<PublicAddress> publicKeys,
+      [this.preferences,
+      this.debugPrint,
+      WalletCallback loaded]) {
+    if (filename != null)
+      openWalletStorage(
+          databaseFactory, filename, true, loaded, null, publicKeys);
+  }
+
   Wallet.fromFile(
       sembast.DatabaseFactory databaseFactory, String filename, this.seed,
       [this.preferences, this.debugPrint, WalletCallback loaded])
@@ -197,7 +212,9 @@ class Wallet {
 
   Future<void> openWalletStorage(
       sembast.DatabaseFactory databaseFactory, String filename, bool create,
-      [WalletCallback opened, List<PrivateKey> privateKeys]) async {
+      [WalletCallback opened,
+      List<PrivateKey> privateKeys,
+      List<PublicAddress> publicKeys]) async {
     bool testing = preferences != null && preferences.testing;
     try {
       debugPrint((create ? 'Creating' : 'Opening') + ' wallet $filename ...');
@@ -229,16 +246,21 @@ class Wallet {
 
     if (hdWallet) {
       for (Account account in accounts.values)
-        while (account.reserveAddress.length < (preferences.minimumReserveAddress ?? 5)) {
+        while (account.reserveAddress.length <
+            (preferences.minimumReserveAddress ?? 5)) {
           addNextAddress(account: account, load: false);
           await Future.delayed(Duration(seconds: 0));
         }
-    }
-
-    if (privateKeys != null) {
+    } else if (privateKeys != null) {
       if (privateKeys.length <= 0) return;
       for (PrivateKey key in privateKeys) {
         addAddress(currency.fromPrivateKey(key), load: false);
+        await Future.delayed(Duration(seconds: 0));
+      }
+    } else if (publicKeys != null) {
+      if (publicKeys.length <= 0) return;
+      for (PublicAddress key in publicKeys) {
+        addAddress(currency.fromPublicKey(key), load: false);
         await Future.delayed(Duration(seconds: 0));
       }
     }
@@ -401,7 +423,10 @@ class Wallet {
     for (Transaction transaction in results.transactions)
       updateTransaction(transaction, newTransaction: false);
 
-    if (results.height == x.loadedHeight && results.index == x.loadedIndex) {
+    if (x.loadedHeight != null &&
+        (results.height > x.loadedHeight ||
+            (results.height == x.loadedHeight &&
+                results.index > x.loadedIndex))) {
       x.loadedHeight = x.loadedIndex = 0;
     } else {
       x.loadedHeight = results.height;

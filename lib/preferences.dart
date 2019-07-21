@@ -13,13 +13,14 @@ import 'package:cruzawl/sembast.dart';
 class CruzawlPreferences extends SembastPreferences {
   String walletsPassword;
   bool testing;
-  CruzawlPreferences(Database db, {this.testing=false}) : super(db);
+  CruzawlPreferences(Database db, {this.testing = false}) : super(db);
 
   String get theme => data['theme'] ?? 'teal';
   set theme(String value) => setPreference('theme', value);
 
   int get minimumReserveAddress => data['minimumReserveAddress'] ?? 5;
-  set minimumReserveAddress(int value) => setPreference('minimumReserveAddress', value);
+  set minimumReserveAddress(int value) =>
+      setPreference('minimumReserveAddress', value);
 
   bool get networkEnabled => data['networkEnabled'] ?? true;
   set networkEnabled(bool value) => setPreference('networkEnabled', value);
@@ -67,7 +68,7 @@ class CruzawlPreferences extends SembastPreferences {
     var peers = data['peers'];
     if (peers == null)
       return <PeerPreference>[
-        PeerPreference('SatoshiLocomo', 'wallet.cruzbit.xyz', 'CRUZ', '')
+        PeerPreference('Satoshi Locomoco', 'wallet.cruzbit.xyz', 'CRUZ', '')
       ];
     return peers.map<PeerPreference>((v) => PeerPreference.fromJson(v)).toList()
       ..sort(PeerPreference.comparePriority);
