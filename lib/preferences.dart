@@ -25,6 +25,9 @@ class CruzawlPreferences extends SembastPreferences {
   bool get networkEnabled => data['networkEnabled'] ?? true;
   set networkEnabled(bool value) => setPreference('networkEnabled', value);
 
+  bool get debugLog => data['debugLog'] ?? false;
+  set debugLog(bool value) => setPreference('debugLog', value);
+
   bool get insecureDeviceWarning => data['insecureDeviceWarning'] ?? true;
   set insecureDeviceWarning(bool value) =>
       setPreference('insecureDeviceWarning', value);
