@@ -21,6 +21,8 @@ import 'package:cruzawl/websocket.dart';
 
 part 'cruz.g.dart';
 
+/// cruzbit: A simple decentralized peer-to-peer ledger implementation
+/// https://github.com/cruzbit/cruzbit
 class CRUZ extends Currency {
   static const int cruzbitsPerCruz = 100000000;
   static const int blocksUntilNewSeries = 1008; // 1 week in blocks
@@ -37,10 +39,6 @@ class CRUZ extends Currency {
       v != null ? (v / cruzbitsPerCruz).toStringAsFixed(2) : '0';
 
   @override
-  String formatTime(int time) =>
-      DateTime.fromMillisecondsSinceEpoch(time * 1000).toString();
-
-  @override
   String suggestedFee(Transaction t) => '0.01';
 
   @override
@@ -55,10 +53,12 @@ class CRUZ extends Currency {
   @override
   PublicAddress get nullAddress => CruzPublicKey(Uint8List(32));
 
+  /// https://www.cruzbase.com/#/height/0
   @override
   String genesisBlockId() =>
       CruzBlock.fromJson(jsonDecode(genesisBlockJson)).id().toJson();
 
+  /// SLIP-0010: Universal private key derivation from master private key
   @override
   CruzAddress deriveAddress(Uint8List seed, String path,
       [StringCallback debugPrint]) {
@@ -72,19 +72,23 @@ class CRUZ extends Currency {
         CruzChainCode(data.chainCode));
   }
 
+  /// For Watch-only wallets
   @override
   CruzAddress fromPublicKey(PublicAddress addr) {
     CruzPublicKey key = CruzPublicKey.fromJson(addr.toJson());
     return CruzAddress.fromPublicKey(key);
   }
 
+  /// For non-HD wallets
   @override
   CruzAddress fromPrivateKey(PrivateKey key) => CruzAddress.fromPrivateKey(key);
 
+  /// For loading wallet from storage
   @override
   CruzAddress fromAddressJson(Map<String, dynamic> json) =>
       CruzAddress.fromJson(json);
 
+  /// Parse CRUZ public key
   @override
   PublicAddress fromPublicAddressJson(String text) {
     try {
@@ -96,16 +100,20 @@ class CRUZ extends Currency {
     }
   }
 
+  /// Parse CRUZ private key
   @override
   PrivateKey fromPrivateKeyJson(String text) => CruzPrivateKey.fromJson(text);
 
+  /// Parse CRUZ transaction id
   TransactionId fromTransactionIdJson(String text) =>
       CruzTransactionId.fromJson(text);
 
+  /// Parse CRUZ transaction
   @override
   Transaction fromTransactionJson(Map<String, dynamic> json) =>
       CruzTransaction.fromJson(json);
 
+  /// Create signed CRUZ transaction
   @override
   Transaction signedTransaction(Address fromInput, PublicAddress toInput,
       num amount, num fee, String memo, int height,
@@ -120,6 +128,7 @@ class CRUZ extends Currency {
   }
 }
 
+/// Ed25519 public key, 32 bytes
 class CruzPublicKey extends PublicAddress {
   final Uint8List data;
   static const int size = 32;
@@ -134,6 +143,7 @@ class CruzPublicKey extends PublicAddress {
   String toJson() => base64.encode(data);
 }
 
+/// Ed25519 private key (pair), 64 bytes
 class CruzPrivateKey extends PrivateKey {
   final Uint8List data;
   static const int size = 64;
@@ -147,14 +157,17 @@ class CruzPrivateKey extends PrivateKey {
   @override
   String toJson() => base64.encode(data);
 
+  /// The second half of an Ed25519 private key is the public key
   CruzPublicKey getPublicKey() =>
       CruzPublicKey(data.buffer.asUint8List(size - CruzPublicKey.size));
 
+  /// Used to verify the key pair
   CruzPublicKey derivePublicKey() => CruzPublicKey(
       tweetnacl.Signature.keyPair_fromSeed(data.buffer.asUint8List(0, 32))
           .publicKey);
 }
 
+/// Ed25519 signature, 64 bytes
 class CruzSignature extends Signature {
   final Uint8List data;
   static const int size = 64;
@@ -168,6 +181,7 @@ class CruzSignature extends Signature {
   String toJson() => base64.encode(data);
 }
 
+/// SLIP-0010 chain code
 class CruzChainCode extends ChainCode {
   final Uint8List data;
   static const int size = 32;
@@ -182,6 +196,7 @@ class CruzChainCode extends ChainCode {
   String toJson() => base64.encode(data);
 }
 
+/// SHA3-256 of the CRUZ transaction JSON
 class CruzTransactionId extends TransactionId {
   final Uint8List data;
   static const int size = 32;
@@ -199,6 +214,7 @@ class CruzTransactionId extends TransactionId {
   String toJson() => hex.encode(data);
 }
 
+/// Reference https://github.com/cruzbit/cruzbit/blob/master/transaction.go
 @JsonSerializable(includeIfNull: false)
 class CruzTransaction extends Transaction {
   int time;
@@ -279,6 +295,7 @@ class CruzTransaction extends Transaction {
   }
 }
 
+/// CRUZ implementation of the [Wallet] entry [Address] abstraction
 @JsonSerializable(includeIfNull: false)
 class CruzAddress extends Address {
   @override
@@ -342,6 +359,7 @@ class CruzAddress extends Address {
           privateKey.getPublicKey().data, privateKey.derivePublicKey().data);
 }
 
+// SHA3-256 of CRUZ block JSON
 class CruzBlockId extends BlockId {
   final Uint8List data;
   static const int size = 32;
@@ -372,6 +390,7 @@ class CruzBlockIds {
   Map<String, dynamic> toJson() => _$CruzBlockIdsToJson(this);
 }
 
+// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go
 @JsonSerializable()
 class CruzBlockHeader extends BlockHeader {
   @override
@@ -417,6 +436,7 @@ class CruzBlockHeader extends BlockHeader {
           .toInt();
 }
 
+// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go
 @JsonSerializable()
 class CruzBlock extends Block {
   @override
@@ -436,6 +456,7 @@ class CruzBlock extends Block {
   CruzBlockId id() => header.id();
 }
 
+/// CRUZ implementation of the [PeerNetwork] abstraction
 class CruzPeerNetwork extends PeerNetwork {
   @override
   String parseUri(String uriText, String genesisId) {
@@ -450,6 +471,7 @@ class CruzPeerNetwork extends PeerNetwork {
       addPeer(CruzPeer(spec, parseUri(spec.url, genesisBlockId)));
 }
 
+/// CRUZ implementation of the [PeerNetwork] entry [Peer] abstraction
 class CruzPeer extends PersistentWebSocketClient {
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
@@ -815,6 +837,7 @@ class CruzPeer extends PersistentWebSocketClient {
   }
 }
 
+/// https://www.cruzbase.com/#/height/0
 const String genesisBlockJson = '''{
   "header": {
     "previous": "0000000000000000000000000000000000000000000000000000000000000000",

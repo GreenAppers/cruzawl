@@ -20,6 +20,7 @@ import 'package:cruzawl/util.dart';
 
 part 'wallet.g.dart';
 
+/// BIP44 account
 @JsonSerializable(includeIfNull: false)
 class Account {
   int id, nextIndex = 0;
@@ -44,6 +45,7 @@ class Account {
   Map<String, dynamic> toJson() => _$AccountToJson(this);
 }
 
+/// SLIP-0010 seed
 class Seed {
   final Uint8List data;
   static const int size = 64;
@@ -82,18 +84,21 @@ class Wallet {
   StringCallback debugPrint;
   CruzawlPreferences preferences;
 
+  /// Generate new HD [Wallet]
   Wallet.generate(sembast.DatabaseFactory databaseFactory, String filename,
       String name, Currency currency,
       [CruzawlPreferences prefs, StringCallback debug, WalletCallback loaded])
       : this.fromSeedPhrase(databaseFactory, filename, name, currency,
             generateMnemonic(), prefs, debug, loaded);
 
+  /// Generate HD [Wallet] from BIP-0039 mnemonic code
   Wallet.fromSeedPhrase(sembast.DatabaseFactory databaseFactory,
       String filename, String name, Currency currency, String seedPhrase,
       [CruzawlPreferences prefs, StringCallback debug, WalletCallback loaded])
       : this.fromSeed(databaseFactory, filename, name, currency,
             Seed(mnemonicToSeed(seedPhrase)), seedPhrase, prefs, debug, loaded);
 
+  /// Generate HD [Wallet] from SLIP-0010 seed
   Wallet.fromSeed(sembast.DatabaseFactory databaseFactory, String filename,
       this.name, this.currency, this.seed,
       [this.seedPhrase,
@@ -104,6 +109,7 @@ class Wallet {
       openWalletStorage(databaseFactory, filename, true, loaded);
   }
 
+  /// Create non-HD [Wallet] from private key list
   Wallet.fromPrivateKeyList(
       sembast.DatabaseFactory databaseFactory,
       String filename,
@@ -118,6 +124,7 @@ class Wallet {
       openWalletStorage(databaseFactory, filename, true, loaded, privateKeys);
   }
 
+  /// Create watch-only [Wallet] from public key list
   Wallet.fromPublicKeyList(
       sembast.DatabaseFactory databaseFactory,
       String filename,

@@ -8,6 +8,7 @@ import 'package:cruzawl/cruz.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/util.dart';
 
+/// Interface [Wallet] interacts with, potentially supports multiple cryptos
 abstract class Currency {
   const Currency();
 
@@ -20,41 +21,16 @@ abstract class Currency {
     }
   }
 
-  String toJson() => ticker;
-  String format(num v) => v.toString();
-  String formatTime(int time) => time.toString();
-  String formatHashRate(int hashesPerSec) {
-    if (hashesPerSec > 1000000000)
-      return '${(hashesPerSec / 1000000000).toStringAsFixed(1)} GH/s';
-    if (hashesPerSec > 1000000)
-      return '${(hashesPerSec ~/ 1000000).toStringAsFixed(1)} MH/s';
-    else
-      return '$hashesPerSec H/S';
-  }
-
-  String formatDuration(Duration duration) {
-    if (duration.inDays >= 1)
-      return duration.inDays == 1 ? 'day' : '${duration.inDays} days';
-    if (duration.inHours >= 1)
-      return duration.inHours == 1 ? 'hour' : '${duration.inHours} hours';
-    if (duration.inMinutes >= 1)
-      return duration.inMinutes == 1
-          ? 'minute'
-          : '${duration.inMinutes} minutes';
-    if (duration.inSeconds >= 1)
-      return duration.inSeconds == 1
-          ? 'second'
-          : '${duration.inSeconds} seconds';
-    return duration.toString();
-  }
-
-  String suggestedFee(Transaction t) => null;
-  num parse(String v) => num.tryParse(v) ?? 0;
-
   String get ticker;
   int get bip44CoinType;
   PeerNetwork get network;
   PublicAddress get nullAddress;
+
+  String toJson() => ticker;
+  String format(num v) => v.toString();
+  num parse(String v) => num.tryParse(v) ?? 0;
+  DateTime parseTime(int time) => DateTime.fromMillisecondsSinceEpoch(time * 1000);
+  String suggestedFee(Transaction t) => null;
 
   String genesisBlockId();
   Address deriveAddress(Uint8List seed, String path,
@@ -71,6 +47,7 @@ abstract class Currency {
       {int matures, int expires});
 }
 
+/// Placeholder [Currency] used during [Wallet] loading
 class LoadingCurrency extends Currency {
   const LoadingCurrency();
 
