@@ -26,13 +26,15 @@ part 'cruz.g.dart';
 class CRUZ extends Currency {
   static const int cruzbitsPerCruz = 100000000;
   static const int blocksUntilNewSeries = 1008; // 1 week in blocks
-  static const int coinbaseMaturity = 100;
 
   @override
   String get ticker => 'CRUZ';
 
   @override
   int get bip44CoinType => 831;
+
+  @override
+  int get coinbaseMaturity => 100;
 
   @override
   String format(num v) =>

@@ -23,13 +23,15 @@ abstract class Currency {
 
   String get ticker;
   int get bip44CoinType;
+  int get coinbaseMaturity;
   PeerNetwork get network;
   PublicAddress get nullAddress;
 
   String toJson() => ticker;
   String format(num v) => v.toString();
   num parse(String v) => num.tryParse(v) ?? 0;
-  DateTime parseTime(int time) => DateTime.fromMillisecondsSinceEpoch(time * 1000);
+  DateTime parseTime(int time) =>
+      DateTime.fromMillisecondsSinceEpoch(time * 1000);
   String suggestedFee(Transaction t) => null;
 
   String genesisBlockId();
@@ -53,6 +55,7 @@ class LoadingCurrency extends Currency {
 
   String get ticker => 'CRUZ';
   int get bip44CoinType => 0;
+  int get coinbaseMaturity => 0;
   PeerNetwork get network => null;
   PublicAddress get nullAddress => null;
 

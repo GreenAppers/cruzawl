@@ -61,24 +61,101 @@ class Seed {
 
 typedef WalletCallback = void Function(Wallet);
 
-class Wallet {
+abstract class WalletStorage {
   String name, seedPhrase;
   Seed seed;
   Currency currency;
   sembast.Database storage;
-  num balance = 0, maturesBalance = 0;
-  int activeAccountId = 0,
-      pendingCount = 0,
-      maturesHeight = 0,
-      nextAddressIndex;
+  var walletStore, accountStore, addressStore, pendingStore;
   Map<int, Account> accounts = <int, Account>{0: Account(0)};
   Map<String, Address> addresses = <String, Address>{};
+  int pendingCount = 0;
+  num balance = 0;
+
+  WalletStorage(this.name, this.currency, this.seed, [this.seedPhrase]);
+
+  Account addAccount(Account x, {bool store = true});
+  Address addAddress(Address x,
+      {bool store = true, bool load = true, sembast.Transaction txn});
+  void updateTransaction(Transaction transaction,
+      {bool newTransaction = true});
+
+  Future<void> storeHeader() async {
+    await walletStore.record('header').put(
+        storage,
+        jsonDecode(jsonEncode(<String, dynamic>{
+          'name': name,
+          'seed': seed,
+          'seedPhrase': seedPhrase,
+          'currency': currency,
+        })));
+  }
+
+  Future<void> readStoredHeader() async {
+    var header = await walletStore.record('header').get(storage);
+    name = header['name'] as String;
+    seed = Seed.fromJson(header['seed']);
+    seedPhrase = header['seedPhrase'] as String;
+    currency = Currency.fromJson(header['currency']);
+  }
+
+  Future<void> storeAccount(Account x, [sembast.Transaction txn]) async {
+    await accountStore.record(x.id).put(txn ?? storage, x.toJson());
+  }
+
+  Future<void> readStoredAccounts() async {
+    var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
+    var records = await accountStore.find(storage, finder: finder);
+    for (var record in records)
+      addAccount(Account.fromJson(record.value), store: false);
+  }
+
+  Future<void> storeAddress(Address x, [sembast.Transaction txn]) async {
+    await addressStore
+        .record(x.publicKey.toJson())
+        .put(txn ?? storage, jsonDecode(jsonEncode(x)));
+  }
+
+  Future<void> readStoredAddresses({bool load = true}) async {
+    var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
+    var records = await addressStore.find(storage, finder: finder);
+    for (var record in records) {
+      Address x = addAddress(currency.fromAddressJson(record.value),
+          store: false, load: load);
+      accounts[x.accountId].balance += x.balance;
+      balance += x.balance;
+    }
+  }
+
+  Future<void> removePendingTransaction(String id) async =>
+      pendingStore.record(id).delete(storage);
+
+  Future<void> storePendingTransaction(Transaction tx) async {
+    String id = tx.id().toJson();
+    await pendingStore.record(id).put(storage, jsonDecode(jsonEncode(tx)));
+  }
+
+  Future<void> readPendingTransactions() async {
+    var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
+    var records = await pendingStore.find(storage, finder: finder);
+    for (var record in records) {
+      updateTransaction(currency.fromTransactionJson(record.value),
+          newTransaction: false);
+      pendingCount++;
+    }
+  }
+}
+
+class Wallet extends WalletStorage {
+  num maturesBalance = 0;
+  int activeAccountId = 0,
+      maturesHeight = 0,
+      nextAddressIndex;
   PriorityQueue<Transaction> maturing =
       PriorityQueue<Transaction>(Transaction.maturityCompare);
   SortedListSet<Transaction> transactions =
       SortedListSet<Transaction>(Transaction.timeCompare, List<Transaction>());
   Map<String, Transaction> transactionIds = Map<String, Transaction>();
-  var walletStore, accountStore, addressStore, pendingStore;
   VoidCallback notifyListeners, balanceChanged;
   ErrorDetails fatal;
   StringCallback debugPrint;
@@ -100,11 +177,12 @@ class Wallet {
 
   /// Generate HD [Wallet] from SLIP-0010 seed
   Wallet.fromSeed(sembast.DatabaseFactory databaseFactory, String filename,
-      this.name, this.currency, this.seed,
-      [this.seedPhrase,
+      String name, Currency currency, Seed seed,
+      [String seedPhrase,
       this.preferences,
       this.debugPrint,
-      WalletCallback loaded]) {
+      WalletCallback loaded])
+      : super(name, currency, seed, seedPhrase) {
     if (filename != null)
       openWalletStorage(databaseFactory, filename, true, loaded);
   }
@@ -113,13 +191,14 @@ class Wallet {
   Wallet.fromPrivateKeyList(
       sembast.DatabaseFactory databaseFactory,
       String filename,
-      this.name,
-      this.currency,
-      this.seed,
+      String name,
+      Currency currency,
+      Seed seed,
       List<PrivateKey> privateKeys,
       [this.preferences,
       this.debugPrint,
-      WalletCallback loaded]) {
+      WalletCallback loaded])
+      : super(name, currency, seed) {
     if (filename != null)
       openWalletStorage(databaseFactory, filename, true, loaded, privateKeys);
   }
@@ -128,23 +207,23 @@ class Wallet {
   Wallet.fromPublicKeyList(
       sembast.DatabaseFactory databaseFactory,
       String filename,
-      this.name,
-      this.currency,
-      this.seed,
+      String name,
+      Currency currency,
+      Seed seed,
       List<PublicAddress> publicKeys,
       [this.preferences,
       this.debugPrint,
-      WalletCallback loaded]) {
+      WalletCallback loaded])
+      : super(name, currency, seed) {
     if (filename != null)
       openWalletStorage(
           databaseFactory, filename, true, loaded, null, publicKeys);
   }
 
   Wallet.fromFile(
-      sembast.DatabaseFactory databaseFactory, String filename, this.seed,
+      sembast.DatabaseFactory databaseFactory, String filename, Seed seed,
       [this.preferences, this.debugPrint, WalletCallback loaded])
-      : name = 'loading',
-        currency = const LoadingCurrency() {
+      : super('loading', const LoadingCurrency(), seed) {
     openWalletStorage(databaseFactory, filename, false, loaded);
   }
 
@@ -187,6 +266,7 @@ class Wallet {
         load: load, txn: txn);
   }
 
+  /// Store address & filter for it
   Address addAddress(Address x,
       {bool store = true, bool load = true, sembast.Transaction txn}) {
     if (preferences != null &&
@@ -277,71 +357,6 @@ class Wallet {
     reload();
   }
 
-  Future<void> storeHeader() async {
-    await walletStore.record('header').put(
-        storage,
-        jsonDecode(jsonEncode(<String, dynamic>{
-          'name': name,
-          'seed': seed,
-          'seedPhrase': seedPhrase,
-          'currency': currency,
-        })));
-  }
-
-  Future<void> readStoredHeader() async {
-    var header = await walletStore.record('header').get(storage);
-    name = header['name'] as String;
-    seed = Seed.fromJson(header['seed']);
-    seedPhrase = header['seedPhrase'] as String;
-    currency = Currency.fromJson(header['currency']);
-  }
-
-  Future<void> storeAccount(Account x, [sembast.Transaction txn]) async {
-    await accountStore.record(x.id).put(txn ?? storage, x.toJson());
-  }
-
-  Future<void> readStoredAccounts() async {
-    var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
-    var records = await accountStore.find(storage, finder: finder);
-    for (var record in records)
-      addAccount(Account.fromJson(record.value), store: false);
-  }
-
-  Future<void> storeAddress(Address x, [sembast.Transaction txn]) async {
-    await addressStore
-        .record(x.publicKey.toJson())
-        .put(txn ?? storage, jsonDecode(jsonEncode(x)));
-  }
-
-  Future<void> readStoredAddresses({bool load = true}) async {
-    var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
-    var records = await addressStore.find(storage, finder: finder);
-    for (var record in records) {
-      Address x = addAddress(currency.fromAddressJson(record.value),
-          store: false, load: load);
-      accounts[x.accountId].balance += x.balance;
-      balance += x.balance;
-    }
-  }
-
-  Future<void> removePendingTransaction(String id) async =>
-      pendingStore.record(id).delete(storage);
-
-  Future<void> storePendingTransaction(Transaction tx) async {
-    String id = tx.id().toJson();
-    await pendingStore.record(id).put(storage, jsonDecode(jsonEncode(tx)));
-  }
-
-  Future<void> readPendingTransactions() async {
-    var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
-    var records = await pendingStore.find(storage, finder: finder);
-    for (var record in records) {
-      updateTransaction(currency.fromTransactionJson(record.value),
-          newTransaction: false);
-      pendingCount++;
-    }
-  }
-
   void expirePendingTransactions(int height) async {
     var finder = sembast.Finder(
       filter: sembast.Filter.lessThan('expires', height),
@@ -402,7 +417,8 @@ class Wallet {
     do {
       // Load most recent 100 blocks worth of transactions
       if (await getNextTransactions(peer, x) == null) return voidResult();
-    } while (x.loadedHeight > max(0, peer.tip.height - 100));
+    } while (
+        x.loadedHeight > max(0, peer.tip.height - currency.coinbaseMaturity));
 
     /// [Address] [newBalance] and [newMatureBalance] account for possibly
     /// receiving new transactions for [x] as we're loading
@@ -450,7 +466,8 @@ class Wallet {
 
   void updateTransaction(Transaction transaction,
       {bool newTransaction = true}) {
-    bool undo = transaction.height < 0, transactionsChanged;
+    int height = transaction.height ?? 0;
+    bool undo = height < 0, transactionsChanged;
     if (undo) {
       transactionsChanged = transactions.remove(transaction);
       transactionIds.remove(transaction.id().toJson());
@@ -465,11 +482,11 @@ class Wallet {
         transaction.from == null ? null : addresses[transaction.from.toJson()];
     Address to = addresses[transaction.to.toJson()];
     if (from != null) {
-      if (transaction.height > 0) from.updateSeenHeight(transaction.height);
+      if (height > 0) from.updateSeenHeight(height);
       updateAddressState(from, AddressState.used, store: !balanceChanged);
     }
     if (to != null) {
-      if (transaction.height > 0) to.updateSeenHeight(transaction.height);
+      if (height > 0) to.updateSeenHeight(height);
       updateAddressState(to, AddressState.used, store: !balanceChanged);
     }
 
