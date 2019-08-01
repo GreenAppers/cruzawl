@@ -27,6 +27,8 @@ class WebSocket {
     client.badCertificateCallback =
         (io.X509Certificate cert, String host, int port) => true;
 
+    /// Upgrade https to wss using [badCertificateCallback] to allow
+    /// self-signed certificates.  This still gains you stream encryption.
     try {
       io.HttpClientRequest request =
           await client.getUrl(Uri.parse('https' + address.substring(3)));

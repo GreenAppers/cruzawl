@@ -61,14 +61,17 @@ class SortedListSet<T> {
   int Function(T, T) compare;
   SortedListSet(this.compare, this.data);
 
+  bool get isEmpty => data.isEmpty;
   int get length => data.length;
+  T get first => data.first;
+  T get last => data.last;
 
   void clear() => data.clear();
 
-  bool add(T value) {
+  bool add(T value, {bool overwrite=true}) {
     int index = lowerBound(data, value, compare: compare);
     if (index < data.length && compare(data[index], value) == 0) {
-      data[index] = value;
+      if (overwrite) data[index] = value;
       return false;
     } else {
       data.insert(index, value);

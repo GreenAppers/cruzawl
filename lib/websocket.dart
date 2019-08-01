@@ -9,6 +9,7 @@ import 'websocket_html.dart' if (dart.library.io) 'websocket_io.dart';
 
 typedef JsonCallback = void Function(Map<String, dynamic>);
 
+/// [Peer] integrating [html.Websocket] and [io.WebSocket]
 abstract class PersistentWebSocketClient extends Peer {
   String address;
   int autoReconnectSeconds;

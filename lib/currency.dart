@@ -199,6 +199,8 @@ abstract class BlockHeader {
   Map<String, dynamic> toJson();
   int deltaWork(BlockHeader x);
   int hashRate(BlockHeader X);
+
+  static int compareHeight(dynamic a, dynamic b) => b.height - a.height;
 }
 
 abstract class Block {

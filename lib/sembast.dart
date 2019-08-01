@@ -10,6 +10,7 @@ import 'package:tweetnacl/tweetnacl.dart';
 
 import 'package:cruzawl/util.dart';
 
+/// Not [SharedPreferences] but [SembastPreferences] !
 class SembastPreferences {
   Database db;
   var store;
@@ -38,6 +39,7 @@ class SembastPreferences {
   }
 }
 
+/// https://github.com/tekartik/sembast.dart/issues/35#issuecomment-498005269
 class Salsa20Encoder extends Converter<Map<String, dynamic>, String> {
   Uint8List password;
   Salsa20Encoder(this.password) {
