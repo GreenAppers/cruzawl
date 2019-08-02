@@ -5,6 +5,7 @@ import 'dart:collection';
 import 'dart:convert';
 
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/preferences.dart';
 import 'websocket_html.dart' if (dart.library.io) 'websocket_io.dart';
 
 typedef JsonCallback = void Function(Map<String, dynamic>);

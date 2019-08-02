@@ -61,6 +61,7 @@ class Seed {
 
 typedef WalletCallback = void Function(Wallet);
 
+/// [WalletStorage] maintains operational and permanent storage synchronization
 abstract class WalletStorage {
   String name, seedPhrase;
   Seed seed;
@@ -74,11 +75,26 @@ abstract class WalletStorage {
 
   WalletStorage(this.name, this.currency, this.seed, [this.seedPhrase]);
 
+  /// [Wallet] interface
   Account addAccount(Account x, {bool store = true});
   Address addAddress(Address x,
       {bool store = true, bool load = true, sembast.Transaction txn});
-  void updateTransaction(Transaction transaction,
-      {bool newTransaction = true});
+  void updateTransaction(Transaction transaction, {bool newTransaction = true});
+
+  Future<void> openStorage(
+      sembast.DatabaseFactory databaseFactory, String filename) async {
+
+    /// The wallet file is always encrypted using [seed]
+    /// The [seed] is randomly generated in the case of non-HD wallets
+    storage = await databaseFactory.openDatabase(filename,
+        codec:
+            getSalsa20SembastCodec(Uint8List.fromList(seed.data.sublist(32))));
+
+    walletStore = sembast.StoreRef<String, dynamic>.main();
+    accountStore = sembast.intMapStoreFactory.store('accounts');
+    addressStore = sembast.stringMapStoreFactory.store('addresses');
+    pendingStore = sembast.stringMapStoreFactory.store('pendingTransactions');
+  }
 
   Future<void> storeHeader() async {
     await walletStore.record('header').put(
@@ -148,9 +164,7 @@ abstract class WalletStorage {
 
 class Wallet extends WalletStorage {
   num maturesBalance = 0;
-  int activeAccountId = 0,
-      maturesHeight = 0,
-      nextAddressIndex;
+  int activeAccountId = 0, maturesHeight = 0, nextAddressIndex;
   PriorityQueue<Transaction> maturing =
       PriorityQueue<Transaction>(Transaction.maturityCompare);
   SortedListSet<Transaction> transactions =
@@ -307,13 +321,7 @@ class Wallet extends WalletStorage {
       debugPrint((create ? 'Creating' : 'Opening') + ' wallet $filename ...');
       if (create && !testing && await File(filename).exists())
         throw FileSystemException('$filename already exists');
-      storage = await databaseFactory.openDatabase(filename,
-          codec: getSalsa20SembastCodec(
-              Uint8List.fromList(seed.data.sublist(32))));
-      walletStore = sembast.StoreRef<String, dynamic>.main();
-      accountStore = sembast.intMapStoreFactory.store('accounts');
-      addressStore = sembast.stringMapStoreFactory.store('addresses');
-      pendingStore = sembast.stringMapStoreFactory.store('pendingTransactions');
+      await openStorage(databaseFactory, filename);
 
       if (create) {
         await storeHeader();

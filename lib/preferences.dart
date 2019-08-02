@@ -4,11 +4,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:json_annotation/json_annotation.dart';
 import "package:pointycastle/digests/sha256.dart";
 import 'package:sembast/sembast.dart';
 
-import 'package:cruzawl/network.dart';
 import 'package:cruzawl/sembast.dart';
+import 'package:cruzawl/util.dart';
+
+part 'preferences.g.dart';
 
 class CruzawlPreferences extends SembastPreferences {
   String walletsPassword;
@@ -92,4 +95,32 @@ class CruzawlPreferences extends SembastPreferences {
     walletsPassword = password;
     wallets = loadedWallets;
   }
+}
+
+@JsonSerializable()
+class PeerPreference {
+  String name, url, currency, options;
+  int priority = 100;
+
+  @JsonKey(ignore: true)
+  StringCallback debugPrint;
+
+  PeerPreference(this.name, this.url, this.currency, this.options,
+      {this.debugPrint});
+
+  factory PeerPreference.fromJson(Map<String, dynamic> json) =>
+      _$PeerPreferenceFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PeerPreferenceToJson(this);
+
+  bool get ignoreBadCert =>
+      options != null && options.contains(',ignoreBadCert,');
+
+  static String formatOptions({bool ignoreBadCert = false}) {
+    String options = ',';
+    if (ignoreBadCert) options += 'ignoreBadCert,';
+    return options;
+  }
+
+  static int comparePriority(dynamic a, dynamic b) => b.priority - a.priority;
 }

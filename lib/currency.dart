@@ -49,7 +49,7 @@ abstract class Currency {
       {int matures, int expires});
 }
 
-/// Placeholder [Currency] used during [Wallet] loading
+/// Placeholder [Currency] during [Wallet] loading
 class LoadingCurrency extends Currency {
   const LoadingCurrency();
 
@@ -96,6 +96,7 @@ abstract class ChainCode {
 
 enum AddressState { reserve, open, used, remove }
 
+/// [Address] interface for element that [Wallet] contains
 abstract class Address {
   String name;
   AddressState state = AddressState.reserve;

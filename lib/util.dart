@@ -68,7 +68,7 @@ class SortedListSet<T> {
 
   void clear() => data.clear();
 
-  bool add(T value, {bool overwrite=true}) {
+  bool add(T value, {bool overwrite = true}) {
     int index = lowerBound(data, value, compare: compare);
     if (index < data.length && compare(data[index], value) == 0) {
       if (overwrite) data[index] = value;

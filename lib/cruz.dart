@@ -16,6 +16,7 @@ import 'package:tweetnacl/tweetnacl.dart' as tweetnacl;
 import 'package:cruzawl/sha3.dart';
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/websocket.dart';
 
@@ -432,10 +433,14 @@ class CruzBlockHeader extends BlockHeader {
   int deltaWork(BlockHeader x) =>
       (decodeBigInt(chainWork.data) - decodeBigInt(x.chainWork.data)).toInt();
 
-  int hashRate(BlockHeader x) =>
-      ((decodeBigInt(chainWork.data) - decodeBigInt(x.chainWork.data)) /
-              (BigInt.from(time - x.time)))
-          .toInt();
+  int hashRate(BlockHeader x) {
+    int dt = time - x.time;
+    return dt == 0
+        ? -1
+        : ((decodeBigInt(chainWork.data) - decodeBigInt(x.chainWork.data)) /
+                (BigInt.from(dt)))
+            .toInt();
+  }
 }
 
 // Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go
