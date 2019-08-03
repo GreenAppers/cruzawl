@@ -466,16 +466,15 @@ class CruzBlock extends Block {
 /// CRUZ implementation of the [PeerNetwork] abstraction
 class CruzPeerNetwork extends PeerNetwork {
   @override
+  Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId) =>
+      CruzPeer(spec, parseUri(spec.url, genesisBlockId));
+
   String parseUri(String uriText, String genesisId) {
     if (!Uri.parse(uriText).hasScheme) uriText = 'wss://' + uriText;
     Uri uri = Uri.parse(uriText);
     Uri url = uri.replace(port: uri.hasPort ? uri.port : 8831);
     return url.toString() + '/' + genesisId;
   }
-
-  @override
-  Peer addPeerWithSpec(PeerPreference spec, String genesisBlockId) =>
-      addPeer(CruzPeer(spec, parseUri(spec.url, genesisBlockId)));
 }
 
 /// CRUZ implementation of the [PeerNetwork] entry [Peer] abstraction

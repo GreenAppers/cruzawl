@@ -13,14 +13,15 @@ typedef PeerStateChangedCallback = void Function(Peer, PeerState, PeerState);
 
 enum PeerState { ready, connected, connecting, disconnected }
 
+/// Interface for [PeerNetwork] element providing [Peer] API
 abstract class Peer {
   PeerPreference spec;
-  VoidCallback tipChanged;
-  PeerStateChangedCallback stateChanged;
   PeerState state = PeerState.disconnected;
-  Queue<Completer<void>> throttleQueue = Queue<Completer<void>>();
-  int maxOutstanding = 20;
+  PeerStateChangedCallback stateChanged;
+  VoidCallback tipChanged;
   Timer connectTimer;
+  int maxOutstanding = 20;
+  Queue<Completer<void>> throttleQueue = Queue<Completer<void>>();
   Peer(this.spec);
 
   String get address;
@@ -29,6 +30,37 @@ abstract class Peer {
   int get numOutstanding;
   num get minAmount;
   num get minFee;
+
+  /// [Peer] API
+  void connect();
+  void disconnect(String reason);
+  Future<num> getBalance(PublicAddress address);
+  Future<TransactionIteratorResults> getTransactions(PublicAddress address,
+      {int startHeight, int startIndex, int endHeight, int limit});
+  Future<TransactionId> putTransaction(Transaction transaction);
+  Future<bool> filterAdd(
+      PublicAddress address, TransactionCallback transactionCb);
+  Future<bool> filterTransactionQueue();
+  Future<BlockHeaderMessage> getBlockHeader({BlockId id, int height});
+  Future<BlockMessage> getBlock({BlockId id, int height});
+  Future<Transaction> getTransaction(TransactionId id);
+
+  void setState(PeerState x) {
+    PeerState oldState = state;
+    state = x;
+    if (stateChanged != null) stateChanged(this, oldState, state);
+  }
+
+  void close() {
+    if (state != PeerState.disconnected) disconnect('Peer close');
+    if (connectTimer != null) connectTimer.cancel();
+    connectTimer = null;
+  }
+
+  void connectAfter(int seconds) {
+    if (connectTimer != null) connectTimer.cancel();
+    connectTimer = Timer(Duration(seconds: seconds), connect);
+  }
 
   Future<Peer> throttle() async {
     if (numOutstanding < maxOutstanding) return this;
@@ -48,23 +80,6 @@ abstract class Peer {
       (throttleQueue.removeFirst()).complete(null);
   }
 
-  void setState(PeerState x) {
-    PeerState oldState = state;
-    state = x;
-    if (stateChanged != null) stateChanged(this, oldState, state);
-  }
-
-  void connectAfter(int seconds) {
-    if (connectTimer != null) connectTimer.cancel();
-    connectTimer = Timer(Duration(seconds: seconds), connect);
-  }
-
-  void close() {
-    if (state != PeerState.disconnected) disconnect('Peer close');
-    if (connectTimer != null) connectTimer.cancel();
-    connectTimer = null;
-  }
-
   void handleProtocol(VoidCallback cb) {
     try {
       cb();
@@ -72,21 +87,10 @@ abstract class Peer {
       disconnect('protocol error: $error $stacktrace');
     }
   }
-
-  void connect();
-  void disconnect(String reason);
-  Future<num> getBalance(PublicAddress address);
-  Future<TransactionIteratorResults> getTransactions(PublicAddress address,
-      {int startHeight, int startIndex, int endHeight, int limit});
-  Future<TransactionId> putTransaction(Transaction transaction);
-  Future<bool> filterAdd(
-      PublicAddress address, TransactionCallback transactionCb);
-  Future<bool> filterTransactionQueue();
-  Future<BlockHeaderMessage> getBlockHeader({BlockId id, int height});
-  Future<BlockMessage> getBlock({BlockId id, int height});
-  Future<Transaction> getTransaction(TransactionId id);
 }
 
+/// [PeerNetwork] controls (re)connection policy for a collection of [Peer]s
+/// and via [createPeerWithSpec] defines a type of network, e.g. [CruzPeerNetwork]
 abstract class PeerNetwork {
   int autoReconnectSeconds;
   List<Peer> peers = <Peer>[];
@@ -109,9 +113,8 @@ abstract class PeerNetwork {
       ? peers[0].address
       : (connecting.length > 0 ? connecting[0].address : '');
 
-  String parseUri(String uriText, String genesisId);
-
-  Peer addPeerWithSpec(PeerPreference spec, String genesisBlockId);
+  /// [Peer] factory interface
+  Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId);
 
   Peer addPeer(Peer x) {
     x.stateChanged = peerStateChanged;

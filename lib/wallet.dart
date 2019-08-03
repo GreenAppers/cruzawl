@@ -83,7 +83,6 @@ abstract class WalletStorage {
 
   Future<void> openStorage(
       sembast.DatabaseFactory databaseFactory, String filename) async {
-
     /// The wallet file is always encrypted using [seed]
     /// The [seed] is randomly generated in the case of non-HD wallets
     storage = await databaseFactory.openDatabase(filename,
