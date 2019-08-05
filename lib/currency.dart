@@ -185,6 +185,7 @@ class TransactionIteratorResults extends TransactionIterator {
 abstract class BlockId {
   Uint8List data;
   String toJson();
+  BigInt toBigInt();
 }
 
 abstract class BlockHeader {
@@ -198,8 +199,10 @@ abstract class BlockHeader {
   int get transactionCount;
 
   Map<String, dynamic> toJson();
-  int deltaWork(BlockHeader x);
-  int hashRate(BlockHeader X);
+  BigInt blockWork();
+  BigInt deltaWork(BlockHeader x);
+  int deltaTime(BlockHeader x);
+  int hashRate(BlockHeader x);
 
   static int compareHeight(dynamic a, dynamic b) => b.height - a.height;
 }

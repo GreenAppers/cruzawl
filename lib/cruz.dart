@@ -380,6 +380,9 @@ class CruzBlockId extends BlockId {
 
   @override
   String toJson() => hex.encode(data);
+
+  @override
+  BigInt toBigInt() => decodeBigInt(data);
 }
 
 @JsonSerializable()
@@ -429,17 +432,19 @@ class CruzBlockHeader extends BlockHeader {
   Map<String, dynamic> toJson() => _$CruzBlockHeaderToJson(this);
 
   CruzBlockId id() => CruzBlockId.compute(jsonEncode(this));
+  
+  BigInt blockWork() {
+    BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0]=1);
+    return twoTo256 ~/ (target.toBigInt() + BigInt.from(1));
+  }
 
-  int deltaWork(BlockHeader x) =>
-      (decodeBigInt(chainWork.data) - decodeBigInt(x.chainWork.data)).toInt();
+  BigInt deltaWork(BlockHeader x) =>
+      chainWork.toBigInt() - x.chainWork.toBigInt();
 
+  int deltaTime(BlockHeader x) => time - x.time;
   int hashRate(BlockHeader x) {
-    int dt = time - x.time;
-    return dt == 0
-        ? -1
-        : ((decodeBigInt(chainWork.data) - decodeBigInt(x.chainWork.data)) /
-                (BigInt.from(dt)))
-            .toInt();
+    int dt = deltaTime(x);
+    return dt == 0 ? 0 : (deltaWork(x) ~/ BigInt.from(dt)).toInt();
   }
 }
 
