@@ -12,6 +12,7 @@ import 'package:cruzawl/util.dart';
 abstract class Currency {
   const Currency();
 
+  /// Called by [Wallet].[fromFile] to load a wallet for an arbitrary [Currency]
   factory Currency.fromJson(String x) {
     switch (x) {
       case 'CRUZ':
@@ -21,12 +22,16 @@ abstract class Currency {
     }
   }
 
+  /// [network] is the only dynamic property
+  PeerNetwork get network;
+
+  /// Constants
   String get ticker;
   int get bip44CoinType;
   int get coinbaseMaturity;
-  PeerNetwork get network;
   PublicAddress get nullAddress;
 
+  /// Constant functions
   String toJson() => ticker;
   String format(num v) => v.toString();
   num parse(String v) => num.tryParse(v) ?? 0;
@@ -34,6 +39,7 @@ abstract class Currency {
       DateTime.fromMillisecondsSinceEpoch(time * 1000);
   String suggestedFee(Transaction t) => null;
 
+  /// [Currency] API
   String genesisBlockId();
   Address deriveAddress(Uint8List seed, String path,
       [StringCallback debugPrint]);
@@ -53,12 +59,16 @@ abstract class Currency {
 class LoadingCurrency extends Currency {
   const LoadingCurrency();
 
+  /// Null [network]
+  PeerNetwork get network => null;
+
+  /// Constants
   String get ticker => 'CRUZ';
   int get bip44CoinType => 0;
   int get coinbaseMaturity => 0;
-  PeerNetwork get network => null;
   PublicAddress get nullAddress => null;
 
+  /// Null [Currency] API
   String genesisBlockId() => null;
   Address deriveAddress(Uint8List seed, String path,
           [StringCallback debugPrint]) =>
@@ -76,20 +86,24 @@ class LoadingCurrency extends Currency {
       null;
 }
 
+/// e.g. Ed25519 public key
 abstract class PublicAddress {
   String toJson();
 }
 
+/// e.g. Ed25519 private key
 abstract class PrivateKey {
   String toJson();
-  CruzPublicKey getPublicKey();
-  CruzPublicKey derivePublicKey();
+  PublicAddress getPublicKey();
+  PublicAddress derivePublicKey();
 }
 
+/// e.g. Ed25519 signature
 abstract class Signature {
   String toJson();
 }
 
+/// e.g. SLIP-0010 chain code
 abstract class ChainCode {
   String toJson();
 }
@@ -103,36 +117,43 @@ abstract class Address {
   int accountId, chainIndex, earliestSeen, latestSeen;
   num balance = 0;
 
-  // JSON ignore
+  /// JSON ignore
   int maturesHeight = 0, loadedHeight, loadedIndex;
   num maturesBalance = 0, newBalance, newMaturesBalance;
 
+  /// [Address] API accessors
   PublicAddress get publicKey;
   PrivateKey get privateKey;
   ChainCode get chainCode;
 
+  /// [Address] API is just accessors and [verify]
   Map<String, dynamic> toJson();
   bool verify();
 
+  /// Track the earliest and latest [height] each [Address] has been seen
   void updateSeenHeight(int height) {
     if (latestSeen == null || height > latestSeen) latestSeen = height;
     if (earliestSeen == null || height < earliestSeen) earliestSeen = height;
   }
 
+  /// An HD wallet [Address] is defined by an [accountId], [chainIndex] pair
   static int compareIndex(dynamic a, dynamic b) {
     int accountDiff = a.accountId - b.accountId;
     return accountDiff != 0 ? accountDiff : a.chainIndex - b.chainIndex;
   }
 
+  /// Sort by [balance] and tie-break so only equivalent [Address] compare equal
   static int compareBalance(dynamic a, dynamic b) {
     int balanceDiff = b.balance - a.balance;
     return balanceDiff != 0 ? balanceDiff : compareIndex(a, b);
   }
 
+  /// Find single [Address] with greatest [balance]
   static Address reduceBalance(Address a, Address b) =>
       b.balance > a.balance ? b : a;
 }
 
+/// e.g. SHA3-256 of [Transaction] data
 abstract class TransactionId {
   String toJson();
 }
@@ -150,19 +171,21 @@ abstract class Transaction {
   int get matures;
   int get expires;
 
-  String get fromText => from.toJson();
-  String get toText => to.toJson();
-  int get maturity => max(matures ?? 0, from != null ? 0 : height + 100);
-
   Map<String, dynamic> toJson();
   TransactionId id();
   bool verify();
 
+  String get fromText => from.toJson();
+  String get toText => to.toJson();
+  int get maturity => max(matures ?? 0, from != null ? 0 : height + 100);
+
+  /// Sort by [time] and tie-break so only equivalent [Transaction] compare equal
   static int timeCompare(Transaction a, Transaction b) {
     int deltaT = -a.time + b.time;
     return deltaT != 0 ? deltaT : a.id().toJson().compareTo(b.id().toJson());
   }
 
+  /// Sort by [maturity] and tie-break so only equivalent [Transaction] compare equal
   static int maturityCompare(Transaction a, Transaction b) {
     int deltaM = a.maturity - b.maturity;
     return deltaM != 0 ? deltaM : a.id().toJson().compareTo(b.id().toJson());
@@ -182,12 +205,14 @@ class TransactionIteratorResults extends TransactionIterator {
       : super(height, index);
 }
 
+/// e.g. SHA3-256 of [BlockHeader] data
 abstract class BlockId {
   Uint8List data;
   String toJson();
   BigInt toBigInt();
 }
 
+/// [BlockHeader].[nonce] is the field varied by [PeerNetwork] miners
 abstract class BlockHeader {
   BlockId get previous;
   TransactionId get hashListRoot;
@@ -207,6 +232,7 @@ abstract class BlockHeader {
   static int compareHeight(dynamic a, dynamic b) => b.height - a.height;
 }
 
+/// [Block] is what the [PeerNetwork] chains
 abstract class Block {
   BlockHeader get header;
   List<Transaction> get transactions;

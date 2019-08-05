@@ -95,6 +95,7 @@ abstract class WalletStorage {
     pendingStore = sembast.stringMapStoreFactory.store('pendingTransactions');
   }
 
+  /// [walletStore] holds "header" with [Wallet] vital information
   Future<void> storeHeader() async {
     await walletStore.record('header').put(
         storage,
@@ -114,6 +115,7 @@ abstract class WalletStorage {
     currency = Currency.fromJson(header['currency']);
   }
 
+  /// [accountStore] holds [Account] summary of [Address] grouped by [accountId]
   Future<void> storeAccount(Account x, [sembast.Transaction txn]) async {
     await accountStore.record(x.id).put(txn ?? storage, x.toJson());
   }
@@ -125,6 +127,7 @@ abstract class WalletStorage {
       addAccount(Account.fromJson(record.value), store: false);
   }
 
+  /// [addressStore] holds every [Address] in [Wallet]
   Future<void> storeAddress(Address x, [sembast.Transaction txn]) async {
     await addressStore
         .record(x.publicKey.toJson())
@@ -142,6 +145,7 @@ abstract class WalletStorage {
     }
   }
 
+  /// [pendingStore] holds our recently sent [Transaction]s
   Future<void> removePendingTransaction(String id) async =>
       pendingStore.record(id).delete(storage);
 
@@ -234,6 +238,7 @@ class Wallet extends WalletStorage {
           databaseFactory, filename, true, loaded, null, publicKeys);
   }
 
+  /// Load arbitrary [Wallet] of arbitrary [Currency]
   Wallet.fromFile(
       sembast.DatabaseFactory databaseFactory, String filename, Seed seed,
       [this.preferences, this.debugPrint, WalletCallback loaded])
@@ -242,10 +247,9 @@ class Wallet extends WalletStorage {
   }
 
   bool get hdWallet => seedPhrase != null;
-
   Account get account => accounts[activeAccountId];
 
-  Address getNextAddress() {
+  Address getNextReceiveAddress() {
     if (hdWallet) {
       if (account.reserveAddress.length > 0)
         return account.reserveAddress.entries.first.value;
@@ -258,29 +262,33 @@ class Wallet extends WalletStorage {
     }
   }
 
+  /// Apostrophe in the path indicates that BIP32 hardened derivation is used.
   String bip44Path(int index, int coinType,
       {int bip43Purpose = 44, int accountId = 0, int change = 0}) {
     return "m/$bip43Purpose'/$coinType'/$accountId'/$change'/$index'";
   }
 
+  /// Run [Currency] specific [deriveAddress] on [path] with [seed]
   Address deriveAddressWithPath(String path) =>
       currency.deriveAddress(seed.data, path, debugPrint);
 
+  /// [Wallet] should use [deriveAddress] instead of [deriveAddressWithPath]
   Address deriveAddress(int index, {int accountId = 0, int change = 0}) =>
       deriveAddressWithPath(bip44Path(index, currency.bip44CoinType,
           accountId: accountId, change: change))
         ..accountId = accountId
         ..chainIndex = index;
 
+  /// Grow the pool of [Address] with [state] equal [reserve] by one
   Address addNextAddress(
       {bool load = true, Account account, sembast.Transaction txn}) {
     if (!hdWallet) return null;
-    if (account == null) account = this.account;
+    account ??= this.account;
     return addAddress(deriveAddress(account.nextIndex, accountId: account.id),
         load: load, txn: txn);
   }
 
-  /// Store address & filter for it
+  /// Store [Address] and [filterNetworkFor] it
   Address addAddress(Address x,
       {bool store = true, bool load = true, sembast.Transaction txn}) {
     if (preferences != null &&
@@ -304,6 +312,7 @@ class Wallet extends WalletStorage {
     return x;
   }
 
+  /// Each [Address] in [Wallet] is associated with one [Account]
   Account addAccount(Account x, {bool store = true}) {
     accounts[x.id] = x;
     activeAccountId = x.id;
@@ -311,6 +320,8 @@ class Wallet extends WalletStorage {
     return x;
   }
 
+  /// Synchronize storage either by creating a database or loading one,
+  /// culminating once (per instance) in [reload] with [initialLoad] true
   Future<void> openWalletStorage(
       sembast.DatabaseFactory databaseFactory, String filename, bool create,
       [WalletCallback openedCallback,
@@ -412,32 +423,39 @@ class Wallet extends WalletStorage {
       (await currency.network.getPeer()).filterTransactionQueue();
   }
 
+  /// [filterNetworkFor] synchronizes our database [x] with the [PeerNetwork]
+  /// and tracks updates
   Future<void> filterNetworkFor(Address x) async {
+    /// Abort if we're offline or lose network.  We'll [reload] when we reconnect.
     if (!currency.network.hasPeer) return voidResult();
     Peer peer = await currency.network.getPeer();
     if (peer == null) return voidResult();
 
+    /// Start filtering [PeerNetwork] for [x]
     x.newBalance = x.newMaturesBalance = 0;
     bool filtering = await peer.filterAdd(x.publicKey, updateTransaction);
     if (filtering == null) return voidResult();
     assert(filtering == true);
 
+    /// Now (that we're filtering) query [x]'s balance
     num newBalance = await peer.getBalance(x.publicKey);
     if (newBalance == null) return voidResult();
-
     x.loadedHeight = x.loadedIndex = null;
     x.newBalance += newBalance;
+
+    /// Load most recent 100 blocks so we know of all maturing transactions
     do {
-      // Load most recent 100 blocks worth of transactions
       if (await getNextTransactions(peer, x) == null) return voidResult();
     } while (
         x.loadedHeight > max(0, peer.tip.height - currency.coinbaseMaturity));
 
-    /// [Address] [newBalance] and [newMatureBalance] account for possibly
-    /// receiving new transactions for [x] as we're loading
+    /// [newBalance] and [newMatureBalance] account for possibly receiving new
+    /// transactions for [x] as we're loading
     applyMaturesBalanceDelta(x, -x.maturesBalance + x.newMaturesBalance);
     updateBalance(x, -x.balance + x.newBalance);
     x.newBalance = x.newMaturesBalance = null;
+
+    /// Stream [Wallet] changes
     if (notifyListeners != null) notifyListeners();
   }
 
