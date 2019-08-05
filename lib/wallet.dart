@@ -162,6 +162,7 @@ abstract class WalletStorage {
 }
 
 class Wallet extends WalletStorage {
+  bool opened = false;
   num maturesBalance = 0;
   int activeAccountId = 0, maturesHeight = 0, nextAddressIndex;
   PriorityQueue<Transaction> maturing =
@@ -312,7 +313,7 @@ class Wallet extends WalletStorage {
 
   Future<void> openWalletStorage(
       sembast.DatabaseFactory databaseFactory, String filename, bool create,
-      [WalletCallback opened,
+      [WalletCallback openedCallback,
       List<PrivateKey> privateKeys,
       List<PublicAddress> publicKeys]) async {
     bool testing = preferences != null && preferences.testing;
@@ -332,8 +333,8 @@ class Wallet extends WalletStorage {
       }
     } catch (error, stackTrace) {
       fatal = ErrorDetails(exception: error, stack: stackTrace);
-      if (opened != null)
-        return opened(this);
+      if (openedCallback != null)
+        return openedCallback(this);
       else
         rethrow;
     }
@@ -359,12 +360,13 @@ class Wallet extends WalletStorage {
       }
     }
 
-    if (opened != null) opened(this);
+    if (openedCallback != null) openedCallback(this);
     if (notifyListeners != null) notifyListeners();
-    reload();
+    reload(initialLoad: true);
   }
 
   void expirePendingTransactions(int height) async {
+    if (!opened) return;
     var finder = sembast.Finder(
       filter: sembast.Filter.lessThan('expires', height),
       sortOrders: [sembast.SortOrder('expires')],
@@ -383,6 +385,7 @@ class Wallet extends WalletStorage {
   }
 
   void completeMaturingTransactions(int height) {
+    if (!opened) return;
     while (maturing.length > 0 && maturing.first.maturity <= height) {
       Transaction transaction = maturing.removeFirst();
       Address to = addresses[transaction.to.toJson()];
@@ -391,7 +394,10 @@ class Wallet extends WalletStorage {
     }
   }
 
-  void reload() async {
+  void reload({bool initialLoad = false}) async {
+    if (!opened && !initialLoad) return;
+    debugPrint((initialLoad ? 'Load' : 'Reload') + ' wallet ' + name);
+    opened = true;
     pendingCount = 0;
     transactions.clear();
     readPendingTransactions();

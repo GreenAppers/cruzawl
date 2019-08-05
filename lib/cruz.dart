@@ -286,6 +286,7 @@ class CruzTransaction extends Transaction {
       : tweetnacl.Signature(from.data, null)
           .detached_verify(id().data, signature.data);
 
+  // Reference https://github.com/cruzbit/cruzbit/blob/master/transaction.go#L143
   static int computeTransactionSeries(bool isCoinbase, int height) {
     if (isCoinbase) {
       // coinbases start using the new series right on time
@@ -432,9 +433,10 @@ class CruzBlockHeader extends BlockHeader {
   Map<String, dynamic> toJson() => _$CruzBlockHeaderToJson(this);
 
   CruzBlockId id() => CruzBlockId.compute(jsonEncode(this));
-  
+
+  // Reference https://github.com/cruzbit/cruzbit/blob/master/block.go#L150-L161
   BigInt blockWork() {
-    BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0]=1);
+    BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0] = 1);
     return twoTo256 ~/ (target.toBigInt() + BigInt.from(1));
   }
 

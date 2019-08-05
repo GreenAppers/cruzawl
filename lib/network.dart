@@ -24,10 +24,13 @@ abstract class Peer {
   Queue<Completer<void>> throttleQueue = Queue<Completer<void>>();
   Peer(this.spec);
 
+  /// Connection properties
   String get address;
+  int get numOutstanding;
+
+  /// Network properties
   BlockId get tipId;
   BlockHeader get tip;
-  int get numOutstanding;
   num get minAmount;
   num get minFee;
 
@@ -45,10 +48,25 @@ abstract class Peer {
   Future<BlockMessage> getBlock({BlockId id, int height});
   Future<Transaction> getTransaction(TransactionId id);
 
+  /// Primary [StateSetter]
   void setState(PeerState x) {
     PeerState oldState = state;
     state = x;
     if (stateChanged != null) stateChanged(this, oldState, state);
+  }
+
+  /// Connection handling
+  void connectAfter(int seconds) {
+    if (connectTimer != null) connectTimer.cancel();
+    connectTimer = Timer(Duration(seconds: seconds), connect);
+  }
+
+  void handleProtocol(VoidCallback cb) {
+    try {
+      cb();
+    } catch (error, stacktrace) {
+      disconnect('protocol error: $error $stacktrace');
+    }
   }
 
   void close() {
@@ -57,11 +75,7 @@ abstract class Peer {
     connectTimer = null;
   }
 
-  void connectAfter(int seconds) {
-    if (connectTimer != null) connectTimer.cancel();
-    connectTimer = Timer(Duration(seconds: seconds), connect);
-  }
-
+  /// Keep a [Queue] after [maxOutstanding] in-flight queries
   Future<Peer> throttle() async {
     if (numOutstanding < maxOutstanding) return this;
     Completer<Peer> completer = Completer();
@@ -79,14 +93,6 @@ abstract class Peer {
     while (throttleQueue.length > 0)
       (throttleQueue.removeFirst()).complete(null);
   }
-
-  void handleProtocol(VoidCallback cb) {
-    try {
-      cb();
-    } catch (error, stacktrace) {
-      disconnect('protocol error: $error $stacktrace');
-    }
-  }
 }
 
 /// [PeerNetwork] controls (re)connection policy for a collection of [Peer]s
@@ -100,12 +106,14 @@ abstract class PeerNetwork {
   PeerNetwork({this.autoReconnectSeconds = 15});
 
   bool get hasPeer => peers.length > 0;
+  int get length => peers.length + connecting.length;
+
+  /// [Peer] property wrappers
   int get tipHeight => hasPeer ? tip.height : 0;
   BlockHeader get tip => hasPeer ? peers[0].tip : null;
   BlockId get tipId => hasPeer ? peers[0].tipId : null;
   num get minAmount => hasPeer ? peers[0].minAmount : null;
   num get minFee => hasPeer ? peers[0].minFee : null;
-  int get length => peers.length + connecting.length;
   PeerState get peerState => hasPeer
       ? peers[0].state
       : (connecting.length > 0 ? connecting[0].state : PeerState.disconnected);
@@ -116,6 +124,7 @@ abstract class PeerNetwork {
   /// [Peer] factory interface
   Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId);
 
+  /// Subscribe [Peer].[setState] handler [peerStateChanged]
   Peer addPeer(Peer x) {
     x.stateChanged = peerStateChanged;
     x.tipChanged = () {
@@ -124,10 +133,11 @@ abstract class PeerNetwork {
     if (x.state != PeerState.ready)
       connecting.add(x);
     else
-      peerReady(x);
+      peerBecameReady(x);
     return x;
   }
 
+  /// Unsubscribe [Peer].[stateChanged] and [close]
   void removePeer(Peer x) {
     x.stateChanged = null;
     x.close();
@@ -135,8 +145,11 @@ abstract class PeerNetwork {
     connecting.remove(x);
   }
 
-  Future<Peer> getPeer() async {
+  /// Get a random throttled [Peer] or add to reconnect [Queue] if none and [wait]
+  Future<Peer> getPeer([bool wait = true]) async {
     if (peers.length == 0) {
+      if (!wait) return null;
+
       Completer<Peer> completer = Completer<Peer>();
       awaitingPeers.add(completer);
       return completer.future;
@@ -145,27 +158,7 @@ abstract class PeerNetwork {
     return peer.throttle();
   }
 
-  void peerReady(Peer x) {
-    peers.add(x);
-    while (awaitingPeers.length > 0) (awaitingPeers.removeFirst()).complete(x);
-    if (peerChanged != null) peerChanged();
-  }
-
-  void peerStateChanged(Peer x, PeerState oldState, PeerState newState) {
-    if (newState == PeerState.ready && oldState != PeerState.ready) {
-      connecting.remove(x);
-      peerReady(x);
-    } else if (newState != PeerState.ready && oldState == PeerState.ready) {
-      peers.remove(x);
-      connecting.add(x);
-    }
-    if (newState == PeerState.disconnected) {
-      if (autoReconnectSeconds != null)
-        reconnectPeer();
-      else if (peers.length == 0 && peerChanged != null) peerChanged();
-    }
-  }
-
+  /// [reconnectPeer] has the only call to [WebSocket].[connect]
   void reconnectPeer() {
     assert(connecting.length > 0);
     Peer x = connecting.removeAt(0);
@@ -173,7 +166,35 @@ abstract class PeerNetwork {
     connecting.add(x);
   }
 
-  void reset() {
+  /// Track [Peer].[setState] triggering [reconnectPeer] or [peerChanged]
+  void peerStateChanged(Peer x, PeerState oldState, PeerState newState) {
+    if (newState == PeerState.ready && oldState != PeerState.ready) {
+      connecting.remove(x);
+      peerBecameReady(x);
+    } else if (newState != PeerState.ready && oldState == PeerState.ready) {
+      peers.remove(x);
+      connecting.add(x);
+    }
+
+    if (newState == PeerState.disconnected) {
+      if (autoReconnectSeconds != null)
+        reconnectPeer();
+      else if (peers.length == 0) lostLastPeer();
+    }
+  }
+
+  /// [lostLastPeer] and [peerBecameReady] have the only calls to [peerChanged]
+  void lostLastPeer() {
+    if (peerChanged != null) peerChanged();
+  }
+
+  void peerBecameReady(Peer x) {
+    peers.add(x);
+    while (awaitingPeers.length > 0) (awaitingPeers.removeFirst()).complete(x);
+    if (peerChanged != null) peerChanged();
+  }
+
+  void shutdown() {
     List<Peer> oldPeers = peers, oldConnecting = connecting;
     peers = <Peer>[];
     connecting = <Peer>[];
