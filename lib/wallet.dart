@@ -81,7 +81,7 @@ abstract class WalletStorage {
       {bool store = true, bool load = true, sembast.Transaction txn});
   void updateTransaction(Transaction transaction, {bool newTransaction = true});
 
-  Future<void> openStorage(
+  Future<void> _openStorage(
       sembast.DatabaseFactory databaseFactory, String filename) async {
     /// The wallet file is always encrypted using [seed]
     /// The [seed] is randomly generated in the case of non-HD wallets
@@ -95,8 +95,25 @@ abstract class WalletStorage {
     pendingStore = sembast.stringMapStoreFactory.store('pendingTransactions');
   }
 
+  Future<void> _readStorage(sembast.DatabaseFactory databaseFactory,
+      String filename, Account newDatabase, bool dontCheckFile) async {
+    if (newDatabase != null && !dontCheckFile && await File(filename).exists())
+      throw FileSystemException('$filename already exists');
+    await _openStorage(databaseFactory, filename);
+
+    if (newDatabase != null) {
+      await _storeHeader();
+      await _storeAccount(newDatabase);
+    } else {
+      /// The only permanent storage iteration of [Address]es and [Account]s
+      await _readStoredHeader();
+      await _readStoredAccounts();
+      await _readStoredAddresses(load: false);
+    }
+  }
+
   /// [walletStore] holds "header" with [Wallet] vital information
-  Future<void> storeHeader() async {
+  Future<void> _storeHeader() async {
     await walletStore.record('header').put(
         storage,
         jsonDecode(jsonEncode(<String, dynamic>{
@@ -107,7 +124,7 @@ abstract class WalletStorage {
         })));
   }
 
-  Future<void> readStoredHeader() async {
+  Future<void> _readStoredHeader() async {
     var header = await walletStore.record('header').get(storage);
     name = header['name'] as String;
     seed = Seed.fromJson(header['seed']);
@@ -116,11 +133,11 @@ abstract class WalletStorage {
   }
 
   /// [accountStore] holds [Account] summary of [Address] grouped by [accountId]
-  Future<void> storeAccount(Account x, [sembast.Transaction txn]) async {
+  Future<void> _storeAccount(Account x, [sembast.Transaction txn]) async {
     await accountStore.record(x.id).put(txn ?? storage, x.toJson());
   }
 
-  Future<void> readStoredAccounts() async {
+  Future<void> _readStoredAccounts() async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await accountStore.find(storage, finder: finder);
     for (var record in records)
@@ -128,13 +145,13 @@ abstract class WalletStorage {
   }
 
   /// [addressStore] holds every [Address] in [Wallet]
-  Future<void> storeAddress(Address x, [sembast.Transaction txn]) async {
+  Future<void> _storeAddress(Address x, [sembast.Transaction txn]) async {
     await addressStore
         .record(x.publicKey.toJson())
         .put(txn ?? storage, jsonDecode(jsonEncode(x)));
   }
 
-  Future<void> readStoredAddresses({bool load = true}) async {
+  Future<void> _readStoredAddresses({bool load = true}) async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await addressStore.find(storage, finder: finder);
     for (var record in records) {
@@ -146,15 +163,15 @@ abstract class WalletStorage {
   }
 
   /// [pendingStore] holds our recently sent [Transaction]s
-  Future<void> removePendingTransaction(String id) async =>
+  Future<void> _removePendingTransaction(String id) async =>
       pendingStore.record(id).delete(storage);
 
-  Future<void> storePendingTransaction(Transaction tx) async {
+  Future<void> _storePendingTransaction(Transaction tx) async {
     String id = tx.id().toJson();
     await pendingStore.record(id).put(storage, jsonDecode(jsonEncode(tx)));
   }
 
-  Future<void> readPendingTransactions() async {
+  Future<void> _readPendingTransactions() async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await pendingStore.find(storage, finder: finder);
     for (var record in records) {
@@ -165,6 +182,10 @@ abstract class WalletStorage {
   }
 }
 
+/// Thin [Wallet] built from [getBalance], [getTransactions], and [filterAdd]
+/// We store [Address]es and [Account]s.  [Transaction]s are dynamically loaded.
+/// [Block] storage isn't necessary if [filterAdd] correctly handles reorgs.
+/// See [updateTransaction].[undoneByReorg]
 class Wallet extends WalletStorage {
   bool opened = false;
   num maturesBalance = 0;
@@ -202,7 +223,7 @@ class Wallet extends WalletStorage {
       WalletCallback loaded])
       : super(name, currency, seed, seedPhrase) {
     if (filename != null)
-      openWalletStorage(databaseFactory, filename, true, loaded);
+      _openWalletStorage(databaseFactory, filename, true, loaded);
   }
 
   /// Create non-HD [Wallet] from private key list
@@ -218,7 +239,7 @@ class Wallet extends WalletStorage {
       WalletCallback loaded])
       : super(name, currency, seed) {
     if (filename != null)
-      openWalletStorage(databaseFactory, filename, true, loaded, privateKeys);
+      _openWalletStorage(databaseFactory, filename, true, loaded, privateKeys);
   }
 
   /// Create watch-only [Wallet] from public key list
@@ -234,7 +255,7 @@ class Wallet extends WalletStorage {
       WalletCallback loaded])
       : super(name, currency, seed) {
     if (filename != null)
-      openWalletStorage(
+      _openWalletStorage(
           databaseFactory, filename, true, loaded, null, publicKeys);
   }
 
@@ -243,24 +264,11 @@ class Wallet extends WalletStorage {
       sembast.DatabaseFactory databaseFactory, String filename, Seed seed,
       [this.preferences, this.debugPrint, WalletCallback loaded])
       : super('loading', const LoadingCurrency(), seed) {
-    openWalletStorage(databaseFactory, filename, false, loaded);
+    _openWalletStorage(databaseFactory, filename, false, loaded);
   }
 
   bool get hdWallet => seedPhrase != null;
   Account get account => accounts[activeAccountId];
-
-  Address getNextReceiveAddress() {
-    if (hdWallet) {
-      if (account.reserveAddress.length > 0)
-        return account.reserveAddress.entries.first.value;
-      else
-        return addNextAddress();
-    } else {
-      if (addresses.length <= 0) return null;
-      nextAddressIndex = ((nextAddressIndex ?? -1) + 1) % addresses.length;
-      return addresses.values.toList()[nextAddressIndex];
-    }
-  }
 
   /// Apostrophe in the path indicates that BIP32 hardened derivation is used.
   String bip44Path(int index, int coinType,
@@ -288,7 +296,7 @@ class Wallet extends WalletStorage {
         load: load, txn: txn);
   }
 
-  /// Store [Address] and [filterNetworkFor] it
+  /// Store [Address] and [_filterNetworkFor] it
   Address addAddress(Address x,
       {bool store = true, bool load = true, sembast.Transaction txn}) {
     if (preferences != null &&
@@ -296,14 +304,14 @@ class Wallet extends WalletStorage {
         !x.verify())
       throw FormatException('${x.publicKey.toJson()} verify failed');
     addresses[x.publicKey.toJson()] = x;
-    if (store) storeAddress(x, txn);
-    if (load) filterNetworkFor(x);
+    if (store) _storeAddress(x, txn);
+    if (load) _filterNetworkFor(x);
     if (x.chainIndex != null) {
       if (x.state == AddressState.reserve)
         account.reserveAddress[x.chainIndex] = x;
       if (x.chainIndex >= account.nextIndex) {
         account.nextIndex = x.chainIndex + 1;
-        storeAccount(account, txn);
+        _storeAccount(account, txn);
       }
     } else {
       x.accountId = 0;
@@ -316,13 +324,13 @@ class Wallet extends WalletStorage {
   Account addAccount(Account x, {bool store = true}) {
     accounts[x.id] = x;
     activeAccountId = x.id;
-    if (store) storeAccount(x);
+    if (store) _storeAccount(x);
     return x;
   }
 
   /// Synchronize storage either by creating a database or loading one,
   /// culminating once (per instance) in [reload] with [initialLoad] true
-  Future<void> openWalletStorage(
+  Future<void> _openWalletStorage(
       sembast.DatabaseFactory databaseFactory, String filename, bool create,
       [WalletCallback openedCallback,
       List<PrivateKey> privateKeys,
@@ -330,18 +338,8 @@ class Wallet extends WalletStorage {
     bool testing = preferences != null && preferences.testing;
     try {
       debugPrint((create ? 'Creating' : 'Opening') + ' wallet $filename ...');
-      if (create && !testing && await File(filename).exists())
-        throw FileSystemException('$filename already exists');
-      await openStorage(databaseFactory, filename);
-
-      if (create) {
-        await storeHeader();
-        await storeAccount(account);
-      } else {
-        await readStoredHeader();
-        await readStoredAccounts();
-        await readStoredAddresses(load: false);
-      }
+      await _readStorage(
+          databaseFactory, filename, create ? account : null, testing);
     } catch (error, stackTrace) {
       fatal = ErrorDetails(exception: error, stack: stackTrace);
       if (openedCallback != null)
@@ -351,6 +349,9 @@ class Wallet extends WalletStorage {
     }
 
     if (hdWallet) {
+      /// https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki#address-gap-limit
+      /// HD wallets maintain an address-gap-limit of [minimumReserveAddress]
+      /// Note: to cross any gap you can repeatedly "Generate new address"
       for (Account account in accounts.values)
         while (account.reserveAddress.length <
             (preferences.minimumReserveAddress ?? 5)) {
@@ -358,12 +359,14 @@ class Wallet extends WalletStorage {
           await Future.delayed(Duration(seconds: 0));
         }
     } else if (privateKeys != null) {
+      /// Create a non-HD wallet
       if (privateKeys.length <= 0) return;
       for (PrivateKey key in privateKeys) {
         addAddress(currency.fromPrivateKey(key), load: false);
         await Future.delayed(Duration(seconds: 0));
       }
     } else if (publicKeys != null) {
+      // Create a watch-only wallet
       if (publicKeys.length <= 0) return;
       for (PublicAddress key in publicKeys) {
         addAddress(currency.fromPublicKey(key), load: false);
@@ -376,6 +379,14 @@ class Wallet extends WalletStorage {
     reload(initialLoad: true);
   }
 
+  /// Persist a new [Transaction] before sending it
+  Future<Transaction> createTransaction(Transaction transaction) async {
+    pendingCount++;
+    await _storePendingTransaction(transaction);
+    return transaction;
+  }
+
+  /// If a pending [Transaction] expires, delete it and return the [amount]
   void expirePendingTransactions(int height) async {
     if (!opened) return;
     var finder = sembast.Finder(
@@ -388,44 +399,82 @@ class Wallet extends WalletStorage {
           transactions.find(currency.fromTransactionJson(record.value));
       if (transaction != null &&
           (transaction.height == null || transaction.height == 0))
-        updateBalance(addresses[transaction.from.toJson()],
+        _updateBalance(addresses[transaction.from.toJson()],
             transaction.amount + transaction.fee);
-      removePendingTransaction(record.key);
+      _removePendingTransaction(record.key);
       pendingCount--;
     }
   }
 
+  /// When a [Transaction] matures move the [amount] from [maturesBalance] to [balance]
   void completeMaturingTransactions(int height) {
     if (!opened) return;
     while (maturing.length > 0 && maturing.first.maturity <= height) {
       Transaction transaction = maturing.removeFirst();
       Address to = addresses[transaction.to.toJson()];
-      applyMaturesBalanceDelta(to, -transaction.amount);
-      updateBalance(to, transaction.amount);
+      _applyMaturesBalanceDelta(to, -transaction.amount);
+      _updateBalance(to, transaction.amount);
     }
   }
 
+  /// When new [Block]s come out, use their [height] as a timer
+  void updateTip() {
+    assert(currency.network.tipHeight != null);
+    expirePendingTransactions(currency.network.tipHeight);
+    completeMaturingTransactions(currency.network.tipHeight);
+    if (notifyListeners != null) notifyListeners();
+  }
+
+  /// When an [Address] changes state, update [reserveAddress] tracking
+  void updateAddressState(Address x, AddressState newState,
+      {bool store = true}) {
+    if (x.state == newState) return;
+    bool wasReserve = x.state == AddressState.reserve;
+    if (wasReserve) accounts[x.accountId].reserveAddress.remove(x.chainIndex);
+    x.state = newState;
+    if (store) {
+      _storeAddress(x);
+      if (notifyListeners != null) notifyListeners();
+    }
+    if (wasReserve) addNextAddress(account: accounts[x.accountId]);
+  }
+
+  /// For HD wallets get next [reserveAddress]. Otherwise loop [nextAddressIndex].
+  Address getNextReceiveAddress() {
+    if (hdWallet) {
+      if (account.reserveAddress.length > 0)
+        return account.reserveAddress.entries.first.value;
+      else
+        return addNextAddress();
+    } else {
+      if (addresses.length <= 0) return null;
+      nextAddressIndex = ((nextAddressIndex ?? -1) + 1) % addresses.length;
+      return addresses.values.toList()[nextAddressIndex];
+    }
+  }
+
+  /// [reload] will fully re-synchronize with the [PeerNetwork]
   void reload({bool initialLoad = false}) async {
     if (!opened && !initialLoad) return;
     debugPrint((initialLoad ? 'Load' : 'Reload') + ' wallet ' + name);
     opened = true;
     pendingCount = 0;
     transactions.clear();
-    readPendingTransactions();
+    _readPendingTransactions();
 
     List<Address> reloadAddresses = addresses.values.toList();
     List<Future<void>> reloading = List<Future<void>>(reloadAddresses.length);
     for (int i = 0; i < reloadAddresses.length; i++)
-      reloading[i] = filterNetworkFor(reloadAddresses[i]);
+      reloading[i] = _filterNetworkFor(reloadAddresses[i]);
     for (int i = 0; i < reloadAddresses.length; i++) await reloading[i];
 
     if (currency.network.hasPeer)
       (await currency.network.getPeer()).filterTransactionQueue();
   }
 
-  /// [filterNetworkFor] synchronizes our database [x] with the [PeerNetwork]
+  /// [_filterNetworkFor] synchronizes our database [x] with the [PeerNetwork]
   /// and tracks updates
-  Future<void> filterNetworkFor(Address x) async {
+  Future<void> _filterNetworkFor(Address x) async {
     /// Abort if we're offline or lose network.  We'll [reload] when we reconnect.
     if (!currency.network.hasPeer) return voidResult();
     Peer peer = await currency.network.getPeer();
@@ -451,22 +500,26 @@ class Wallet extends WalletStorage {
 
     /// [newBalance] and [newMatureBalance] account for possibly receiving new
     /// transactions for [x] as we're loading
-    applyMaturesBalanceDelta(x, -x.maturesBalance + x.newMaturesBalance);
-    updateBalance(x, -x.balance + x.newBalance);
+    _applyMaturesBalanceDelta(x, -x.maturesBalance + x.newMaturesBalance);
+    _updateBalance(x, -x.balance + x.newBalance);
     x.newBalance = x.newMaturesBalance = null;
 
     /// Stream [Wallet] changes
     if (notifyListeners != null) notifyListeners();
   }
 
+  /// Use [getTransactions] iterator to load [x]'s [Transaction]s by [height]
   Future<TransactionIteratorResults> getNextTransactions(
       Peer peer, Address x) async {
+    /// Increment [getTransactions] iterator
     if (x.loadedHeight != null) {
       if (x.loadedIndex == 0)
         x.loadedHeight--;
       else
         x.loadedIndex--;
     }
+
+    /// Fetch next block with [getTransactions] iterator and [updateTransaction]
     TransactionIteratorResults results = await peer.getTransactions(
       x.publicKey,
       startHeight: x.loadedHeight,
@@ -477,6 +530,7 @@ class Wallet extends WalletStorage {
     for (Transaction transaction in results.transactions)
       updateTransaction(transaction, newTransaction: false);
 
+    /// Update [getTransactions] iterator
     if (x.loadedHeight != null &&
         (results.height > x.loadedHeight ||
             (results.height == x.loadedHeight &&
@@ -486,29 +540,27 @@ class Wallet extends WalletStorage {
       x.loadedHeight = results.height;
       x.loadedIndex = results.index;
     }
+
     return results;
   }
 
-  Future<Transaction> newTransaction(Transaction transaction) async {
-    pendingCount++;
-    await storePendingTransaction(transaction);
-    return transaction;
-  }
-
+  /// All [Transaction] updates go through [updateTransaction]
+  /// From either [getNextTransactions], [Peer].[filterAdd] results, or [_readPendingTransactions]
   void updateTransaction(Transaction transaction,
       {bool newTransaction = true}) {
     int height = transaction.height ?? 0;
-    bool undo = height < 0, transactionsChanged;
-    if (undo) {
+    bool undoneByReorg = height < 0, transactionsChanged;
+    if (undoneByReorg) {
       transactionsChanged = transactions.remove(transaction);
       transactionIds.remove(transaction.id().toJson());
     } else {
       transactionsChanged = transactions.add(transaction);
       transactionIds[transaction.id().toJson()] = transaction;
     }
-    bool balanceChanged = transactionsChanged && (newTransaction || undo);
+    bool balanceChanged = transactionsChanged && (newTransaction || undoneByReorg);
     bool mature = transaction.maturity <= currency.network.tipHeight;
 
+    /// Track [Address].[state] changes
     Address from =
         transaction.from == null ? null : addresses[transaction.from.toJson()];
     Address to = addresses[transaction.to.toJson()];
@@ -521,60 +573,45 @@ class Wallet extends WalletStorage {
       updateAddressState(to, AddressState.used, store: !balanceChanged);
     }
 
+    /// Track [Address].[balance] changes
     if (balanceChanged) {
       if (from != null) {
         num cost = transaction.amount + transaction.fee;
-        updateBalance(from, undo ? cost : -cost);
+        _updateBalance(from, undoneByReorg ? cost : -cost);
       }
       if (to != null && mature)
-        updateBalance(to, undo ? -transaction.amount : transaction.amount);
+        _updateBalance(to, undoneByReorg ? -transaction.amount : transaction.amount);
     }
 
+    /// Track [Address].[maturesBalance] changes
     if (to != null && !mature && transactionsChanged)
-      applyMaturesBalanceDelta(
-          to, undo ? -transaction.amount : transaction.amount, transaction);
+      _applyMaturesBalanceDelta(
+          to, undoneByReorg ? -transaction.amount : transaction.amount, transaction);
 
     /*debugPrint('${transaction.fromText} -> ${transaction.toText} ' +
                currency.format(transaction.amount) +
                ' mature=$mature, changed=$balanceChanged');*/
   }
 
-  void updateBalance(Address x, num delta) {
+  /// [_updateBalance] has the only call to [_applyBalanceDelta]
+  void _updateBalance(Address x, num delta) {
     if (x == null || delta == 0) return;
-    applyBalanceDelta(x, delta);
-    storeAddress(x);
+    _applyBalanceDelta(x, delta);
+    _storeAddress(x);
     if (notifyListeners != null) notifyListeners();
     if (balanceChanged != null) balanceChanged();
   }
 
-  void updateAddressState(Address x, AddressState newState,
-      {bool store = true}) {
-    if (x.state == newState) return;
-    bool wasReserve = x.state == AddressState.reserve;
-    if (wasReserve) accounts[x.accountId].reserveAddress.remove(x.chainIndex);
-    x.state = newState;
-    if (store) {
-      storeAddress(x);
-      if (notifyListeners != null) notifyListeners();
-    }
-    if (wasReserve) addNextAddress(account: accounts[x.accountId]);
-  }
-
-  void updateTip() {
-    assert(currency.network.tipHeight != null);
-    expirePendingTransactions(currency.network.tipHeight);
-    completeMaturingTransactions(currency.network.tipHeight);
-    if (notifyListeners != null) notifyListeners();
-  }
-
-  void applyBalanceDelta(Address x, num delta) {
+  /// Maintain hierarchy of [balance] with [delta] updates
+  void _applyBalanceDelta(Address x, num delta) {
     x.balance += delta;
     if (x.newBalance != null) x.newBalance += delta;
     accounts[x.accountId].balance += delta;
     balance += delta;
   }
 
-  void applyMaturesBalanceDelta(Address x, num delta,
+  /// Maintain hierarchy of [maturesBalance] with [delta] updates
+  void _applyMaturesBalanceDelta(Address x, num delta,
       [Transaction transaction]) {
     x.maturesBalance += delta;
     if (x.newMaturesBalance != null) x.newMaturesBalance += delta;
