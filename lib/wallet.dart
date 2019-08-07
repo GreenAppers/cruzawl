@@ -126,7 +126,7 @@ abstract class WalletStorage {
 
   /// Interface used by [_readStoredAddresses].
   Address addAddress(Address x,
-      {bool store = true, bool load = true, sembast.Transaction txn});a
+      {bool store = true, bool load = true, sembast.Transaction txn});
 
   /// Interface used by [_readPendingTransactions()].
   void updateTransaction(Transaction transaction, {bool newTransaction = true});
@@ -183,10 +183,12 @@ abstract class WalletStorage {
     currency = Currency.fromJson(header['currency']);
   }
 
+  /// Write single [Account] to [accountStore]
   Future<void> _storeAccount(Account x, [sembast.Transaction txn]) async {
     await accountStore.record(x.id).put(txn ?? storage, x.toJson());
   }
 
+  /// Read entire [accountStore] and [addAccount]
   Future<void> _readStoredAccounts() async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await accountStore.find(storage, finder: finder);
@@ -194,12 +196,14 @@ abstract class WalletStorage {
       addAccount(Account.fromJson(record.value), store: false);
   }
 
+  /// Write single [Address] to [addressStore]
   Future<void> _storeAddress(Address x, [sembast.Transaction txn]) async {
     await addressStore
         .record(x.publicKey.toJson())
         .put(txn ?? storage, jsonDecode(jsonEncode(x)));
   }
 
+  /// Read entire [addressStore] and [addAddress]
   Future<void> _readStoredAddresses({bool load = true}) async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await addressStore.find(storage, finder: finder);
@@ -211,14 +215,17 @@ abstract class WalletStorage {
     }
   }
 
+  /// Remove [Transaction.id()] matching [id] from [pendingStore]
   Future<void> _removePendingTransaction(String id) async =>
       pendingStore.record(id).delete(storage);
 
+  /// Write single [Transaction] to [pendingStore]
   Future<void> _storePendingTransaction(Transaction tx) async {
     String id = tx.id().toJson();
     await pendingStore.record(id).put(storage, jsonDecode(jsonEncode(tx)));
   }
 
+  /// Read entire [pendingStore] and [updateTransaction]
   Future<void> _readPendingTransactions() async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await pendingStore.find(storage, finder: finder);
@@ -235,17 +242,46 @@ abstract class WalletStorage {
 /// [Block] storage isn't necessary if [Peer.filterAdd] correctly handles reorgs.
 /// See: [undoneByReorg] in [updateTransaction].
 class Wallet extends WalletStorage {
+
+  /// True if [_openWalletStorage] has completed and this [Wallet] is ready.
   bool opened = false;
+
+  /// Active [Account] context for [addAddress()]
+  int activeAccountId = 0;
+
+  /// For non-HD wallets. Cycles through [addresses].
+  int nextAddressIndex;
+
+  /// Maturing balance for this wallet.
   num maturesBalance = 0;
-  int activeAccountId = 0, maturesHeight = 0, nextAddressIndex;
+
+  /// Maturing balance height for this wallet.
+  int maturesHeight = 0;
+
+  /// [PriorityQueue] of maturing [Transaction] involving [addresses].
   PriorityQueue<Transaction> maturing =
       PriorityQueue<Transaction>(Transaction.maturityCompare);
+
+  /// [Transaction] involving [addresses].
   SortedListSet<Transaction> transactions =
       SortedListSet<Transaction>(Transaction.timeCompare, List<Transaction>());
+
+  /// Map of [TransactionId.toJson()] to [transactions] entry.
   Map<String, Transaction> transactionIds = Map<String, Transaction>();
-  VoidCallback notifyListeners, balanceChanged;
+
+  /// We imagine we're a [ScopedModel]. A pure Dart proto-[ScopedModel].
+  VoidCallback notifyListeners;
+
+  /// Like [notifyListeners] but only called when [balance] changes.
+  VoidCallback balanceChanged;
+
+  /// If something horrible happened, give some explanation.
   ErrorDetails fatal;
+
+  /// Debug logging hook.
   StringCallback debugPrint;
+
+  /// e.g. [CruzawlPreferences.verifyAddressEveryLoad].
   CruzawlPreferences preferences;
 
   /// Generate new HD [Wallet].

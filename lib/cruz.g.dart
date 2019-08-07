@@ -147,17 +147,25 @@ CruzBlockHeader _$CruzBlockHeaderFromJson(Map<String, dynamic> json) {
     ..transactionCount = json['transaction_count'] as int;
 }
 
-Map<String, dynamic> _$CruzBlockHeaderToJson(CruzBlockHeader instance) =>
-    <String, dynamic>{
-      'previous': instance.previous,
-      'hash_list_root': instance.hashListRoot,
-      'time': instance.time,
-      'target': instance.target,
-      'chain_work': instance.chainWork,
-      'nonce': instance.nonce,
-      'height': instance.height,
-      'transaction_count': instance.transactionCount
-    };
+Map<String, dynamic> _$CruzBlockHeaderToJson(CruzBlockHeader instance) {
+  final val = <String, dynamic>{};
+
+  void writeNotNull(String key, dynamic value) {
+    if (value != null) {
+      val[key] = value;
+    }
+  }
+
+  writeNotNull('previous', instance.previous);
+  writeNotNull('hash_list_root', instance.hashListRoot);
+  writeNotNull('time', instance.time);
+  writeNotNull('target', instance.target);
+  writeNotNull('chain_work', instance.chainWork);
+  writeNotNull('nonce', instance.nonce);
+  writeNotNull('height', instance.height);
+  writeNotNull('transaction_count', instance.transactionCount);
+  return val;
+}
 
 CruzBlock _$CruzBlockFromJson(Map<String, dynamic> json) {
   return CruzBlock()

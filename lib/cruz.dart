@@ -501,7 +501,7 @@ class CruzBlockIds {
 
 /// Data used to determine block validity and place in the block chain.
 /// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go
-@JsonSerializable()
+@JsonSerializable(includeIfNull: false)
 class CruzBlockHeader extends BlockHeader {
   /// The ID of the previous block in the chain.
   @override
