@@ -9,9 +9,9 @@ import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/util.dart';
 
-typedef PeerStateChangedCallback = void Function(Peer, PeerState, PeerState);
-
 enum PeerState { ready, connected, connecting, disconnected }
+
+typedef PeerStateChangedCallback = void Function(Peer, PeerState, PeerState);
 
 /// Interface for [PeerNetwork] element providing Peer API.
 abstract class Peer {
@@ -95,8 +95,8 @@ abstract class Peer {
   }
 }
 
-/// Controls (re)connection policy for a collection of [Peer]s.
-/// And via [createPeerWithSpec] defines a type of network, e.g. [CruzPeerNetwork].
+/// Interface controlling (re)connection policy for a collection of [Peer]s.
+/// Defines a type of network via [createPeerWithSpec], e.g. [CruzPeerNetwork].
 abstract class PeerNetwork {
   int autoReconnectSeconds;
   List<Peer> peers = <Peer>[];
@@ -201,4 +201,31 @@ abstract class PeerNetwork {
     for (Peer peer in oldPeers) removePeer(peer);
     for (Peer peer in oldConnecting) removePeer(peer);
   }
+}
+
+/// Interface for message with [BlockId] and [Block].
+class BlockMessage {
+  BlockId id;
+  Block block;
+  BlockMessage(this.id, this.block);
+}
+
+/// Interface for message with [BlockId] and [BlockHeader].
+class BlockHeaderMessage {
+  BlockId id;
+  BlockHeader header;
+  BlockHeaderMessage(this.id, this.header);
+}
+
+/// Interface for iterating [Transaction] for [PublicAddress] by [height].
+class TransactionIterator {
+  int height, index;
+  TransactionIterator(this.height, this.index);
+}
+
+/// Interface for [TransactionIterator] results.
+class TransactionIteratorResults extends TransactionIterator {
+  List<Transaction> transactions;
+  TransactionIteratorResults(int height, int index, this.transactions)
+      : super(height, index);
 }

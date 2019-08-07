@@ -136,8 +136,8 @@ abstract class WalletStorage {
   Future<void> _openStorage(
       sembast.DatabaseFactory databaseFactory, String filename) async {
     storage = await databaseFactory.openDatabase(filename,
-        codec:
-            getSalsa20SembastCodec(Uint8List.fromList(seed.data.sublist(32))));
+        codec: getSecretBoxSembastCodec(
+            Uint8List.fromList(seed.data.sublist(32))));
 
     walletStore = sembast.StoreRef<String, dynamic>.main();
     accountStore = sembast.intMapStoreFactory.store('accounts');
@@ -242,7 +242,6 @@ abstract class WalletStorage {
 /// [Block] storage isn't necessary if [Peer.filterAdd] correctly handles reorgs.
 /// See: [undoneByReorg] in [updateTransaction].
 class Wallet extends WalletStorage {
-
   /// True if [_openWalletStorage] has completed and this [Wallet] is ready.
   bool opened = false;
 

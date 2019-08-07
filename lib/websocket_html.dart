@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:html' as html;
 
+/// dart:html WebSocket wrapper.
 class WebSocket {
   static const String type = 'html';
 

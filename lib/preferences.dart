@@ -54,7 +54,7 @@ class CruzawlPreferences extends SembastPreferences {
       assert(walletsPassword != null);
       Uint8List password = SHA256Digest().process(utf8.encode(walletsPassword));
       return Map<String, String>.from(
-          Salsa20Decoder(password).convert(data['wallets']));
+          SecretBoxDecoder(password).convert(data['wallets']));
     } else {
       return Map<String, String>.from(data['wallets'] ?? Map<String, String>());
     }
@@ -64,7 +64,7 @@ class CruzawlPreferences extends SembastPreferences {
     if (walletsEncrypted) {
       assert(walletsPassword != null);
       Uint8List password = SHA256Digest().process(utf8.encode(walletsPassword));
-      setPreference('wallets', Salsa20Encoder(password).convert(value));
+      setPreference('wallets', SecretBoxEncoder(password).convert(value));
     } else {
       setPreference('wallets', value);
     }

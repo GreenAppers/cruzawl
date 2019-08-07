@@ -3,6 +3,6 @@ import 'package:test/test.dart';
 import 'package:cruzawl/test.dart';
 
 void main() {
-  CruzTest(group, test, expect).run();
-  WalletTest(group, test, expect).run();
+  CruzTester(group, test, expect).run();
+  WalletTester(group, test, expect).run();
 }

@@ -6,6 +6,7 @@ import 'dart:io' as io;
 
 import 'package:cruzawl/util.dart';
 
+/// dart:io WebSocket wrapper.
 class WebSocket {
   static const String type = 'io';
 

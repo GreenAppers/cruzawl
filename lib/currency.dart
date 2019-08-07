@@ -86,13 +86,13 @@ class LoadingCurrency extends Currency {
       null;
 }
 
-/// e.g. Ed25519 public key
+/// Interface for e.g. Ed25519 public key
 abstract class PublicAddress {
   /// Marshals this address as a JSON-encoded string.
   String toJson();
 }
 
-/// e.g. Ed25519 private key
+/// Interface for e.g. Ed25519 private key
 abstract class PrivateKey {
   /// Marshals this key as a JSON-encoded string.
   String toJson();
@@ -100,13 +100,13 @@ abstract class PrivateKey {
   PublicAddress derivePublicKey();
 }
 
-/// e.g. Ed25519 signature
+/// Interface for e.g. Ed25519 signature
 abstract class Signature {
   /// Marshals this signature as a JSON-encoded string.
   String toJson();
 }
 
-/// e.g. SLIP-0010 chain code
+/// Interface for e.g. SLIP-0010 chain code
 abstract class ChainCode {
   /// Marshals this chain code as a JSON-encoded string.
   String toJson();
@@ -213,25 +213,14 @@ abstract class Transaction {
 
 typedef TransactionCallback = void Function(Transaction);
 
-class TransactionIterator {
-  int height, index;
-  TransactionIterator(this.height, this.index);
-}
-
-class TransactionIteratorResults extends TransactionIterator {
-  List<Transaction> transactions;
-  TransactionIteratorResults(int height, int index, this.transactions)
-      : super(height, index);
-}
-
-/// e.g. SHA3-256 of [BlockHeader] data
+/// Interface for e.g. SHA3-256 of [BlockHeader] data
 abstract class BlockId {
   Uint8List data;
   String toJson();
   BigInt toBigInt();
 }
 
-/// [BlockHeader.nonce] is the field varied by [PeerNetwork] miners
+/// Interface for block header with [BlockHeader.nonce] varied by [PeerNetwork] miners
 abstract class BlockHeader {
   BlockId get previous;
   TransactionId get hashListRoot;
@@ -251,23 +240,11 @@ abstract class BlockHeader {
   static int compareHeight(dynamic a, dynamic b) => b.height - a.height;
 }
 
-/// [Block] is what the [PeerNetwork] chains
+/// Interface for [Block] that the [PeerNetwork] chains
 abstract class Block {
   BlockHeader get header;
   List<Transaction> get transactions;
   BlockId id();
-}
-
-class BlockMessage {
-  BlockId id;
-  Block block;
-  BlockMessage(this.id, this.block);
-}
-
-class BlockHeaderMessage {
-  BlockId id;
-  BlockHeader header;
-  BlockHeaderMessage(this.id, this.header);
 }
 
 CRUZ cruz = CRUZ();

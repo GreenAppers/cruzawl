@@ -12,19 +12,33 @@ typedef JsonCallback = void Function(Map<String, dynamic>);
 
 /// [Peer] integrating [html.Websocket] and [io.WebSocket]
 abstract class PersistentWebSocketClient extends Peer {
+  /// The URI for [WebSocket.connect]
   String address;
+
+  /// Automatically attempt reconnecting this [Peer].
   int autoReconnectSeconds;
+
+  /// The wrapped dart:html or dart:io [WebSocket].
   WebSocket ws = WebSocket();
+
+  /// [Queue] holding [JsonCallback] for expected in-order responses.
   Queue<JsonCallback> jsonResponseQueue = Queue<JsonCallback>();
+
+  /// [address] is derived from [spec] with optional context, e.g. genesis [BlockId].
   PersistentWebSocketClient(PeerPreference spec, this.address,
       {this.autoReconnectSeconds})
       : super(spec);
 
-  // PersistentWebSocket API
+  /// Interface for newly established connection.
   void handleConnected();
+
+  /// Interface for lost connection.
   void handleDisconnected();
+
+  /// Interface for messages received from transport.
   void handleMessage(String message);
 
+  /// Number of in-flight queries.
   @override
   int get numOutstanding => jsonResponseQueue.length;
 

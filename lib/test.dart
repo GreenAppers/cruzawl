@@ -13,6 +13,10 @@ import 'package:cruzawl/wallet.dart';
 typedef TestCallback = void Function(String, VoidCallback);
 typedef ExpectCallback = void Function(dynamic, dynamic);
 
+/// Harness for running [package:test] unit tests in-app.
+///
+/// It's always a good practice to run unit tests with objective test vectors (in-app)
+/// before doing any sensitive cryptography.
 abstract class TestRunner {
   TestCallback group, test;
   ExpectCallback expect;
@@ -21,13 +25,15 @@ abstract class TestRunner {
   void run();
 }
 
-class CruzTest extends TestRunner {
-  CruzTest(TestCallback group, TestCallback test, ExpectCallback expect)
+/// Runs cruzbit test vectors and unit tests
+class CruzTester extends TestRunner {
+  CruzTester(TestCallback group, TestCallback test, ExpectCallback expect)
       : super(group, test, expect);
 
   void run() {
     group('TestVector1', () {
-      // create transaction for Test Vector 1
+      /// Create [CruzTransaction] for Test Vector 1.
+      /// Reference: https://github.com/cruzbit/cruzbit/blob/master/transaction_test.go#L59
       CruzPublicKey pubKey = CruzPublicKey.fromJson(
           '80tvqyCax0UdXB+TPvAQwre7NxUHhISm/bsEOtbF+yI=');
       CruzPublicKey pubKey2 = CruzPublicKey.fromJson(
@@ -78,16 +84,18 @@ class CruzTest extends TestRunner {
   }
 }
 
-class WalletTest extends TestRunner {
-  WalletTest(TestCallback group, TestCallback test, ExpectCallback expect)
+/// Runs wallet test vectors and unit tests
+class WalletTester extends TestRunner {
+  WalletTester(TestCallback group, TestCallback test, ExpectCallback expect)
       : super(group, test, expect);
 
   void run() {
-    group('SLIP 0010 Test vector 1 for ed25519', () {
+    /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0010.md#test-vector-2-for-ed25519
+    group('SLIP 0010 Test vector 2 for ed25519', () {
       Wallet wallet = Wallet.fromSeed(
           null,
           null,
-          'TestVector1',
+          'TestVector2',
           cruz,
           Seed(hex.decode(
               'fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542')));

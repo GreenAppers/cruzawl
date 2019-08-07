@@ -12,57 +12,63 @@ import 'package:cruzawl/util.dart';
 
 /// Not [SharedPreferences] but [SembastPreferences].
 class SembastPreferences {
+  /// sembast: Simple Embedded Application Store database.
   Database db;
+
+  /// Holds single 'preferences' record with the preferences [data].
   var store;
-  bool loaded = false, dirty = false;
+
+  /// The preferences data. e.g. data.update('theme', 'teal')
   Map<String, dynamic> data = Map<String, dynamic>();
+
+  /// Initialize this preference store with sembast [Database].
   SembastPreferences(this.db) : store = StoreRef<String, dynamic>.main();
 
+  /// Writes the preferences [data] to [store]
   Future<void> save() async => await store.record('preferences').put(db, data);
 
+  /// Reads the preferences from [store] into [data]
   Future<SembastPreferences> load() async {
     data = Map<String, dynamic>.from(
         await store.record('preferences').get(db) ?? Map<String, dynamic>());
-    if (dirty) save();
-    loaded = true;
     return this;
   }
 
+  /// Update a preference and [save()] when (by default) [store] is set.
   Future<void> setPreference(String key, dynamic value, {bool store = true}) {
     data[key] = value;
-    if (!loaded || !store) {
-      dirty = true;
-      return voidResult();
-    } else {
-      return save();
-    }
+    return store ? save() : voidResult();
   }
 }
 
-/// https://github.com/tekartik/sembast.dart/issues/35#issuecomment-498005269
-class Salsa20Encoder extends Converter<Map<String, dynamic>, String> {
+/// Secretbox uses XSalsa20 and Poly1305 to encrypt and authenticate messages with
+/// secret-key cryptography. The length of messages is not hidden.
+class SecretBoxEncoder extends Converter<Map<String, dynamic>, String> {
   Uint8List password;
-  Salsa20Encoder(this.password) {
+  SecretBoxEncoder(this.password) {
     assert(password.length == 32);
   }
 
   @override
   String convert(Map<String, dynamic> input) {
+    /// Nonces are long enough that randomly generated nonces have negligible risk of collision.
     Uint8List initialValue = randBytes(8);
     String encoded = base64.encode(initialValue);
     assert(encoded.length == 12);
 
     final Uint8List message = utf8.encode(jsonEncode(input));
-    final SecretBox salsa20 = SecretBox(password);
-    encoded += base64.encode(salsa20.box_nonce_len(
+    final SecretBox secretBox = SecretBox(password);
+    encoded += base64.encode(secretBox.box_nonce_len(
         message, 0, message.length, _generateNonce(initialValue)));
     return encoded;
   }
 }
 
-class Salsa20Decoder extends Converter<String, Map<String, dynamic>> {
+/// Authenticates and decrypts the given secret box using the key and the nonce.
+/// Implements xsalsa20-poly1305.
+class SecretBoxDecoder extends Converter<String, Map<String, dynamic>> {
   Uint8List password;
-  Salsa20Decoder(this.password) {
+  SecretBoxDecoder(this.password) {
     assert(password.length == 32);
   }
 
@@ -73,8 +79,8 @@ class Salsa20Decoder extends Converter<String, Map<String, dynamic>> {
     input = input.substring(12);
 
     final Uint8List message = base64.decode(input);
-    final SecretBox salsa20 = SecretBox(password);
-    var decoded = json.decode(utf8.decode(salsa20.open_nonce_len(
+    final SecretBox secretBox = SecretBox(password);
+    var decoded = json.decode(utf8.decode(secretBox.open_nonce_len(
         message, 0, message.length, _generateNonce(initialValue))));
     if (decoded is Map) {
       return decoded.cast<String, dynamic>();
@@ -83,13 +89,14 @@ class Salsa20Decoder extends Converter<String, Map<String, dynamic>> {
   }
 }
 
-class Salsa20Codec extends Codec<Map<String, dynamic>, String> {
-  Salsa20Encoder _encoder;
-  Salsa20Decoder _decoder;
+/// Reference: https://github.com/tekartik/sembast.dart/issues/35#issuecomment-498005269
+class SecretBoxCodec extends Codec<Map<String, dynamic>, String> {
+  SecretBoxEncoder _encoder;
+  SecretBoxDecoder _decoder;
 
-  Salsa20Codec(Uint8List password) {
-    _encoder = Salsa20Encoder(password);
-    _decoder = Salsa20Decoder(password);
+  SecretBoxCodec(Uint8List password) {
+    _encoder = SecretBoxEncoder(password);
+    _decoder = SecretBoxDecoder(password);
   }
 
   @override
@@ -99,10 +106,12 @@ class Salsa20Codec extends Codec<Map<String, dynamic>, String> {
   Converter<Map<String, dynamic>, String> get encoder => _encoder;
 }
 
+// Oops. This should've been 'SecretBox'. Too late now.
 const _encryptCodecSignature = 'salsa20';
 
-SembastCodec getSalsa20SembastCodec(Uint8List password) => SembastCodec(
-    signature: _encryptCodecSignature, codec: Salsa20Codec(password));
+/// Returns a SecretBox [SembastCodec] using [password].
+SembastCodec getSecretBoxSembastCodec(Uint8List password) => SembastCodec(
+    signature: _encryptCodecSignature, codec: SecretBoxCodec(password));
 
 /// From https://github.com/jspschool/tweetnacl-dart/blob/master/lib/src/tweetnacl_base.dart#L67
 Uint8List _generateNonce(Uint8List input) {
