@@ -13,7 +13,7 @@ typedef PeerStateChangedCallback = void Function(Peer, PeerState, PeerState);
 
 enum PeerState { ready, connected, connecting, disconnected }
 
-/// Interface for [PeerNetwork] element providing [Peer] API
+/// Interface for [PeerNetwork] element providing Peer API.
 abstract class Peer {
   PeerPreference spec;
   PeerState state = PeerState.disconnected;
@@ -24,17 +24,17 @@ abstract class Peer {
   Queue<Completer<void>> throttleQueue = Queue<Completer<void>>();
   Peer(this.spec);
 
-  /// Connection properties
+  // Connection properties
   String get address;
   int get numOutstanding;
 
-  /// Network properties
+  // Network properties
   BlockId get tipId;
   BlockHeader get tip;
   num get minAmount;
   num get minFee;
 
-  /// [Peer] API
+  // Peer API
   void connect();
   void disconnect(String reason);
   Future<num> getBalance(PublicAddress address);
@@ -48,14 +48,14 @@ abstract class Peer {
   Future<BlockMessage> getBlock({BlockId id, int height});
   Future<Transaction> getTransaction(TransactionId id);
 
-  /// Primary [StateSetter]
+  /// Primary [StateSetter].
   void setState(PeerState x) {
     PeerState oldState = state;
     state = x;
     if (stateChanged != null) stateChanged(this, oldState, state);
   }
 
-  /// Connection handling
+  // Connection handling
   void connectAfter(int seconds) {
     if (connectTimer != null) connectTimer.cancel();
     connectTimer = Timer(Duration(seconds: seconds), connect);
@@ -75,7 +75,7 @@ abstract class Peer {
     connectTimer = null;
   }
 
-  /// Keep a [Queue] after [maxOutstanding] in-flight queries
+  /// Keep a [Queue] after [maxOutstanding] in-flight queries.
   Future<Peer> throttle() async {
     if (numOutstanding < maxOutstanding) return this;
     Completer<Peer> completer = Completer();
@@ -95,8 +95,8 @@ abstract class Peer {
   }
 }
 
-/// [PeerNetwork] controls (re)connection policy for a collection of [Peer]s
-/// and via [createPeerWithSpec] defines a type of network, e.g. [CruzPeerNetwork]
+/// Controls (re)connection policy for a collection of [Peer]s.
+/// And via [createPeerWithSpec] defines a type of network, e.g. [CruzPeerNetwork].
 abstract class PeerNetwork {
   int autoReconnectSeconds;
   List<Peer> peers = <Peer>[];
@@ -108,7 +108,7 @@ abstract class PeerNetwork {
   bool get hasPeer => peers.length > 0;
   int get length => peers.length + connecting.length;
 
-  /// [Peer] property wrappers
+  // Peer property wrappers
   int get tipHeight => hasPeer ? tip.height : 0;
   BlockHeader get tip => hasPeer ? peers[0].tip : null;
   BlockId get tipId => hasPeer ? peers[0].tipId : null;
@@ -121,10 +121,10 @@ abstract class PeerNetwork {
       ? peers[0].address
       : (connecting.length > 0 ? connecting[0].address : '');
 
-  /// [Peer] factory interface
+  /// [Peer] factory interface.
   Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId);
 
-  /// Subscribe [Peer].[setState] handler [peerStateChanged]
+  /// Subscribe [Peer.setState] handler [peerStateChanged].
   Peer addPeer(Peer x) {
     x.stateChanged = peerStateChanged;
     x.tipChanged = () {
@@ -137,7 +137,7 @@ abstract class PeerNetwork {
     return x;
   }
 
-  /// Unsubscribe [Peer].[stateChanged] and [close]
+  /// Unsubscribe [Peer.stateChanged] and [Peer.close].
   void removePeer(Peer x) {
     x.stateChanged = null;
     x.close();
@@ -145,7 +145,7 @@ abstract class PeerNetwork {
     connecting.remove(x);
   }
 
-  /// Get a random throttled [Peer] or add to reconnect [Queue] if none and [wait]
+  /// Get a random throttled [Peer] or add to reconnect [Queue] if none and [wait].
   Future<Peer> getPeer([bool wait = true]) async {
     if (peers.length == 0) {
       if (!wait) return null;
@@ -158,7 +158,7 @@ abstract class PeerNetwork {
     return peer.throttle();
   }
 
-  /// [reconnectPeer] has the only call to [WebSocket].[connect]
+  /// Makes the only call to [WebSocket.connect].
   void reconnectPeer() {
     assert(connecting.length > 0);
     Peer x = connecting.removeAt(0);
@@ -166,7 +166,7 @@ abstract class PeerNetwork {
     connecting.add(x);
   }
 
-  /// Track [Peer].[setState] triggering [reconnectPeer] or [peerChanged]
+  /// Track [Peer.setState] triggering [reconnectPeer] or [peerChanged].
   void peerStateChanged(Peer x, PeerState oldState, PeerState newState) {
     if (newState == PeerState.ready && oldState != PeerState.ready) {
       connecting.remove(x);
@@ -183,7 +183,7 @@ abstract class PeerNetwork {
     }
   }
 
-  /// [lostLastPeer] and [peerBecameReady] have the only calls to [peerChanged]
+  /// lostLastPeer and [peerBecameReady] have the only calls to [peerChanged].
   void lostLastPeer() {
     if (peerChanged != null) peerChanged();
   }

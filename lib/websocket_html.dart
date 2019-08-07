@@ -15,7 +15,7 @@ class WebSocket {
 
   void connect(String address, Function onConnected, Function onError,
       {int timeoutSeconds = 15, bool ignoreBadCert = false}) {
-    /// No way to allow self-signed certificates
+    /// No way to allow self-signed certificates.
     assert(!ignoreBadCert);
     try {
       connectCallback = onConnected;

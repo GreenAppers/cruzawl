@@ -12,7 +12,7 @@ import 'package:cruzawl/util.dart';
 abstract class Currency {
   const Currency();
 
-  /// Called by [Wallet].[fromFile] to load a wallet for an arbitrary [Currency]
+  /// Called by [Wallet.fromFile] to load a wallet for an arbitrary [Currency]
   factory Currency.fromJson(String x) {
     switch (x) {
       case 'CRUZ':
@@ -22,16 +22,16 @@ abstract class Currency {
     }
   }
 
-  /// [network] is the only dynamic property
+  /// The only dynamic property
   PeerNetwork get network;
 
-  /// Constants
+  // Constants
   String get ticker;
   int get bip44CoinType;
   int get coinbaseMaturity;
   PublicAddress get nullAddress;
 
-  /// Constant functions
+  // Constant functions
   String toJson() => ticker;
   String format(num v) => v.toString();
   num parse(String v) => num.tryParse(v) ?? 0;
@@ -39,7 +39,7 @@ abstract class Currency {
       DateTime.fromMillisecondsSinceEpoch(time * 1000);
   String suggestedFee(Transaction t) => null;
 
-  /// [Currency] API
+  // Currency API
   String genesisBlockId();
   Address deriveAddress(Uint8List seed, String path,
       [StringCallback debugPrint]);
@@ -59,16 +59,16 @@ abstract class Currency {
 class LoadingCurrency extends Currency {
   const LoadingCurrency();
 
-  /// Null [network]
+  /// Null network.
   PeerNetwork get network => null;
 
-  /// Constants
+  // Constants
   String get ticker => 'CRUZ';
   int get bip44CoinType => 0;
   int get coinbaseMaturity => 0;
   PublicAddress get nullAddress => null;
 
-  /// Null [Currency] API
+  // Null Currency API
   String genesisBlockId() => null;
   Address deriveAddress(Uint8List seed, String path,
           [StringCallback debugPrint]) =>
@@ -88,11 +88,13 @@ class LoadingCurrency extends Currency {
 
 /// e.g. Ed25519 public key
 abstract class PublicAddress {
+  /// Marshals this address as a JSON-encoded string.
   String toJson();
 }
 
 /// e.g. Ed25519 private key
 abstract class PrivateKey {
+  /// Marshals this key as a JSON-encoded string.
   String toJson();
   PublicAddress getPublicKey();
   PublicAddress derivePublicKey();
@@ -100,34 +102,38 @@ abstract class PrivateKey {
 
 /// e.g. Ed25519 signature
 abstract class Signature {
+  /// Marshals this signature as a JSON-encoded string.
   String toJson();
 }
 
 /// e.g. SLIP-0010 chain code
 abstract class ChainCode {
+  /// Marshals this chain code as a JSON-encoded string.
   String toJson();
 }
 
 enum AddressState { reserve, open, used, remove }
 
-/// [Address] interface for element that [Wallet] contains
+/// Interface for element that [Wallet] contains
 abstract class Address {
   String name;
   AddressState state = AddressState.reserve;
   int accountId, chainIndex, earliestSeen, latestSeen;
   num balance = 0;
 
-  /// JSON ignore
+  // JSON ignore
   int maturesHeight = 0, loadedHeight, loadedIndex;
   num maturesBalance = 0, newBalance, newMaturesBalance;
 
-  /// [Address] API accessors
+  // Accessors
   PublicAddress get publicKey;
   PrivateKey get privateKey;
   ChainCode get chainCode;
 
-  /// [Address] API is just accessors and [verify]
+  /// Marshals [Address] as a JSON-encoded string.
   Map<String, dynamic> toJson();
+
+  /// Verifies the integrity of this [Address]
   bool verify();
 
   /// Track the earliest and latest [height] each [Address] has been seen
@@ -155,10 +161,13 @@ abstract class Address {
 
 /// e.g. SHA3-256 of [Transaction] data
 abstract class TransactionId {
+  /// Marshals this transaction ID as a JSON-encoded string.
   String toJson();
 }
 
 abstract class Transaction {
+  /// [BlockHeader.height] where this transaction appears in the blockchain.
+  /// Zero for uncomfirmed transactions.
   int height = 0;
 
   int get time;
@@ -171,21 +180,31 @@ abstract class Transaction {
   int get matures;
   int get expires;
 
+  /// Marshals this transaction as a JSON-encoded string.
   Map<String, dynamic> toJson();
+
+  /// Computes an ID for this transaction.
   TransactionId id();
+
+  /// Verifies this transaction's signature.
   bool verify();
 
+  /// The JSON-encoded sender of this transaction.
   String get fromText => from.toJson();
+
+  /// The JSON-encoded receiver of this transaction.
   String get toText => to.toJson();
+
+  /// Block height after which this transaction can be spent.
   int get maturity => max(matures ?? 0, from != null ? 0 : height + 100);
 
-  /// Sort by [time] and tie-break so only equivalent [Transaction] compare equal
+  /// Sorts by [time] and tie-break so only equivalent [Transaction] compare equal.
   static int timeCompare(Transaction a, Transaction b) {
     int deltaT = -a.time + b.time;
     return deltaT != 0 ? deltaT : a.id().toJson().compareTo(b.id().toJson());
   }
 
-  /// Sort by [maturity] and tie-break so only equivalent [Transaction] compare equal
+  /// Sorts by [maturity] and tie-break so only equivalent [Transaction] compare equal.
   static int maturityCompare(Transaction a, Transaction b) {
     int deltaM = a.maturity - b.maturity;
     return deltaM != 0 ? deltaM : a.id().toJson().compareTo(b.id().toJson());
@@ -212,7 +231,7 @@ abstract class BlockId {
   BigInt toBigInt();
 }
 
-/// [BlockHeader].[nonce] is the field varied by [PeerNetwork] miners
+/// [BlockHeader.nonce] is the field varied by [PeerNetwork] miners
 abstract class BlockHeader {
   BlockId get previous;
   TransactionId get hashListRoot;

@@ -22,46 +22,62 @@ import 'package:cruzawl/websocket.dart';
 
 part 'cruz.g.dart';
 
-/// cruzbit: A simple decentralized peer-to-peer ledger implementation
+/// cruzbit: A simple decentralized peer-to-peer ledger implementation.
 /// https://github.com/cruzbit/cruzbit
 class CRUZ extends Currency {
-  static const int cruzbitsPerCruz = 100000000;
-  static const int blocksUntilNewSeries = 1008; // 1 week in blocks
+  /// 1 week in blocks.
+  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/constants.go#L42
+  static const int blocksUntilNewSeries = 1008;
 
+  /// Same ratio of cruzbits to CRUZ as Satoshis to Bitcoin.
+  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/constants.go#L10
+  static const int cruzbitsPerCruz = 100000000;
+
+  /// Ticker symbol.  e.g. the CRUZ in https://qtrade.io/market/CRUZ_BTC
   @override
   String get ticker => 'CRUZ';
 
+  /// The coin type used for HD wallets.
+  /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
   @override
   int get bip44CoinType => 831;
 
+  /// Coinbase transactions mature after 100 blocks.
+  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/constants.go#L14
   @override
   int get coinbaseMaturity => 100;
 
+  /// 0.01
+  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/constants.go#L70
+  @override
+  String suggestedFee(Transaction t) => '0.01';
+
+  /// Format discrete cruzbit value [v] in fractional CRUZ representation.
   @override
   String format(num v) =>
       v != null ? (v / cruzbitsPerCruz).toStringAsFixed(2) : '0';
 
-  @override
-  String suggestedFee(Transaction t) => '0.01';
-
+  /// Parse fractional CRUZ value [v] into discrete cruzbits.
   @override
   num parse(String v) {
     num x = num.tryParse(v);
     return x != null ? (x * cruzbitsPerCruz).floor() : 0;
   }
 
+  /// The cruzbit [PeerNetwork].
   @override
   CruzPeerNetwork network = CruzPeerNetwork();
 
+  /// Address with the value of zero.
   @override
   PublicAddress get nullAddress => CruzPublicKey(Uint8List(32));
 
-  /// https://www.cruzbase.com/#/height/0
+  /// ID of the first [Block] in the chain. e.g. https://www.cruzbase.com/#/height/0
   @override
   String genesisBlockId() =>
       CruzBlock.fromJson(jsonDecode(genesisBlockJson)).id().toJson();
 
-  /// SLIP-0010: Universal private key derivation from master private key
+  /// SLIP-0010: Universal private key derivation from master private key.
   @override
   CruzAddress deriveAddress(Uint8List seed, String path,
       [StringCallback debugPrint]) {
@@ -75,23 +91,23 @@ class CRUZ extends Currency {
         CruzChainCode(data.chainCode));
   }
 
-  /// For Watch-only wallets
+  /// For Watch-only wallets.
   @override
   CruzAddress fromPublicKey(PublicAddress addr) {
     CruzPublicKey key = CruzPublicKey.fromJson(addr.toJson());
     return CruzAddress.fromPublicKey(key);
   }
 
-  /// For non-HD wallets
+  /// For non-HD wallets.
   @override
   CruzAddress fromPrivateKey(PrivateKey key) => CruzAddress.fromPrivateKey(key);
 
-  /// For loading wallet from storage
+  /// For loading wallet from storage.
   @override
   CruzAddress fromAddressJson(Map<String, dynamic> json) =>
       CruzAddress.fromJson(json);
 
-  /// Parse CRUZ public key
+  /// Parse CRUZ public key.
   @override
   PublicAddress fromPublicAddressJson(String text) {
     try {
@@ -103,20 +119,20 @@ class CRUZ extends Currency {
     }
   }
 
-  /// Parse CRUZ private key
+  /// Parse CRUZ private key.
   @override
   PrivateKey fromPrivateKeyJson(String text) => CruzPrivateKey.fromJson(text);
 
-  /// Parse CRUZ transaction id
+  /// Parse CRUZ transaction id.
   TransactionId fromTransactionIdJson(String text) =>
       CruzTransactionId.fromJson(text);
 
-  /// Parse CRUZ transaction
+  /// Parse CRUZ transaction.
   @override
   Transaction fromTransactionJson(Map<String, dynamic> json) =>
       CruzTransaction.fromJson(json);
 
-  /// Create signed CRUZ transaction
+  /// Creates signed CRUZ transaction.
   @override
   Transaction signedTransaction(Address fromInput, PublicAddress toInput,
       num amount, num fee, String memo, int height,
@@ -131,141 +147,160 @@ class CRUZ extends Currency {
   }
 }
 
-/// Ed25519 public key, 32 bytes
+/// Ed25519 public key, 32 bytes.
 class CruzPublicKey extends PublicAddress {
   final Uint8List data;
   static const int size = 32;
 
+  /// Fully specified constructor used by JSON deserializer.
   CruzPublicKey(this.data) {
     if (data.length != size) throw FormatException();
   }
 
+  /// Unmarshals a base64-encoded string to [CruzPublicKey].
   CruzPublicKey.fromJson(String x) : this(base64.decode(x));
 
+  /// Marshals [CruzPublicKey] as a base64-encoded string.
   @override
   String toJson() => base64.encode(data);
 }
 
-/// Ed25519 private key (pair), 64 bytes
+/// Ed25519 private key (pair), 64 bytes.
 class CruzPrivateKey extends PrivateKey {
   final Uint8List data;
   static const int size = 64;
 
+  /// Fully specified constructor used by JSON deserializer.
   CruzPrivateKey(this.data) {
     if (data.length != size) throw FormatException();
   }
 
+  /// Unmarshals a base64-encoded string to [CruzPrivateKey].
   CruzPrivateKey.fromJson(String x) : this(base64.decode(x));
 
+  /// Marshals [CruzPrivateKey] as a base64-encoded string.
   @override
   String toJson() => base64.encode(data);
 
-  /// The second half of an Ed25519 private key is the public key
+  /// The second half of an Ed25519 private key is the public key.
   CruzPublicKey getPublicKey() =>
       CruzPublicKey(data.buffer.asUint8List(size - CruzPublicKey.size));
 
-  /// Used to verify the key pair
+  /// Used to verify the key pair.
   CruzPublicKey derivePublicKey() => CruzPublicKey(
       tweetnacl.Signature.keyPair_fromSeed(data.buffer.asUint8List(0, 32))
           .publicKey);
 }
 
-/// Ed25519 signature, 64 bytes
+/// Ed25519 signature, 64 bytes.
 class CruzSignature extends Signature {
   final Uint8List data;
   static const int size = 64;
 
+  /// Fully specified constructor used by JSON deserializer.
   CruzSignature(this.data) {
     if (data.length != size) throw FormatException();
   }
 
+  /// Unmarshals a base64-encoded string to [CruzSignature].
   CruzSignature.fromJson(String x) : this(base64.decode(x));
 
+  /// Marshals [CruzSignature] as a base64-encoded string.
   String toJson() => base64.encode(data);
 }
 
-/// SLIP-0010 chain code
+/// SLIP-0010 chain code.
 class CruzChainCode extends ChainCode {
   final Uint8List data;
   static const int size = 32;
 
+  /// Fully specified constructor used by JSON deserializer.
   CruzChainCode(this.data) {
     if (data.length != size) throw FormatException();
   }
 
+  /// Unmarshals a base64-encoded string to [CruzChainCode].
   CruzChainCode.fromJson(String x) : this(base64.decode(x));
 
+  /// Marshals [CruzChainCode] as a base64-encoded string.
   @override
   String toJson() => base64.encode(data);
 }
 
-/// SHA3-256 of the CRUZ transaction JSON
+/// SHA3-256 of the CRUZ transaction JSON.
 class CruzTransactionId extends TransactionId {
   final Uint8List data;
   static const int size = 32;
 
+  /// Fully specified constructor used by JSON deserializer.
   CruzTransactionId(this.data) {
     if (data.length != size) throw FormatException();
   }
 
-  /// [compute] the hash of [transactionJson]
+  /// Computes the hash of [transactionJson].
   CruzTransactionId.compute(String transactionJson)
       : data = SHA3Digest(256).process(utf8.encode(transactionJson));
 
-  /// [fromJson] unmarshals a hex string to [CruzTransactionID].
+  /// Unmarshals a hex string to [CruzTransactionId].
   CruzTransactionId.fromJson(String x) : this(hex.decode(x));
 
-  /// [toJson] marshals [CruzTransactionId] as a hex string.
+  /// Marshals [CruzTransactionId] as a hex string.
   @override
   String toJson() => hex.encode(data);
 }
 
-/// Reference https://github.com/cruzbit/cruzbit/blob/master/transaction.go
-/// [CruzTransaction] represents a ledger transaction. It transfers value from one public key to another.
+/// A ledger transaction representation. It transfers value from one public key to another.
+/// Reference: https://github.com/cruzbit/cruzbit/blob/master/transaction.go
 @JsonSerializable(includeIfNull: false)
 class CruzTransaction extends Transaction {
+  // Unix time
   @override
   int time;
 
-  /// [nonce] collision prevention. pseudorandom. not used for crypto
+  /// Collision prevention. Pseudorandom. Not used for crypto.
   @override
   int nonce;
 
+  /// Public key this transaction transfers value from.
   @override
   CruzPublicKey from;
 
+  /// Public key this transaction transfers value to.
   @override
   CruzPublicKey to;
 
+  /// Amount of value this transaction transfers in cruzbits.
   @override
   int amount;
 
+  /// The handling fee paid to the [PeerNetwork] for this transaction.
   @override
   int fee;
 
-  /// [memo] max 100 characters
+  /// Max 100 characters.
   @override
   String memo;
 
-  /// [matures] block height. if set transaction can't be mined before
+  /// Block height. If set transaction can't be mined before.
   @override
   int matures;
 
-  /// [expires] block height. if set transaction can't be mined after
+  /// Block height. If set transaction can't be mined after.
   @override
   int expires;
 
-  /// [series] +1 roughly once a week to allow for pruning history
+  /// Increments roughly once a week to allow for pruning history.
   @override
   int series;
 
-  /// [signature] is a [CruzTransaction]'s signature.
+  /// The signature of this transaction.
   CruzSignature signature;
 
-  /// [height] used by [Wallet].  Not marshaled
+  /// Used by [Wallet].  Not marshaled.
   @JsonKey(ignore: true)
   int height = 0;
 
+  /// Creates an arbitrary unsigned [CruzTransaction].
   CruzTransaction(this.from, this.to, this.amount, this.fee, this.memo,
       {this.matures, this.expires, this.series, this.height})
       : time = DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -274,6 +309,7 @@ class CruzTransaction extends Transaction {
     if (memo != null && memo.isEmpty) memo = null;
   }
 
+  /// Copies transaction [x] minus the [signature]
   CruzTransaction.withoutSignature(CruzTransaction x)
       : time = x.time,
         nonce = x.nonce,
@@ -286,42 +322,47 @@ class CruzTransaction extends Transaction {
         expires = x.expires,
         series = x.series;
 
+  /// Unmarshals a JSON-encoded string to [CruzTransaction].
   factory CruzTransaction.fromJson(Map<String, dynamic> json) =>
       _$CruzTransactionFromJson(json);
 
-  @override
-  String get fromText => from != null ? from.toJson() : 'cruzbase';
-
+  /// Marshals [CruzTransaction] as a JSON-encoded string.
   @override
   Map<String, dynamic> toJson() => signedJson();
 
+  /// Equivalent to [toJson].
   Map<String, dynamic> signedJson() => _$CruzTransactionToJson(this);
 
+  /// Marshals [CruzTransaction] sans [signature] as a JSON-encoded string.
   Map<String, dynamic> unsignedJson() => signature == null
       ? _$CruzTransactionToJson(this)
       : _$CruzTransactionToJson(CruzTransaction.withoutSignature(this));
 
-  /// [id] computes an ID for a given transaction.
+  // The base64-encoded sender of this transaction, or 'cruzbase' if no sender.
+  @override
+  String get fromText => from != null ? from.toJson() : 'cruzbase';
+
+  /// Computes an ID for this transaction.
   @override
   CruzTransactionId id() =>
       CruzTransactionId.compute(jsonEncode(unsignedJson()));
 
-  /// [sign] is called to sign a transaction.
+  /// Signs this transaction.
   void sign(CruzPrivateKey key) =>
       signature = CruzSignature(tweetnacl.Signature(null, key.data)
           .sign(id().data)
           .buffer
           .asUint8List(0, 64));
 
-  /// [verify] is called to verify only that the transaction is properly signed.
+  /// Verify only that the transaction is properly signed.
   @override
   bool verify() => signature == null
       ? false
       : tweetnacl.Signature(from.data, null)
           .detached_verify(id().data, signature.data);
 
-  /// Reference https://github.com/cruzbit/cruzbit/blob/master/transaction.go#L143
-  /// Compute the series to use for a new transaction.
+  /// Computes the series to use for a new transaction.
+  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/transaction.go#L143
   static int computeTransactionSeries(bool isCoinbase, int height) {
     if (isCoinbase) {
       /// coinbases start using the new series right on time
@@ -334,38 +375,46 @@ class CruzTransaction extends Transaction {
   }
 }
 
-/// CRUZ implementation of the [Wallet] entry [Address] abstraction
+/// CRUZ implementation of the [Wallet] entry [Address] abstraction.
 @JsonSerializable(includeIfNull: false)
 class CruzAddress extends Address {
+  /// The public key of this [CruzAddress].
   @override
   CruzPublicKey publicKey;
 
+  /// The private key for this address, if not watch-only.
   @override
   CruzPrivateKey privateKey;
 
+  /// The chain code for this address, if HD derived.
   @override
   CruzChainCode chainCode;
 
-  /// Dynamically tracked properties
-  @JsonKey(ignore: true)
-  int maturesHeight = 0;
-
-  @JsonKey(ignore: true)
-  int loadedHeight;
-
-  @JsonKey(ignore: true)
-  int loadedIndex;
-
+  /// Maturing balance for this address.
   @JsonKey(ignore: true)
   num maturesBalance = 0;
 
+  /// Maturing balance height for this address.
+  @JsonKey(ignore: true)
+  int maturesHeight = 0;
+
+  /// Dynamically tracked property.
+  @JsonKey(ignore: true)
+  int loadedHeight;
+
+  /// Dynamically tracked property.
+  @JsonKey(ignore: true)
+  int loadedIndex;
+
+  /// Dynamically tracked property.
   @JsonKey(ignore: true)
   num newBalance;
 
+  /// Dynamically tracked property.
   @JsonKey(ignore: true)
   num newMaturesBalance;
 
-  /// Fully specified constructor used by JSON deserializer
+  /// Fully specified constructor used by JSON deserializer.
   CruzAddress(this.publicKey, this.privateKey, this.chainCode) {
     if (publicKey == null ||
         (privateKey != null &&
@@ -373,161 +422,190 @@ class CruzAddress extends Address {
       throw FormatException();
   }
 
-  /// Element of watch-only [Wallet]
+  /// Element of watch-only [Wallet].
   CruzAddress.fromPublicKey(this.publicKey);
 
-  /// Element of non-HD [Wallet]
+  /// Element of non-HD [Wallet].
   CruzAddress.fromPrivateKey(this.privateKey) {
     publicKey = privateKey.getPublicKey();
   }
 
-  /// Element of HD [Wallet]
+  /// Element of HD [Wallet].
   CruzAddress.fromSeed(Uint8List seed) {
     tweetnacl.KeyPair pair = tweetnacl.Signature.keyPair_fromSeed(seed);
     publicKey = CruzPublicKey(pair.publicKey);
     privateKey = CruzPrivateKey(pair.secretKey);
   }
 
+  /// Generate a random [CruzAddress]. Not used by [Wallet].
   CruzAddress.generateRandom()
       : this.fromSeed(SHA256Digest().process(randBytes(32)));
 
+  /// Unmarshals a JSON-encoded string to [CruzAddress].
   factory CruzAddress.fromJson(Map<String, dynamic> json) =>
       _$CruzAddressFromJson(json);
 
+  /// Marshals [CruzAddress] as a JSON-encoded string.
   @override
   Map<String, dynamic> toJson() => _$CruzAddressToJson(this);
 
+  /// Verifies [privateKey] produces [publicKey].
   bool verify() =>
       privateKey != null &&
       equalUint8List(
           privateKey.getPublicKey().data, privateKey.derivePublicKey().data);
 }
 
-/// [CruzBlockID] is a block's unique identifier.
-/// e.g. the SHA3-256 of [CruzBlockHeader] JSON
+/// Unique identifier for [Block].
+/// e.g. the SHA3-256 of [CruzBlockHeader] JSON.
 class CruzBlockId extends BlockId {
   final Uint8List data;
   static const int size = 32;
 
+  /// Fully specified constructor used by JSON deserializer.
   CruzBlockId(this.data) {
     if (data.length != size) throw FormatException();
   }
 
-  /// [compute] the hash of [blockHeaderJson]
+  /// Computes the hash of [blockHeaderJson].
   CruzBlockId.compute(String blockHeaderJson)
       : data = SHA3Digest(256).process(utf8.encode(blockHeaderJson));
 
-  /// [fromJson] unmarshals [CruzBlockID] hex string to [CruzBlockID].
+  /// Unmarshals hex string to [CruzBlockId].
   CruzBlockId.fromJson(String x) : data = hex.decode(x) {
     if (data.length != size) throw FormatException('input=${x}');
   }
 
-  /// [toJson] marshals [CruzBlockID] as a hex string.
+  /// Marshals [CruzBlockId] as a hex string.
   @override
   String toJson() => hex.encode(data);
 
+  /// Decodes a [BigInt] representation.
   @override
   BigInt toBigInt() => decodeBigInt(data);
 }
 
+/// List of [CruzBlockId]
 @JsonSerializable()
 class CruzBlockIds {
   List<CruzBlockId> ids;
   CruzBlockIds();
 
+  /// Unmarshals a base64-encoded string to [CruzBlockIds].
   factory CruzBlockIds.fromJson(Map<String, dynamic> json) =>
       _$CruzBlockIdsFromJson(json);
 
+  /// Marshals [CruzBlockIds] as a JSON-encoded string.
   Map<String, dynamic> toJson() => _$CruzBlockIdsToJson(this);
 }
 
+/// Data used to determine block validity and place in the block chain.
 /// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go
-/// [CruzBlockHeader] contains data used to determine block validity and its place in the block chain.
 @JsonSerializable()
 class CruzBlockHeader extends BlockHeader {
+  /// The ID of the previous block in the chain.
   @override
   CruzBlockId previous;
 
+  /// The hash of all the transactions in this block.
   @JsonKey(name: 'hash_list_root')
   CruzTransactionId hashListRoot;
 
+  /// Unix time.
   @override
   int time;
 
-  /// [target] is the threshold new [CruzBlock]s must hash under
+  /// Threshold new [CruzBlock] must hash under.
   @override
   CruzBlockId target;
 
-  /// [chainWork] is the total cumulative chain work
+  /// Total cumulative chain work.
   @JsonKey(name: 'chain_work')
   CruzBlockId chainWork;
 
-  /// [nonce] is varied by miners
+  /// Parameter varied by miners.
   @override
   int nonce;
 
-  /// [height] must be eventually unique
+  /// Height is eventually unique.
   @override
   int height;
 
+  /// The number of transactions in this block.
   @JsonKey(name: 'transaction_count')
   int transactionCount;
 
+  /// Default constructor used by JSON deserializer.
   CruzBlockHeader();
 
+  /// Unmarshals a JSON-encoded string to [CruzBlockHeader].
   factory CruzBlockHeader.fromJson(Map<String, dynamic> json) =>
       _$CruzBlockHeaderFromJson(json);
 
+  /// Marshals [CruzBlockHeader] as a JSON-encoded string.
   @override
   Map<String, dynamic> toJson() => _$CruzBlockHeaderToJson(this);
 
+  /// Computes an ID for this block.
   CruzBlockId id() => CruzBlockId.compute(jsonEncode(this));
 
-  // Reference https://github.com/cruzbit/cruzbit/blob/master/block.go#L150-L161
+  /// Expected number of random hashes before mining this block.
+  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go#L150-L161
   BigInt blockWork() {
     BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0] = 1);
     return twoTo256 ~/ (target.toBigInt() + BigInt.from(1));
   }
 
+  /// Difference in work between [x] and this block.
   BigInt deltaWork(BlockHeader x) =>
       chainWork.toBigInt() - x.chainWork.toBigInt();
 
+  /// Difference in time between [x] and this block.
   int deltaTime(BlockHeader x) => time - x.time;
+
+  /// Expected hashes per second from [x] to this block.
   int hashRate(BlockHeader x) {
     int dt = deltaTime(x);
     return dt == 0 ? 0 : (deltaWork(x) ~/ BigInt.from(dt)).toInt();
   }
 }
 
-/// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go
-/// [CruzBlock] represents a block in the block chain. It has a header and a list of transactions.
+/// Represents a block in the block chain. It has a header and a list of transactions.
 /// As blocks are connected their transactions affect the underlying ledger.
+/// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go
 @JsonSerializable()
 class CruzBlock extends Block {
+  /// Header has [transactions] checksums and Proof of Work.
   @override
   CruzBlockHeader header;
 
+  /// The list of [CruzTransaction] in this block of the ledger.
   @override
   List<CruzTransaction> transactions;
 
+  /// Default constructor used by JSON deserializer.
   CruzBlock();
 
+  /// Unmarshals a JSON-encoded string to [CruzBlock].
   factory CruzBlock.fromJson(Map<String, dynamic> json) =>
       _$CruzBlockFromJson(json);
 
+  /// Marshals [CruzBlock] as a JSON-encoded string.
   Map<String, dynamic> toJson() => _$CruzBlockToJson(this);
 
-  /// [id] computes an ID for a given block header.
+  /// Computes an ID for a given block header.
   @override
   CruzBlockId id() => header.id();
 }
 
-/// CRUZ implementation of the [PeerNetwork] abstraction
+/// The cruzbit.1 [PeerNetwork] implementing a distributed ledger.
 class CruzPeerNetwork extends PeerNetwork {
+  /// Creates [Peer] ready to [Peer.connect()].
   @override
   Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId) =>
       CruzPeer(spec, parseUri(spec.url, genesisBlockId));
 
+  /// Valid CRUZ URI: 'wallet.cruzbit.xyz', 'wallet:8832', 'wss://wallet:8832'.
   String parseUri(String uriText, String genesisId) {
     if (!Uri.parse(uriText).hasScheme) uriText = 'wss://' + uriText;
     Uri uri = Uri.parse(uriText);
@@ -536,26 +614,33 @@ class CruzPeerNetwork extends PeerNetwork {
   }
 }
 
+/// CRUZ implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://github.com/cruzbit/cruzbit/blob/master/protocol.go
-/// CRUZ implementation of the [PeerNetwork] entry [Peer] abstraction
 class CruzPeer extends PersistentWebSocketClient {
+  /// The [CruzAddress] we're monitoring [CruzPeerNetwork] for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
 
+  /// ID of tip [CruzBlock] according to this peer.
   @override
   CruzBlockId tipId;
 
+  /// Header of tip [CruzBlock] according to this peer.
   @override
   CruzBlockHeader tip;
 
+  /// This minimum [CruzTransaction.amount] for the [CruzPeerNetwork].
   @override
   num minAmount;
 
+  /// This minimum [CruzTransaction.fee] for the [CruzPeerNetwork].
   @override
   num minFee;
 
+  /// Forward [Peer] constructor.
   CruzPeer(PeerPreference spec, String address) : super(spec, address);
 
+  /// Network lost. Clear [tip] and [tipId].
   @override
   void handleDisconnected() {
     addressFilter = Map<String, TransactionCallback>();
@@ -563,6 +648,7 @@ class CruzPeer extends PersistentWebSocketClient {
     tip = null;
   }
 
+  /// Network connected. Request [tipId], [tip], [minAmount], and [minFee].
   @override
   void handleConnected() {
     // TipHeaderMessage is used to send a peer the header for the tip block in the block chain.
@@ -599,8 +685,8 @@ class CruzPeer extends PersistentWebSocketClient {
     );
   }
 
-  // GetBalanceMessage requests a public key's balance.
-  // Type: "get_balance".
+  /// GetBalanceMessage requests a public key's balance.
+  /// Type: "get_balance".
   @override
   Future<num> getBalance(PublicAddress address) {
     Completer<num> completer = Completer<num>();
@@ -623,9 +709,9 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
-  // GetPublicKeyTransactionsMessage requests transactions associated with a given public key over a given
-  // height range of the block chain.
-  // Type: "get_public_key_transactions".
+  /// GetPublicKeyTransactionsMessage requests transactions associated with a given public key over a given
+  /// height range of the block chain.
+  /// Type: "get_public_key_transactions".
   @override
   Future<TransactionIteratorResults> getTransactions(PublicAddress address,
       {int startHeight, int startIndex, int endHeight, int limit = 20}) {
@@ -680,8 +766,8 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
-  // PushTransactionMessage is used to push a newly processed unconfirmed transaction to peers.
-  // Type: "push_transaction".
+  /// PushTransactionMessage is used to push a newly processed unconfirmed transaction to peers.
+  /// Type: "push_transaction".
   @override
   Future<TransactionId> putTransaction(Transaction transaction) {
     Completer<TransactionId> completer = Completer<TransactionId>();
@@ -711,9 +797,9 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
-  // FilterAddMessage is used to request the addition of the given public keys to the current filter.
-  // The filter is created if it's not set.
-  // Type: "filter_add".
+  /// FilterAddMessage is used to request the addition of the given public keys to the current filter.
+  /// The filter is created if it's not set.
+  /// Type: "filter_add".
   @override
   Future<bool> filterAdd(
       PublicAddress address, TransactionCallback transactionCb) {
@@ -742,9 +828,9 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
-  // FilterTransactionQueueMessage returns a pared down view of the unconfirmed transaction queue containing only
-  // transactions relevant to the peer given their filter.
-  // Type: "filter_transaction_queue".
+  /// FilterTransactionQueueMessage returns a pared down view of the unconfirmed transaction queue containing only
+  /// transactions relevant to the peer given their filter.
+  /// Type: "filter_transaction_queue".
   @override
   Future<bool> filterTransactionQueue() {
     Completer<bool> completer = Completer<bool>();
@@ -769,8 +855,8 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
-  // GetBlockHeaderMessage is used to request a block header.
-  // Type: "get_block_header".
+  /// GetBlockHeaderMessage is used to request a block header.
+  /// Type: "get_block_header".
   @override
   Future<BlockHeaderMessage> getBlockHeader({BlockId id, int height}) {
     Completer<BlockHeaderMessage> completer = Completer<BlockHeaderMessage>();
@@ -802,8 +888,8 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
-  // GetBlockMessage is used to request a block for download.
-  // Type: "get_block".
+  /// GetBlockMessage is used to request a block for download.
+  /// Type: "get_block".
   @override
   Future<BlockMessage> getBlock({BlockId id, int height}) {
     Completer<BlockMessage> completer = Completer<BlockMessage>();
@@ -835,8 +921,8 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
-  // GetTransactionMessage is used to request a confirmed transaction.
-  // Type: "get_transaction".
+  /// GetTransactionMessage is used to request a confirmed transaction.
+  /// Type: "get_transaction".
   @override
   Future<Transaction> getTransaction(TransactionId id) {
     Completer<Transaction> completer = Completer<Transaction>();
@@ -862,6 +948,7 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
+  /// Handle the cruzbit.1 JSON message frame consisting of [type] and [body].
   void handleMessage(String message) {
     if (spec.debugPrint != null)
       debugPrintLong('got message ' + message, spec.debugPrint);
@@ -896,6 +983,8 @@ class CruzPeer extends PersistentWebSocketClient {
     }
   }
 
+  /// Handles every new [CruzBlock] on the [CruzPeerNetwork].
+  /// [CruzBlock.transactions] is empty if no [CruzTransaction] match our [filterAdd()].
   void handleFilterBlock(CruzBlockId id, CruzBlock block, bool undo) {
     if (undo) {
       if (spec.debugPrint != null)
@@ -917,6 +1006,7 @@ class CruzPeer extends PersistentWebSocketClient {
       }
   }
 
+  /// Handles every new [CruzTransaction] matching our [filterAdd()]
   void handleNewTransaction(CruzTransaction transaction) {
     TransactionCallback cb = transaction.from != null
         ? addressFilter[transaction.from.toJson()]
@@ -926,7 +1016,7 @@ class CruzPeer extends PersistentWebSocketClient {
   }
 }
 
-/// https://www.cruzbase.com/#/height/0
+/// The first [CruzBlock] in the chain: https://www.cruzbase.com/#/height/0
 const String genesisBlockJson = '''{
   "header": {
     "previous": "0000000000000000000000000000000000000000000000000000000000000000",

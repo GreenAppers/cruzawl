@@ -20,7 +20,7 @@ abstract class PersistentWebSocketClient extends Peer {
       {this.autoReconnectSeconds})
       : super(spec);
 
-  /// [PersistentWebSocket] API
+  // PersistentWebSocket API
   void handleConnected();
   void handleDisconnected();
   void handleMessage(String message);
@@ -59,7 +59,7 @@ abstract class PersistentWebSocketClient extends Peer {
     handleConnected();
   }
 
-  /// [send] message [x] expecting an in-order response for [responseCalback]
+  /// [WebSocket.send] message [x] expecting an in-order response for [responseCallback]
   void addJsonMessage(Map<String, dynamic> x, JsonCallback responseCallback) {
     String message = jsonEncode(x);
     if (spec.debugPrint != null) spec.debugPrint('sending message: $message');

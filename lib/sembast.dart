@@ -10,7 +10,7 @@ import 'package:tweetnacl/tweetnacl.dart';
 
 import 'package:cruzawl/util.dart';
 
-/// Not [SharedPreferences] but [SembastPreferences]
+/// Not [SharedPreferences] but [SembastPreferences].
 class SembastPreferences {
   Database db;
   var store;
@@ -104,7 +104,7 @@ const _encryptCodecSignature = 'salsa20';
 SembastCodec getSalsa20SembastCodec(Uint8List password) => SembastCodec(
     signature: _encryptCodecSignature, codec: Salsa20Codec(password));
 
-// From https://github.com/jspschool/tweetnacl-dart/blob/master/lib/src/tweetnacl_base.dart#L67
+/// From https://github.com/jspschool/tweetnacl-dart/blob/master/lib/src/tweetnacl_base.dart#L67
 Uint8List _generateNonce(Uint8List input) {
   assert(input.length == 8);
   const int nonceLength = 24;
