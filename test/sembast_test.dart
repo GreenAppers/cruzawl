@@ -7,8 +7,8 @@ import 'package:cruzawl/sembast.dart';
 import 'package:cruzawl/util.dart';
 
 void main() {
-  test('Salsa20Codec', () {
-    Salsa20Codec codec = Salsa20Codec(randBytes(32));
+  test('SecretBoxCodec', () {
+    SecretBoxCodec codec = SecretBoxCodec(randBytes(32));
     PeerPreference peer = PeerPreference('foo', 'bar', 'baz', 'bat');
     Map<String, dynamic> peerJson = peer.toJson();
     String peerText = jsonEncode(peerJson);

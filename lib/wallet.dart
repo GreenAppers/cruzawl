@@ -574,14 +574,14 @@ class Wallet extends WalletStorage {
     /// Now (that we're filtering) query [x]'s balance.
     num newBalance = await peer.getBalance(x.publicKey);
     if (newBalance == null) return voidResult();
-    x.loadedHeight = x.loadedIndex = null;
+    x.loadIterator = null;
     x.newBalance += newBalance;
 
     /// Load most recent 100 blocks so we know of all maturing transactions.
     do {
       if (await getNextTransactions(peer, x) == null) return voidResult();
-    } while (
-        x.loadedHeight > max(0, peer.tip.height - currency.coinbaseMaturity));
+    } while (x.loadIterator.height >
+        max(0, peer.tip.height - currency.coinbaseMaturity));
 
     /// [newBalance] and [newMatureBalance] account for possibly receiving new
     /// transactions for [x] as we're loading.
@@ -596,36 +596,14 @@ class Wallet extends WalletStorage {
   /// Use [Peer.getTransactions] iterator to load [x]'s [Transaction]s by [Transaction.height].
   Future<TransactionIteratorResults> getNextTransactions(
       Peer peer, Address x) async {
-    /// Increment [Peer.getTransactions] iterator.
-    if (x.loadedHeight != null) {
-      if (x.loadedIndex == 0)
-        x.loadedHeight--;
-      else
-        x.loadedIndex--;
-    }
-
     /// Fetch next block with [Peer.getTransactions] iterator and [updateTransaction].
-    TransactionIteratorResults results = await peer.getTransactions(
-      x.publicKey,
-      startHeight: x.loadedHeight,
-      startIndex: x.loadedIndex,
-      endHeight: x.loadedHeight != null ? 0 : null,
-    );
+    TransactionIteratorResults results =
+        await peer.getTransactions(x.publicKey, x.loadIterator);
     if (results == null) return null;
     for (Transaction transaction in results.transactions)
       updateTransaction(transaction, newTransaction: false);
 
-    /// Update [Peer.getTransactions] iterator.
-    if (x.loadedHeight != null &&
-        (results.height > x.loadedHeight ||
-            (results.height == x.loadedHeight &&
-                results.index > x.loadedIndex))) {
-      x.loadedHeight = x.loadedIndex = 0;
-    } else {
-      x.loadedHeight = results.height;
-      x.loadedIndex = results.index;
-    }
-
+    x.loadIterator = TransactionIterator(results.height, results.index);
     return results;
   }
 

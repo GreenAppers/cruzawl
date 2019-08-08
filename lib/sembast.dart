@@ -52,6 +52,7 @@ class SecretBoxEncoder extends Converter<Map<String, dynamic>, String> {
   @override
   String convert(Map<String, dynamic> input) {
     /// Nonces are long enough that randomly generated nonces have negligible risk of collision.
+    /// Reference: https://godoc.org/golang.org/x/crypto/nacl/secretbox
     Uint8List initialValue = randBytes(8);
     String encoded = base64.encode(initialValue);
     assert(encoded.length == 12);

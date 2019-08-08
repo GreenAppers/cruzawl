@@ -12,6 +12,7 @@ typedef VoidCallback = void Function();
 
 Future<void> voidResult() async {}
 
+/// Optionally [debugPrint] failed assertions in-app.
 bool checkEquals(dynamic x, dynamic y, [StringCallback debugPrint]) {
   bool equals = x == y;
   if (debugPrint != null && !equals) debugPrint('assertion failure: $x != $y');
@@ -19,12 +20,14 @@ bool checkEquals(dynamic x, dynamic y, [StringCallback debugPrint]) {
   return equals;
 }
 
+/// Returns true if [x] and [y] are equivalent.
 bool equalUint8List(Uint8List x, Uint8List y) {
   if (x.length != y.length) return false;
   for (int i = 0; i < x.length; ++i) if (x[i] != y[i]) return false;
   return true;
 }
 
+/// Returns [n] random bytes.
 Uint8List randBytes(int n) {
   final Random generator = Random.secure();
   final Uint8List random = Uint8List(n);
@@ -32,6 +35,7 @@ Uint8List randBytes(int n) {
   return random;
 }
 
+/// Splits [debugPrint] into separate calls of [maxPrintLength].
 void debugPrintLong(Object object, StringCallback debugPrint) async {
   const int maxPrintLength = 1000;
   if (object == null || object.toString().length <= maxPrintLength) {
@@ -50,12 +54,14 @@ void debugPrintLong(Object object, StringCallback debugPrint) async {
   }
 }
 
+/// Saves exception details for presentation.
 class ErrorDetails {
   dynamic exception;
   StackTrace stack;
   ErrorDetails({this.exception, this.stack});
 }
 
+/// A proto-[Set] implemented as a [List] sorted by [compare].
 class SortedListSet<T> {
   List<T> data;
   int Function(T, T) compare;

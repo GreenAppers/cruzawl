@@ -15,52 +15,95 @@ typedef PeerStateChangedCallback = void Function(Peer, PeerState, PeerState);
 
 /// Interface for [PeerNetwork] element providing Peer API.
 abstract class Peer {
+  /// The persisted record defining this [Peer].
   PeerPreference spec;
+
+  /// The connection state of this [Peer].
   PeerState state = PeerState.disconnected;
+
+  /// Sends subscriber updates on [state] change.
   PeerStateChangedCallback stateChanged;
+
+  /// Notifies that a new [Block] was mined.
   VoidCallback tipChanged;
+
+  /// [Timer] to reconnection this [Peer]. Unused with [PeerNetwork] reconnect.
   Timer connectTimer;
+
+  // Maximum number of in-flight queries.
   int maxOutstanding = 20;
+
+  /// [Queue] of subscribers waiting for [numOutstanding] to decrease.
   Queue<Completer<void>> throttleQueue = Queue<Completer<void>>();
+
+  /// Create [Peer] fully specified by [PeerPreference].
   Peer(this.spec);
 
-  // Connection properties
+  /// URI for [Peer].
   String get address;
+
+  /// Number of in-flight queries.
   int get numOutstanding;
 
-  // Network properties
+  /// [BlockId] of the most recently mined [Block].
   BlockId get tipId;
+
+  /// [BlockHeader] of the most recently mined [Block].
   BlockHeader get tip;
+
+  /// The minimum [Transaction.amount] that the network allows.
   num get minAmount;
+
+  /// The minimum [Transaction.fee] that the network allows.
   num get minFee;
 
-  // Peer API
+  /// Connect the [Peer]. e.g. with [WebSocket.connect].
   void connect();
+
+  /// Disconnect the [Peer]. e.g. with [WebSocket.close].
   void disconnect(String reason);
+
+  /// Retrieves [address]' spendable balance.
   Future<num> getBalance(PublicAddress address);
-  Future<TransactionIteratorResults> getTransactions(PublicAddress address,
-      {int startHeight, int startIndex, int endHeight, int limit});
+
+  /// Iterates [address]' transactions by height.
+  Future<TransactionIteratorResults> getTransactions(
+      PublicAddress address, TransactionIterator iterator,
+      {int limit});
+
+  /// Adds [transaction] to the network.
   Future<TransactionId> putTransaction(Transaction transaction);
+
+  /// Subscribes [transactionCb] to updates on [Transaction] involving [address].
   Future<bool> filterAdd(
       PublicAddress address, TransactionCallback transactionCb);
+
+  /// Filters uncomfirmed transactions for the [fitlerAdd()] set.
   Future<bool> filterTransactionQueue();
+
+  /// Returns the [BlockHeader] with [id] or [height].
   Future<BlockHeaderMessage> getBlockHeader({BlockId id, int height});
+
+  /// Returns the [Block] with [id] or [height].
   Future<BlockMessage> getBlock({BlockId id, int height});
+
+  /// Returns the [Transaction] with [id].
   Future<Transaction> getTransaction(TransactionId id);
 
-  /// Primary [StateSetter].
+  /// The [StateSetter] for [PeerState].
   void setState(PeerState x) {
     PeerState oldState = state;
     state = x;
     if (stateChanged != null) stateChanged(this, oldState, state);
   }
 
-  // Connection handling
+  /// Restart [connectTimer] that eventually will [connect].
   void connectAfter(int seconds) {
     if (connectTimer != null) connectTimer.cancel();
     connectTimer = Timer(Duration(seconds: seconds), connect);
   }
 
+  /// Context for handling received messages.
   void handleProtocol(VoidCallback cb) {
     try {
       cb();
@@ -69,6 +112,7 @@ abstract class Peer {
     }
   }
 
+  /// Disconnect and reset.  Idempotent.
   void close() {
     if (state != PeerState.disconnected) disconnect('Peer close');
     if (connectTimer != null) connectTimer.cancel();
@@ -83,12 +127,14 @@ abstract class Peer {
     return completer.future;
   }
 
+  /// Dequeue as much of [throttleQueue] as we can.
   void dispatchFromThrottleQueue() {
     if (throttleQueue.length > 0 &&
         (numOutstanding ?? maxOutstanding) < maxOutstanding)
       (throttleQueue.removeFirst()).complete(this);
   }
 
+  /// Complete [throttleQueue] with null and discard it.
   void failThrottleQueue() {
     while (throttleQueue.length > 0)
       (throttleQueue.removeFirst()).complete(null);
@@ -98,25 +144,53 @@ abstract class Peer {
 /// Interface controlling (re)connection policy for a collection of [Peer]s.
 /// Defines a type of network via [createPeerWithSpec], e.g. [CruzPeerNetwork].
 abstract class PeerNetwork {
-  int autoReconnectSeconds;
+  /// The [Peer] we've connected to.
   List<Peer> peers = <Peer>[];
+
+  /// The [Peer] we're trying to connect to.
   List<Peer> connecting = <Peer>[];
+
+  /// [Queue] of subscribes waiting for a [Peer].
   Queue<Completer<Peer>> awaitingPeers = Queue<Completer<Peer>>();
-  VoidCallback peerChanged, tipChanged;
+
+  /// Notifies on any changes to [peers].
+  VoidCallback peerChanged;
+
+  /// Notifies when new [Blocks] are mined.
+  VoidCallback tipChanged;
+
+  /// Triggers [reconnectPeer] on [PeerState.disconnected].
+  int autoReconnectSeconds;
+
   PeerNetwork({this.autoReconnectSeconds = 15});
 
+  /// True if a [Peer] is connected.
   bool get hasPeer => peers.length > 0;
+
+  /// Number of [Peer] either [connecting] or connected.
   int get length => peers.length + connecting.length;
 
-  // Peer property wrappers
+  /// [Block.height] of the most recently mined [Block].
   int get tipHeight => hasPeer ? tip.height : 0;
+
+  /// [BlockHeader] of the most recently mined [Block].
   BlockHeader get tip => hasPeer ? peers[0].tip : null;
+
+  /// [BlockId] of the most recently mined [Block].
   BlockId get tipId => hasPeer ? peers[0].tipId : null;
+
+  /// The minimum [Transaction.amount] that the network allows.
   num get minAmount => hasPeer ? peers[0].minAmount : null;
+
+  /// The minimum [Transaction.fee] that the network allows.
   num get minFee => hasPeer ? peers[0].minFee : null;
+
+  /// [Peer.state] from [peers] or [PeerState.disconnected] if none.
   PeerState get peerState => hasPeer
       ? peers[0].state
       : (connecting.length > 0 ? connecting[0].state : PeerState.disconnected);
+
+  /// [Peer.address] from [peers] or empty [String] if none.
   String get peerAddress => hasPeer
       ? peers[0].address
       : (connecting.length > 0 ? connecting[0].address : '');
@@ -158,7 +232,8 @@ abstract class PeerNetwork {
     return peer.throttle();
   }
 
-  /// Makes the only call to [WebSocket.connect].
+  /// Cycles through [connecting] in round-robin fashion.
+  /// Triggers only call to [WebSocket.connect] this class makes.
   void reconnectPeer() {
     assert(connecting.length > 0);
     Peer x = connecting.removeAt(0);
@@ -188,12 +263,15 @@ abstract class PeerNetwork {
     if (peerChanged != null) peerChanged();
   }
 
+  /// Notify [awaitingPeers] and [peerChanged] subscribers of a new [Peer].
   void peerBecameReady(Peer x) {
     peers.add(x);
     while (awaitingPeers.length > 0) (awaitingPeers.removeFirst()).complete(x);
     if (peerChanged != null) peerChanged();
   }
 
+  /// Disconnect from and clear [peers] and [connecting].
+  /// [awaitingPeers] is unaffected.
   void shutdown() {
     List<Peer> oldPeers = peers, oldConnecting = connecting;
     peers = <Peer>[];
@@ -221,6 +299,9 @@ class BlockHeaderMessage {
 class TransactionIterator {
   int height, index;
   TransactionIterator(this.height, this.index);
+
+  /// True when the [Transaction] for [PublicAddress] have been fully traversed.
+  bool get done => height == 0 && index == 0;
 }
 
 /// Interface for [TransactionIterator] results.

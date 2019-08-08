@@ -398,21 +398,17 @@ class CruzAddress extends Address {
   @JsonKey(ignore: true)
   int maturesHeight = 0;
 
-  /// Dynamically tracked property.
-  @JsonKey(ignore: true)
-  int loadedHeight;
-
-  /// Dynamically tracked property.
-  @JsonKey(ignore: true)
-  int loadedIndex;
-
-  /// Dynamically tracked property.
+  /// Holds [balance] update during [PeerNetwork] synchronization.
   @JsonKey(ignore: true)
   num newBalance;
 
-  /// Dynamically tracked property.
+  /// Holds [maturesBalance] update during [PeerNetwork] synchronization.
   @JsonKey(ignore: true)
   num newMaturesBalance;
+
+  /// Iterator for loading more [Transaction] involving [Address].
+  @JsonKey(ignore: true)
+  TransactionIterator loadIterator;
 
   /// Fully specified constructor used by JSON deserializer.
   CruzAddress(this.publicKey, this.privateKey, this.chainCode) {
@@ -709,12 +705,33 @@ class CruzPeer extends PersistentWebSocketClient {
     return completer.future;
   }
 
+  @override
+  Future<TransactionIteratorResults> getTransactions(
+      PublicAddress address, TransactionIterator iterator,
+      {int limit = 20}) {
+    if (iterator != null) {
+      /// Increment this iterator.
+      if (iterator.index == 0)
+        iterator.height--;
+      else
+        iterator.index--;
+    }
+    return getPublicKeyTransactions(address,
+        startHeight: iterator != null ? iterator.height : null,
+        startIndex: iterator != null ? iterator.index : null,
+        endHeight: iterator != null ? 0 : null,
+        limit: limit);
+  }
+
   /// GetPublicKeyTransactionsMessage requests transactions associated with a given public key over a given
   /// height range of the block chain.
   /// Type: "get_public_key_transactions".
-  @override
-  Future<TransactionIteratorResults> getTransactions(PublicAddress address,
-      {int startHeight, int startIndex, int endHeight, int limit = 20}) {
+  Future<TransactionIteratorResults> getPublicKeyTransactions(
+      PublicAddress address,
+      {int startHeight,
+      int startIndex,
+      int endHeight,
+      int limit = 20}) {
     Completer<TransactionIteratorResults> completer =
         Completer<TransactionIteratorResults>();
 
@@ -749,8 +766,11 @@ class CruzPeer extends PersistentWebSocketClient {
           response['body']['stop_height'],
           response['body']['stop_index'],
           List<Transaction>());
-      if (ret.height == startHeight && ret.index == startIndex)
-        ret.height = ret.index = 0;
+
+      if (ret.height > startHeight ||
+          (ret.height == startHeight &&
+              startIndex != null &&
+              ret.index > startIndex)) ret.height = ret.index = 0;
 
       if (blocks == null)
         completer.complete(ret);
