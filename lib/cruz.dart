@@ -74,8 +74,7 @@ class CRUZ extends Currency {
 
   /// ID of the first [Block] in the chain. e.g. https://www.cruzbase.com/#/height/0
   @override
-  String genesisBlockId() =>
-      CruzBlock.fromJson(jsonDecode(genesisBlockJson)).id().toJson();
+  CruzBlock genesisBlock() => CruzBlock.fromJson(jsonDecode(genesisBlockJson));
 
   /// SLIP-0010: Universal private key derivation from master private key.
   @override
@@ -499,11 +498,11 @@ class CruzBlockIds {
 /// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go
 @JsonSerializable(includeIfNull: false)
 class CruzBlockHeader extends BlockHeader {
-  /// The ID of the previous block in the chain.
+  /// ID of the previous block in this chain.
   @override
   CruzBlockId previous;
 
-  /// The hash of all the transactions in this block.
+  /// Hash of all the transactions in this block.
   @JsonKey(name: 'hash_list_root')
   CruzTransactionId hashListRoot;
 
@@ -511,15 +510,16 @@ class CruzBlockHeader extends BlockHeader {
   @override
   int time;
 
-  /// Threshold new [CruzBlock] must hash under.
+  /// Threshold new [CruzBlock] must hash under for Proof of Work.
   @override
   CruzBlockId target;
 
   /// Total cumulative chain work.
+  /// [blockWork(CRUZ.genesisBock())] + [deltaWork(genesisBlock)].
   @JsonKey(name: 'chain_work')
   CruzBlockId chainWork;
 
-  /// Parameter varied by miners.
+  /// Parameter varied by miners for Proof of Work.
   @override
   int nonce;
 
@@ -589,7 +589,7 @@ class CruzBlock extends Block {
   /// Marshals [CruzBlock] as a JSON-encoded string.
   Map<String, dynamic> toJson() => _$CruzBlockToJson(this);
 
-  /// Computes an ID for a given block header.
+  /// Computes an ID for this block.
   @override
   CruzBlockId id() => header.id();
 }
@@ -737,12 +737,16 @@ class CruzPeer extends PersistentWebSocketClient {
 
     if (startHeight == null) {
       if (endHeight == null) {
-        // Get transactions in reverse order
+        /// Get transactions in reverse order
         startHeight = tip.height;
         endHeight = 0;
       } else
         startHeight = 0;
-    } else if (endHeight == null) endHeight = tip.height;
+    } else if (endHeight == null) endHeight = tip.height + 1;
+
+    /// For forward iteration we need [endHeight] > [tip.height].
+    /// Otherwise when [startHeight] == [endHeight] the direction is indistinguishable.
+    bool reverseOrder = endHeight <= startHeight;
 
     Map<String, dynamic> body = <String, dynamic>{
       'public_key': address.toJson(),
@@ -767,10 +771,18 @@ class CruzPeer extends PersistentWebSocketClient {
           response['body']['stop_index'],
           List<Transaction>());
 
-      if (ret.height > startHeight ||
-          (ret.height == startHeight &&
-              startIndex != null &&
-              ret.index > startIndex)) ret.height = ret.index = 0;
+      /// If newIterator < oldIterator we're done.
+      if (reverseOrder) {
+        if (ret.height > startHeight ||
+            (ret.height == startHeight &&
+             startIndex != null &&
+             ret.index > startIndex)) ret.height = ret.index = 0;
+      } else {
+        if (ret.height < startHeight ||
+            (ret.height == startHeight &&
+             startIndex != null &&
+             ret.index < startIndex)) ret.height = ret.index = 0;
+      }
 
       if (blocks == null)
         completer.complete(ret);

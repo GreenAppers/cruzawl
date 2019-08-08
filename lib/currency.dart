@@ -56,8 +56,8 @@ abstract class Currency {
   /// Suggests a fee for [transaction].
   String suggestedFee(Transaction transaction) => null;
 
-  /// The [BlockId] with [Block.height] equal zero.
-  String genesisBlockId();
+  /// The [Block] with [Block.height] equal zero.
+  Block genesisBlock();
 
   /// Derives the [Address] specified by [Wallet.seed] and [path].
   Address deriveAddress(Uint8List seed, String path,
@@ -101,7 +101,7 @@ class LoadingCurrency extends Currency {
   int get coinbaseMaturity => 0;
   PublicAddress get nullAddress => null;
 
-  String genesisBlockId() => null;
+  Block genesisBlock() => null;
   Address deriveAddress(Uint8List seed, String path,
           [StringCallback debugPrint]) =>
       null;
@@ -129,10 +129,10 @@ abstract class PrivateKey {
   /// Marshals this key as a JSON-encoded string.
   String toJson();
 
-  /// Retrieve the [PublicAddress] associted with this [PrivateKey].
+  /// Retrieve the [PublicAddress] associated with this [PrivateKey].
   PublicAddress getPublicKey();
 
-  /// Derive the [PublicAddress] associted with this [PrivateKey].
+  /// Derive the [PublicAddress] associated with this [PrivateKey].
   PublicAddress derivePublicKey();
 }
 
@@ -238,14 +238,31 @@ abstract class Transaction {
   /// Zero for uncomfirmed transactions.
   int height = 0;
 
+  /// e.g. Unix time.
   int get time;
+
+  /// De-dupes similar transactions.
   int get nonce;
+
+  /// Public key this transaction transfers value from.
   PublicAddress get from;
+
+  /// Public key this transaction transfers value to.
   PublicAddress get to;
+
+  /// Amount of value this transaction transfers.
   num get amount;
+
+  /// The handling fee paid to the [PeerNetwork] for this transaction.
   num get fee;
+
+  /// Optional memo attachment.
   String get memo;
+
+  /// Optional height delay for including this transaction.
   int get matures;
+
+  /// Optional height expiry for including this transaction.
   int get expires;
 
   /// Marshals this transaction as a JSON-encoded string.
@@ -284,34 +301,70 @@ typedef TransactionCallback = void Function(Transaction);
 /// Interface for e.g. SHA3-256 of [BlockHeader] data
 abstract class BlockId {
   Uint8List data;
+
+  /// Marshals this [BlockId] as a JSON-encoded string.
   String toJson();
+
+  /// Decode this [BlockId] to a [BigInt].
   BigInt toBigInt();
 }
 
 /// Interface for block header with [BlockHeader.nonce] varied by [PeerNetwork] miners
 abstract class BlockHeader {
+  /// ID of the previous block in this chain.
   BlockId get previous;
+
+  /// Checksum of all the transaction in this block.
   TransactionId get hashListRoot;
+
+  /// e.g. Unix time.
   int get time;
+
+  /// Threshold new [Block] must hash under for Proof of Work.
   BlockId get target;
+
+  /// Total cumulative chain work.
+  /// [blockWork(genesisBock)] + [deltaWork(genesisBlock)].
   BlockId get chainWork;
+
+  /// Parameter varied by miners for Proof of Work.
   int get nonce;
+
+  /// The [BlockHeader.height] of [previous] plus one.
   int get height;
+
+  /// The number of transactions in this block.
+  /// Strictly positive if coinbase transactions are required.
   int get transactionCount;
 
+  /// Marshals this [BlockHeader] as a JSON-encoded string.
   Map<String, dynamic> toJson();
+
+  /// Expected number of random hashes before mining this block.
   BigInt blockWork();
+
+  /// Difference in work between [x] and this block.
   BigInt deltaWork(BlockHeader x);
+
+  /// Difference in time between [x] and this block.
   int deltaTime(BlockHeader x);
+
+  /// Expected hashes per second from [x] to this block.
   int hashRate(BlockHeader x);
 
+  /// Compare [BlockHeader.height] of [a] and [b].
   static int compareHeight(dynamic a, dynamic b) => b.height - a.height;
 }
 
 /// Interface for [Block] that the [PeerNetwork] chains
 abstract class Block {
+  /// Data used to determine block validity and place in the block chain.
   BlockHeader get header;
+
+  /// The transactions in this block.
   List<Transaction> get transactions;
+
+  /// Computes an ID for this block.
   BlockId id();
 }
 
