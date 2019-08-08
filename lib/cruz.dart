@@ -912,9 +912,11 @@ class CruzPeer extends PersistentWebSocketClient {
           return;
         }
         checkEquals('block_header', response['type'], spec.debugPrint);
+        var body = response['body'];
+        var header = body != null ? body['header'] : null;
         completer.complete(BlockHeaderMessage(
-            CruzBlockId.fromJson(response['body']['block_id']),
-            CruzBlockHeader.fromJson(response['body']['header'])));
+            body != null ? CruzBlockId.fromJson(body['block_id']) : null,
+            header != null ? CruzBlockHeader.fromJson(header) : null));
       },
     );
     return completer.future;
@@ -945,9 +947,11 @@ class CruzPeer extends PersistentWebSocketClient {
           return;
         }
         checkEquals('block', response['type'], spec.debugPrint);
+        var body = response['body'];
+        var block = body['block'];
         completer.complete(BlockMessage(
-            CruzBlockId.fromJson(response['body']['block_id']),
-            CruzBlock.fromJson(response['body']['block'])));
+            CruzBlockId.fromJson(body['block_id']),
+            block != null ? CruzBlock.fromJson(block) : null));
       },
     );
     return completer.future;
