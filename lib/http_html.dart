@@ -6,6 +6,7 @@ import 'dart:html' as html;
 
 import 'http.dart';
 
+/// HTTP request itegrating [io.HttpClient] and [html.HttpRequest].
 class HttpRequest {
   static const String type = 'html';
 

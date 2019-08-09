@@ -4,6 +4,7 @@
 import 'dart:async';
 export 'http_html.dart' if (dart.library.io) 'http_io.dart';
 
+/// HTTP response itegrating [io.HttpClient] and [html.HttpRequest].
 class HttpResponse {
   int status;
   String text;
