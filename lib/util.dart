@@ -23,7 +23,9 @@ bool checkEquals(dynamic x, dynamic y, [StringCallback debugPrint]) {
 /// Returns true if [x] and [y] are equivalent.
 bool equalUint8List(Uint8List x, Uint8List y) {
   if (x.length != y.length) return false;
-  for (int i = 0; i < x.length; ++i) if (x[i] != y[i]) return false;
+  for (int i = 0; i < x.length; ++i) {
+    if (x[i] != y[i]) return false;
+  }
   return true;
 }
 
@@ -31,7 +33,9 @@ bool equalUint8List(Uint8List x, Uint8List y) {
 Uint8List randBytes(int n) {
   final Random generator = Random.secure();
   final Uint8List random = Uint8List(n);
-  for (int i = 0; i < random.length; i++) random[i] = generator.nextInt(255);
+  for (int i = 0; i < random.length; i++) {
+    random[i] = generator.nextInt(255);
+  }
   return random;
 }
 

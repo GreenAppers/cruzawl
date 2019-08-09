@@ -5,7 +5,7 @@
 Follow the same procedure as [the continuous integration](https://github.com/GreenAppers/cruzawl/blob/master/.travis.yml)
 
 # Architecture
-<img src="http://www.greenappers.com/cruzawl/diagram.svg" />
+<img src="https://www.greenappers.com/cruzawl/diagram.svg" />
 
 ## License
 

@@ -1,6 +1,6 @@
 name: cruzawl
-version: 1.0.0+0
-description: Library for CRUZ cryptocurrency
+version: 1.0.1+1
+description: Library for CRUZ cryptocurrency and cruzbit.1 network.
 author: Green Appers, Inc. <greenappers@gmail.com>
 homepage: https://github.com/GreenAppers/cruzawl
 documentation: https://github.com/GreenAppers/cruzawl/wiki

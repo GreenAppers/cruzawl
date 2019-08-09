@@ -129,15 +129,17 @@ abstract class Peer {
 
   /// Dequeue as much of [throttleQueue] as we can.
   void dispatchFromThrottleQueue() {
-    if (throttleQueue.length > 0 &&
-        (numOutstanding ?? maxOutstanding) < maxOutstanding)
+    if (throttleQueue.isNotEmpty &&
+        (numOutstanding ?? maxOutstanding) < maxOutstanding) {
       (throttleQueue.removeFirst()).complete(this);
+    }
   }
 
   /// Complete [throttleQueue] with null and discard it.
   void failThrottleQueue() {
-    while (throttleQueue.length > 0)
+    while (throttleQueue.isNotEmpty) {
       (throttleQueue.removeFirst()).complete(null);
+    }
   }
 }
 
@@ -165,7 +167,7 @@ abstract class PeerNetwork {
   PeerNetwork({this.autoReconnectSeconds = 15});
 
   /// True if a [Peer] is connected.
-  bool get hasPeer => peers.length > 0;
+  bool get hasPeer => peers.isNotEmpty;
 
   /// Number of [Peer] either [connecting] or connected.
   int get length => peers.length + connecting.length;

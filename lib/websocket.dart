@@ -56,9 +56,10 @@ abstract class PersistentWebSocketClient extends Peer {
   @override
   void connect() {
     setState(PeerState.connecting);
-    if (spec.debugPrint != null)
+    if (spec.debugPrint != null) {
       spec.debugPrint(
           'Connecting to $address ' + (spec.ignoreBadCert ? '' : 'securely'));
+    }
     ws.connect(address, onConnected, (error) => disconnect('connect error'),
         ignoreBadCert: spec.ignoreBadCert);
   }
@@ -88,7 +89,8 @@ abstract class PersistentWebSocketClient extends Peer {
   }
 
   void failJsonResponseQueue() {
-    while (jsonResponseQueue.length > 0)
+    while (jsonResponseQueue.length > 0) {
       (jsonResponseQueue.removeFirst())(null);
+    }
   }
 }

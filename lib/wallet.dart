@@ -148,8 +148,12 @@ abstract class WalletStorage {
   /// The only permanent storage iteration of [Address] and [Account] records.
   Future<void> _readStorage(sembast.DatabaseFactory databaseFactory,
       String filename, Account newDatabase, bool dontCheckFile) async {
-    if (newDatabase != null && !dontCheckFile && await File(filename).exists())
+    if (newDatabase != null &&
+        !dontCheckFile &&
+        await File(filename).exists()) {
       throw FileSystemException('$filename already exists');
+    }
+
     await _openStorage(databaseFactory, filename);
 
     if (newDatabase != null) {
@@ -192,8 +196,9 @@ abstract class WalletStorage {
   Future<void> _readStoredAccounts() async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await accountStore.find(storage, finder: finder);
-    for (var record in records)
+    for (var record in records) {
       addAccount(Account.fromJson(record.value), store: false);
+    }
   }
 
   /// Write single [Address] to [addressStore]
@@ -305,8 +310,9 @@ class Wallet extends WalletStorage {
       this.debugPrint,
       WalletCallback loaded])
       : super(name, currency, seed, seedPhrase) {
-    if (filename != null)
+    if (filename != null) {
       _openWalletStorage(databaseFactory, filename, true, loaded);
+    }
   }
 
   /// Create non-HD [Wallet] from private key list.
@@ -321,8 +327,9 @@ class Wallet extends WalletStorage {
       this.debugPrint,
       WalletCallback loaded])
       : super(name, currency, seed) {
-    if (filename != null)
+    if (filename != null) {
       _openWalletStorage(databaseFactory, filename, true, loaded, privateKeys);
+    }
   }
 
   /// Create watch-only [Wallet] from public key list.
@@ -337,9 +344,10 @@ class Wallet extends WalletStorage {
       this.debugPrint,
       WalletCallback loaded])
       : super(name, currency, seed) {
-    if (filename != null)
+    if (filename != null) {
       _openWalletStorage(
           databaseFactory, filename, true, loaded, null, publicKeys);
+    }
   }
 
   /// Load arbitrary [Wallet] of arbitrary [Currency].

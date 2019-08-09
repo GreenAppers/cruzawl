@@ -82,8 +82,9 @@ class CRUZ extends Currency {
       [StringCallback debugPrint]) {
     KeyData data = ED25519_HD_KEY.derivePath(path, hex.encode(seed));
     Uint8List publicKey = ED25519_HD_KEY.getBublickKey(data.key, false);
-    if (debugPrint != null)
+    if (debugPrint != null) {
       debugPrint('deriveAddress($path) = ${base64.encode(publicKey)}');
+    }
     return CruzAddress(
         CruzPublicKey(publicKey),
         CruzPrivateKey(Uint8List.fromList(data.key + publicKey)),
@@ -289,7 +290,6 @@ class CruzTransaction extends Transaction {
   int expires;
 
   /// Increments roughly once a week to allow for pruning history.
-  @override
   int series;
 
   /// The signature of this transaction.
@@ -413,8 +413,9 @@ class CruzAddress extends Address {
   CruzAddress(this.publicKey, this.privateKey, this.chainCode) {
     if (publicKey == null ||
         (privateKey != null &&
-            !equalUint8List(publicKey.data, privateKey.getPublicKey().data)))
+            !equalUint8List(publicKey.data, privateKey.getPublicKey().data))) {
       throw FormatException();
+    }
   }
 
   /// Element of watch-only [Wallet].
@@ -658,8 +659,9 @@ class CruzPeer extends PersistentWebSocketClient {
         checkEquals('tip_header', response['type'], spec.debugPrint);
         tipId = CruzBlockId.fromJson(response['body']['block_id']);
         tip = CruzBlockHeader.fromJson(response['body']['header']);
-        if (spec.debugPrint != null)
+        if (spec.debugPrint != null) {
           spec.debugPrint('initial blockHeight=${tip.height}');
+        }
         setState(PeerState.ready);
         if (tipChanged != null) tipChanged();
       },
@@ -711,10 +713,11 @@ class CruzPeer extends PersistentWebSocketClient {
       {int limit = 20}) {
     if (iterator != null) {
       /// Increment this iterator.
-      if (iterator.index == 0)
+      if (iterator.index == 0) {
         iterator.height--;
-      else
+      } else {
         iterator.index--;
+      }
     }
     return getPublicKeyTransactions(address,
         startHeight: iterator != null ? iterator.height : null,
@@ -775,13 +778,13 @@ class CruzPeer extends PersistentWebSocketClient {
       if (reverseOrder) {
         if (ret.height > startHeight ||
             (ret.height == startHeight &&
-             startIndex != null &&
-             ret.index > startIndex)) ret.height = ret.index = 0;
+                startIndex != null &&
+                ret.index > startIndex)) ret.height = ret.index = 0;
       } else {
         if (ret.height < startHeight ||
             (ret.height == startHeight &&
-             startIndex != null &&
-             ret.index < startIndex)) ret.height = ret.index = 0;
+                startIndex != null &&
+                ret.index < startIndex)) ret.height = ret.index = 0;
       }
 
       if (blocks == null)
@@ -949,8 +952,7 @@ class CruzPeer extends PersistentWebSocketClient {
         checkEquals('block', response['type'], spec.debugPrint);
         var body = response['body'];
         var block = body['block'];
-        completer.complete(BlockMessage(
-            CruzBlockId.fromJson(body['block_id']),
+        completer.complete(BlockMessage(CruzBlockId.fromJson(body['block_id']),
             block != null ? CruzBlock.fromJson(block) : null));
       },
     );

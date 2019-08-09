@@ -18,11 +18,12 @@ class WebSocket {
 
   void connect(String address, Function onConnected, Function onError,
       {int timeoutSeconds = 15, bool ignoreBadCert = false}) async {
-    if (!ignoreBadCert || !address.startsWith('wss://'))
+    if (!ignoreBadCert || !address.startsWith('wss://')) {
       return io.WebSocket.connect(address)
           .timeout(Duration(seconds: timeoutSeconds))
           .then((io.WebSocket x) => onConnected((ws = x)),
               onError: (error, _) => onError(error));
+    }
 
     io.HttpClient client = io.HttpClient();
     client.badCertificateCallback =
