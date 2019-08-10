@@ -83,13 +83,13 @@ abstract class PersistentWebSocketClient extends Peer {
   }
 
   void dispatchFromJsonResponseQueue(Map<String, dynamic> response) {
-    assert(jsonResponseQueue.length > 0);
+    assert(jsonResponseQueue.isNotEmpty);
     (jsonResponseQueue.removeFirst())(response);
     dispatchFromThrottleQueue();
   }
 
   void failJsonResponseQueue() {
-    while (jsonResponseQueue.length > 0) {
+    while (jsonResponseQueue.isNotEmpty) {
       (jsonResponseQueue.removeFirst())(null);
     }
   }

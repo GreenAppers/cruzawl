@@ -53,6 +53,9 @@ abstract class Currency {
   DateTime parseTime(int time) =>
       DateTime.fromMillisecondsSinceEpoch(time * 1000);
 
+  /// Returns number of coins issued at [height].
+  int supply(int height) => 0;
+
   /// Suggests a fee for [transaction].
   String suggestedFee(Transaction transaction) => null;
 

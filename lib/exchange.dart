@@ -81,20 +81,24 @@ void updateCruzToBtcWithQtrade(ExchangeRates rates) {
     /// Unfortunately it is a bit complicated to change the CORS policy for just
     /// the public endpoints with the way our backend is setup, but it is on our
     /// list of improvements -Eric @ qTrade
-    Map<String, dynamic> data = jsonDecode(resp.text)['data'], market = data['market'];
+    Map<String, dynamic> data = jsonDecode(resp.text)['data'],
+        market = data['market'];
     String base = market['market_currency'], currency = market['base_currency'];
     assert(base == 'CRUZ');
     assert(currency == 'BTC');
-    rates.updateRate(base, currency, num.parse(data['recent_trades'][0]['price']));
+    rates.updateRate(
+        base, currency, num.parse(data['recent_trades'][0]['price']));
   });
 }
 
 /// Updates CRUZ → BTC.
 void updateCruzToBtcWithVinex(ExchangeRates rates) {
   /// {"status":200,"data":{"id":4000027,"symbol":"BTC_CRUZ","assetId1":1,"assetId2":3000015,"lastPrice":0,"bidPrice":0,"askPrice":0,"volume":0,"weeklyVolume":0,"monthlyVolume":0,"volume24h":0,"asset2Volume24h":0,"change24h":0,"high24h":0,"low24h":0,"createdAt":1564564587,"updatedAt":1565380556,"status":true,"statusTrading":1,"threshold":0.001,"tradingFee":0.001,"makerFee":null,"takerFee":null,"decPrice":8,"decAmount":8,"totalVolume":0,"tokenInfo1":{"id":1,"name":"Bitcoin","symbol":"BTC"},"tokenInfo2":{"id":3000015,"name":"Cruzbit","symbol":"CRUZ"}}}
-  HttpRequest.request('https://api.vinex.network/api/v2/markets/BTC_CRUZ').then((resp) {
+  HttpRequest.request('https://api.vinex.network/api/v2/markets/BTC_CRUZ')
+      .then((resp) {
     Map<String, dynamic> data = jsonDecode(resp.text)['data'];
-    String base = data['tokenInfo2']['symbol'], currency = data['tokenInfo1']['symbol'];
+    String base = data['tokenInfo2']['symbol'],
+        currency = data['tokenInfo1']['symbol'];
     assert(base == 'CRUZ');
     assert(currency == 'BTC');
     rates.updateRate(base, currency, data['lastPrice']);

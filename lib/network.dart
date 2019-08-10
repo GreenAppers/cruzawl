@@ -190,12 +190,12 @@ abstract class PeerNetwork {
   /// [Peer.state] from [peers] or [PeerState.disconnected] if none.
   PeerState get peerState => hasPeer
       ? peers[0].state
-      : (connecting.length > 0 ? connecting[0].state : PeerState.disconnected);
+      : (connecting.isNotEmpty ? connecting[0].state : PeerState.disconnected);
 
   /// [Peer.address] from [peers] or empty [String] if none.
   String get peerAddress => hasPeer
       ? peers[0].address
-      : (connecting.length > 0 ? connecting[0].address : '');
+      : (connecting.isNotEmpty ? connecting[0].address : '');
 
   /// [Peer] factory interface.
   Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId);
@@ -206,10 +206,11 @@ abstract class PeerNetwork {
     x.tipChanged = () {
       if (tipChanged != null) tipChanged();
     };
-    if (x.state != PeerState.ready)
+    if (x.state != PeerState.ready) {
       connecting.add(x);
-    else
+    } else {
       peerBecameReady(x);
+    }
     return x;
   }
 
@@ -223,7 +224,7 @@ abstract class PeerNetwork {
 
   /// Get a random throttled [Peer] or add to reconnect [Queue] if none and [wait].
   Future<Peer> getPeer([bool wait = true]) async {
-    if (peers.length == 0) {
+    if (peers.isEmpty) {
       if (!wait) return null;
 
       Completer<Peer> completer = Completer<Peer>();
@@ -237,7 +238,7 @@ abstract class PeerNetwork {
   /// Cycles through [connecting] in round-robin fashion.
   /// Triggers only call to [WebSocket.connect] this class makes.
   void reconnectPeer() {
-    assert(connecting.length > 0);
+    assert(connecting.isNotEmpty);
     Peer x = connecting.removeAt(0);
     x.connectAfter(autoReconnectSeconds);
     connecting.add(x);
@@ -254,9 +255,11 @@ abstract class PeerNetwork {
     }
 
     if (newState == PeerState.disconnected) {
-      if (autoReconnectSeconds != null)
+      if (autoReconnectSeconds != null) {
         reconnectPeer();
-      else if (peers.length == 0) lostLastPeer();
+      } else if (peers.isEmpty) {
+        lostLastPeer();
+      }
     }
   }
 
@@ -268,7 +271,7 @@ abstract class PeerNetwork {
   /// Notify [awaitingPeers] and [peerChanged] subscribers of a new [Peer].
   void peerBecameReady(Peer x) {
     peers.add(x);
-    while (awaitingPeers.length > 0) (awaitingPeers.removeFirst()).complete(x);
+    while (awaitingPeers.isNotEmpty) (awaitingPeers.removeFirst()).complete(x);
     if (peerChanged != null) peerChanged();
   }
 

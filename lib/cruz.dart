@@ -33,6 +33,12 @@ class CRUZ extends Currency {
   /// Reference: https://github.com/cruzbit/cruzbit/blob/master/constants.go#L10
   static const int cruzbitsPerCruz = 100000000;
 
+  /// Initial CRUZ reward for mining a block.
+  static const int initialCoinbaseReward = 50;
+
+  /// 4 years in blocks.
+  static const int blocksUntilRewardHalving = 210000;
+
   /// Ticker symbol.  e.g. the CRUZ in https://qtrade.io/market/CRUZ_BTC
   @override
   String get ticker => 'CRUZ';
@@ -47,11 +53,6 @@ class CRUZ extends Currency {
   @override
   int get coinbaseMaturity => 100;
 
-  /// 0.01
-  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/constants.go#L70
-  @override
-  String suggestedFee(Transaction t) => '0.01';
-
   /// Format discrete cruzbit value [v] in fractional CRUZ representation.
   @override
   String format(num v) =>
@@ -64,13 +65,34 @@ class CRUZ extends Currency {
     return x != null ? (x * cruzbitsPerCruz).floor() : 0;
   }
 
-  /// The cruzbit [PeerNetwork].
+  /// Returns number of CRUZ issued at [height].
+  int supply(int blocks) {
+    int supply = 0, reward = initialCoinbaseReward * cruzbitsPerCruz;
+    while (blocks > 0) {
+      if (blocks > blocksUntilRewardHalving) {
+        supply += (reward * blocksUntilRewardHalving);
+        blocks -= blocksUntilRewardHalving;
+        reward = reward ~/ 2;
+      } else {
+        supply += (reward * blocks);
+        blocks = 0;
+      }
+    }
+    return supply ~/ cruzbitsPerCruz;
+  }
+
+  /// 0.01
+  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/constants.go#L70
   @override
-  CruzPeerNetwork network = CruzPeerNetwork();
+  String suggestedFee(Transaction t) => '0.01';
 
   /// Address with the value of zero.
   @override
   PublicAddress get nullAddress => CruzPublicKey(Uint8List(32));
+
+  /// The cruzbit [PeerNetwork].
+  @override
+  CruzPeerNetwork network = CruzPeerNetwork();
 
   /// ID of the first [Block] in the chain. e.g. https://www.cruzbase.com/#/height/0
   @override
@@ -626,11 +648,11 @@ class CruzPeer extends PersistentWebSocketClient {
   @override
   CruzBlockHeader tip;
 
-  /// This minimum [CruzTransaction.amount] for the [CruzPeerNetwork].
+  /// The minimum [CruzTransaction.amount] for the [CruzPeerNetwork].
   @override
   num minAmount;
 
-  /// This minimum [CruzTransaction.fee] for the [CruzPeerNetwork].
+  /// The minimum [CruzTransaction.fee] for the [CruzPeerNetwork].
   @override
   num minFee;
 
@@ -743,9 +765,12 @@ class CruzPeer extends PersistentWebSocketClient {
         /// Get transactions in reverse order
         startHeight = tip.height;
         endHeight = 0;
-      } else
+      } else {
         startHeight = 0;
-    } else if (endHeight == null) endHeight = tip.height + 1;
+      }
+    } else if (endHeight == null) {
+      endHeight = tip.height + 1;
+    }
 
     /// For forward iteration we need [endHeight] > [tip.height].
     /// Otherwise when [startHeight] == [endHeight] the direction is indistinguishable.
@@ -779,17 +804,21 @@ class CruzPeer extends PersistentWebSocketClient {
         if (ret.height > startHeight ||
             (ret.height == startHeight &&
                 startIndex != null &&
-                ret.index > startIndex)) ret.height = ret.index = 0;
+                ret.index > startIndex)) {
+          ret.height = ret.index = 0;
+        }
       } else {
         if (ret.height < startHeight ||
             (ret.height == startHeight &&
                 startIndex != null &&
-                ret.index < startIndex)) ret.height = ret.index = 0;
+                ret.index < startIndex)) {
+          ret.height = ret.index = 0;
+        }
       }
 
-      if (blocks == null)
+      if (blocks == null) {
         completer.complete(ret);
-      else {
+      } else {
         for (var block in blocks) {
           List<Transaction> tx = CruzBlock.fromJson(block).transactions;
           for (Transaction x in tx) x.height = block['header']['height'];
@@ -820,8 +849,9 @@ class CruzPeer extends PersistentWebSocketClient {
       Map<String, dynamic> result = response['body'];
       assert(result != null);
       if (result['error'] != null) {
-        if (spec.debugPrint != null)
+        if (spec.debugPrint != null) {
           spec.debugPrint('putTransaction error: ' + result['error']);
+        }
         completer.complete(null);
       } else {
         completer
@@ -855,8 +885,9 @@ class CruzPeer extends PersistentWebSocketClient {
         checkEquals('filter_result', response['type'], spec.debugPrint);
         var body = response['body'];
         String error = body != null ? body['error'] : null;
-        if (error != null && spec.debugPrint != null)
+        if (error != null && spec.debugPrint != null) {
           spec.debugPrint('filterAdd error: $error');
+        }
         completer.complete(error == null);
       },
     );
@@ -988,8 +1019,9 @@ class CruzPeer extends PersistentWebSocketClient {
 
   /// Handle the cruzbit.1 JSON message frame consisting of [type] and [body].
   void handleMessage(String message) {
-    if (spec.debugPrint != null)
+    if (spec.debugPrint != null) {
       debugPrintLong('got message ' + message, spec.debugPrint);
+    }
     Map<String, dynamic> json = jsonDecode(message);
     Map<String, dynamic> body = json['body'];
     switch (json['type']) {
@@ -1025,23 +1057,26 @@ class CruzPeer extends PersistentWebSocketClient {
   /// [CruzBlock.transactions] is empty if no [CruzTransaction] match our [filterAdd()].
   void handleFilterBlock(CruzBlockId id, CruzBlock block, bool undo) {
     if (undo) {
-      if (spec.debugPrint != null)
+      if (spec.debugPrint != null) {
         spec.debugPrint('got undo!  reorg occurring.');
+      }
     } else {
       int expectedHeight = tip.height + 1;
       tipId = id;
       tip = block.header;
-      if (spec.debugPrint != null)
+      if (spec.debugPrint != null) {
         spec.debugPrint('new blockHeight=${tip.height} ' +
             (expectedHeight == tip.height ? 'as expected' : 'reorg'));
+      }
       if (tipChanged != null) tipChanged();
     }
 
-    if (block.transactions != null)
+    if (block.transactions != null) {
       for (CruzTransaction transaction in block.transactions) {
         transaction.height = undo ? -1 : block.header.height;
         handleNewTransaction(transaction);
       }
+    }
   }
 
   /// Handles every new [CruzTransaction] matching our [filterAdd()]

@@ -72,23 +72,25 @@ class CruzawlPreferences extends SembastPreferences {
 
   List<PeerPreference> get peers {
     var peers = data['peers'];
-    if (peers == null)
+    if (peers == null) {
       return <PeerPreference>[
         PeerPreference('Satoshi Locomoco', 'wallet.cruzbit.xyz', 'CRUZ', '')
       ];
+    }
     return peers.map<PeerPreference>((v) => PeerPreference.fromJson(v)).toList()
       ..sort(PeerPreference.comparePriority);
   }
 
   set peers(List<PeerPreference> value) {
     int priority = 10;
-    for (int i = value.length - 1; i >= 0; i--, priority += 10)
+    for (int i = value.length - 1; i >= 0; i--, priority += 10) {
       value[i].priority = priority;
+    }
     setPreference('peers', value.map((v) => v.toJson()).toList());
   }
 
   void encryptWallets(String password) {
-    bool enabled = password != null && password.length > 0;
+    bool enabled = password != null && password.isNotEmpty;
     if (enabled == walletsEncrypted) return;
     Map<String, String> loadedWallets = wallets;
     setPreference('walletsEncrypted', enabled, store: false);

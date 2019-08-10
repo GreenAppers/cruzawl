@@ -395,14 +395,16 @@ class Wallet extends WalletStorage {
       {bool store = true, bool load = true, sembast.Transaction txn}) {
     if (preferences != null &&
         preferences.verifyAddressEveryLoad &&
-        !x.verify())
+        !x.verify()) {
       throw FormatException('${x.publicKey.toJson()} verify failed');
+    }
     addresses[x.publicKey.toJson()] = x;
     if (store) _storeAddress(x, txn);
     if (load) _filterNetworkFor(x);
     if (x.chainIndex != null) {
-      if (x.state == AddressState.reserve)
+      if (x.state == AddressState.reserve) {
         account.reserveAddress[x.chainIndex] = x;
+      }
       if (x.chainIndex >= account.nextIndex) {
         account.nextIndex = x.chainIndex + 1;
         _storeAccount(account, txn);
@@ -436,22 +438,24 @@ class Wallet extends WalletStorage {
           databaseFactory, filename, create ? account : null, testing);
     } catch (error, stackTrace) {
       fatal = ErrorDetails(exception: error, stack: stackTrace);
-      if (openedCallback != null)
+      if (openedCallback != null) {
         return openedCallback(this);
-      else
+      } else {
         rethrow;
+      }
     }
 
     if (hdWallet) {
       /// HD wallets maintain an address-gap-limit of [minimumReserveAddress].
       /// Note: to cross any gap you can repeatedly "Generate new address".
       /// Reference: https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki#address-gap-limit
-      for (Account account in accounts.values)
+      for (Account account in accounts.values) {
         while (account.reserveAddress.length <
             (preferences.minimumReserveAddress ?? 5)) {
           addNextAddress(account: account, load: false);
           await Future.delayed(Duration(seconds: 0));
         }
+      }
     } else if (privateKeys != null) {
       /// Create a non-HD wallet.
       if (privateKeys.length <= 0) return;
@@ -492,9 +496,10 @@ class Wallet extends WalletStorage {
       Transaction transaction =
           transactions.find(currency.fromTransactionJson(record.value));
       if (transaction != null &&
-          (transaction.height == null || transaction.height == 0))
+          (transaction.height == null || transaction.height == 0)) {
         _updateBalance(addresses[transaction.from.toJson()],
             transaction.amount + transaction.fee);
+      }
       _removePendingTransaction(record.key);
       pendingCount--;
     }
@@ -536,10 +541,11 @@ class Wallet extends WalletStorage {
   /// For HD wallets get next [Account.reserveAddress]. Otherwise loop [nextAddressIndex].
   Address getNextReceiveAddress() {
     if (hdWallet) {
-      if (account.reserveAddress.length > 0)
+      if (account.reserveAddress.length > 0) {
         return account.reserveAddress.entries.first.value;
-      else
+      } else {
         return addNextAddress();
+      }
     } else {
       if (addresses.length <= 0) return null;
       nextAddressIndex = ((nextAddressIndex ?? -1) + 1) % addresses.length;
@@ -558,12 +564,14 @@ class Wallet extends WalletStorage {
 
     List<Address> reloadAddresses = addresses.values.toList();
     List<Future<void>> reloading = List<Future<void>>(reloadAddresses.length);
-    for (int i = 0; i < reloadAddresses.length; i++)
+    for (int i = 0; i < reloadAddresses.length; i++) {
       reloading[i] = _filterNetworkFor(reloadAddresses[i]);
+    }
     for (int i = 0; i < reloadAddresses.length; i++) await reloading[i];
 
-    if (currency.network.hasPeer)
+    if (currency.network.hasPeer) {
       (await currency.network.getPeer()).filterTransactionQueue();
+    }
   }
 
   /// Synchronizes our database [x] with the [PeerNetwork] and tracks updates.
@@ -608,8 +616,9 @@ class Wallet extends WalletStorage {
     TransactionIteratorResults results =
         await peer.getTransactions(x.publicKey, x.loadIterator);
     if (results == null) return null;
-    for (Transaction transaction in results.transactions)
+    for (Transaction transaction in results.transactions) {
       updateTransaction(transaction, newTransaction: false);
+    }
 
     x.loadIterator = TransactionIterator(results.height, results.index);
     return results;
@@ -651,17 +660,19 @@ class Wallet extends WalletStorage {
         num cost = transaction.amount + transaction.fee;
         _updateBalance(from, undoneByReorg ? cost : -cost);
       }
-      if (to != null && mature)
+      if (to != null && mature) {
         _updateBalance(
             to, undoneByReorg ? -transaction.amount : transaction.amount);
+      }
     }
 
     /// Track [Address].[maturesBalance] changes.
-    if (to != null && !mature && transactionsChanged)
+    if (to != null && !mature && transactionsChanged) {
       _applyMaturesBalanceDelta(
           to,
           undoneByReorg ? -transaction.amount : transaction.amount,
           transaction);
+    }
 
     /*debugPrint('${transaction.fromText} -> ${transaction.toText} ' +
                currency.format(transaction.amount) +
@@ -700,9 +711,10 @@ class Wallet extends WalletStorage {
     account.maturesHeight = max(account.maturesHeight, maturity);
     maturesHeight = max(maturesHeight, maturity);
 
-    if (delta > 0)
+    if (delta > 0) {
       maturing.add(transaction);
-    else
+    } else {
       maturing.remove(transaction);
+    }
   }
 }
