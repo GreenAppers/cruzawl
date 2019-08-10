@@ -78,8 +78,13 @@ class CruzTester extends TestRunner {
     test('Test Genesis', () {
       CruzBlock genesis = CruzBlock.fromJson(jsonDecode(genesisBlockJson));
       expect(jsonEncode(genesis), jsonEncode(jsonDecode(genesisBlockJson)));
-      expect(genesis.id().toJson(),
+      expect(genesis.computeHashListRoot().toJson(),
+          genesis.header.hashListRoot.toJson());
+
+      CruzBlockId genesisId = genesis.id();
+      expect(genesisId.toJson(),
           '00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb');
+      expect(genesisId.toBigInt() <= genesis.header.target.toBigInt(), true);
     });
   }
 }

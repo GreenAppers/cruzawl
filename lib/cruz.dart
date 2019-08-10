@@ -625,19 +625,23 @@ class CruzBlock extends Block {
       hasher.update(id.data, 0, id.data.length);
     }
 
-    CruzTransactionId rootHashWithoutCoinbase = CruzTransactionId(Uint8List(CruzTransactionId.size));
+    CruzTransactionId rootHashWithoutCoinbase =
+        CruzTransactionId(Uint8List(CruzTransactionId.size));
     hasher.doFinal(rootHashWithoutCoinbase.data, 0);
     return addCoinbaseToHashListRoot(rootHashWithoutCoinbase);
   }
 
   /// Add the coinbase to the hash list root.
-  CruzTransactionId addCoinbaseToHashListRoot(CruzTransactionId rootHashWithoutCoinbase) {
+  CruzTransactionId addCoinbaseToHashListRoot(
+      CruzTransactionId rootHashWithoutCoinbase) {
     SHA3Digest hasher = SHA3Digest(256);
     CruzTransactionId coinbase = transactions[0].id();
     hasher.update(coinbase.data, 0, coinbase.data.length);
-    hasher.update(rootHashWithoutCoinbase.data, 0, rootHashWithoutCoinbase.data.length);
+    hasher.update(
+        rootHashWithoutCoinbase.data, 0, rootHashWithoutCoinbase.data.length);
 
-    CruzTransactionId hashListRoot = CruzTransactionId(Uint8List(CruzTransactionId.size));
+    CruzTransactionId hashListRoot =
+        CruzTransactionId(Uint8List(CruzTransactionId.size));
     hasher.doFinal(hashListRoot.data, 0);
     return hashListRoot;
   }

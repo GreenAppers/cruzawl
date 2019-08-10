@@ -560,17 +560,19 @@ class Wallet extends WalletStorage {
     opened = true;
     pendingCount = 0;
     transactions.clear();
-    _readPendingTransactions();
+    await _readPendingTransactions();
 
     List<Address> reloadAddresses = addresses.values.toList();
     List<Future<void>> reloading = List<Future<void>>(reloadAddresses.length);
     for (int i = 0; i < reloadAddresses.length; i++) {
       reloading[i] = _filterNetworkFor(reloadAddresses[i]);
     }
-    for (int i = 0; i < reloadAddresses.length; i++) await reloading[i];
+    for (int i = 0; i < reloadAddresses.length; i++) {
+      await reloading[i];
+    }
 
     if (currency.network.hasPeer) {
-      (await currency.network.getPeer()).filterTransactionQueue();
+      await (await currency.network.getPeer()).filterTransactionQueue();
     }
   }
 
