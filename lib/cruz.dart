@@ -821,7 +821,9 @@ class CruzPeer extends PersistentWebSocketClient {
       } else {
         for (var block in blocks) {
           List<Transaction> tx = CruzBlock.fromJson(block).transactions;
-          for (Transaction x in tx) x.height = block['header']['height'];
+          for (Transaction x in tx) {
+            x.height = block['header']['height'];
+          }
           ret.transactions += tx;
         }
         completer.complete(ret);
@@ -912,9 +914,11 @@ class CruzPeer extends PersistentWebSocketClient {
         checkEquals(
             'filter_transaction_queue', response['type'], spec.debugPrint);
         var transactions = response['body']['transactions'];
-        if (transactions != null)
-          for (var transaction in transactions)
+        if (transactions != null) {
+          for (var transaction in transactions) {
             handleNewTransaction(CruzTransaction.fromJson(transaction));
+          }
+        }
         completer.complete(true);
       },
     );

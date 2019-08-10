@@ -3,7 +3,6 @@ version: 1.0.2+2
 description: Library for the CRUZ cryptocurrency and the cruzbit.1 network.
 author: Green Appers, Inc. <greenappers@gmail.com>
 homepage: https://github.com/GreenAppers/cruzawl
-documentation: https://pub.dev/documentation/cruzawl/latest/
 
 environment:
   sdk: ">=2.1.0 <3.0.0"

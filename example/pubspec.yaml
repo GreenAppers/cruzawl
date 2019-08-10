@@ -1,0 +1,13 @@
+name: cruzawl_example
+version: 1.0.0+0
+description: Example for the cruzawl Dart library.
+author: Green Appers, Inc. <greenappers@gmail.com>
+homepage: https://github.com/GreenAppers/cruzawl
+documentation: https://pub.dev/documentation/cruzawl/latest/
+
+environment:
+  sdk: ">=2.1.0 <3.0.0"
+
+dependencies:
+  cruzawl:
+    path: ../

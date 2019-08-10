@@ -77,7 +77,8 @@ void updateCruzToBtcWithQtrade(ExchangeRates rates) {
   int qtrade_cruz_market_id = 32;
 
   /// {"data":{"market":{"id":32,"market_currency":"CRUZ","base_currency":"BTC","maker_fee":"0","taker_fee":"0.015","metadata":{},"can_trade":true,"can_cancel":true,"can_view":false},"recent_trades":[{"id":55989,"amount":"6.70380253","price":"0.00001499","created_at":"2019-08-09T11:27:24.430434Z"}]}}
-  HttpRequest.request('https://api.qtrade.io/v1/market/32').then((resp) {
+  HttpRequest.request('https://api.qtrade.io/v1/market/$qtrade_cruz_market_id')
+      .then((resp) {
     /// Unfortunately it is a bit complicated to change the CORS policy for just
     /// the public endpoints with the way our backend is setup, but it is on our
     /// list of improvements -Eric @ qTrade

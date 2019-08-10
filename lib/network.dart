@@ -271,7 +271,9 @@ abstract class PeerNetwork {
   /// Notify [awaitingPeers] and [peerChanged] subscribers of a new [Peer].
   void peerBecameReady(Peer x) {
     peers.add(x);
-    while (awaitingPeers.isNotEmpty) (awaitingPeers.removeFirst()).complete(x);
+    while (awaitingPeers.isNotEmpty) {
+      (awaitingPeers.removeFirst()).complete(x);
+    }
     if (peerChanged != null) peerChanged();
   }
 
@@ -281,8 +283,12 @@ abstract class PeerNetwork {
     List<Peer> oldPeers = peers, oldConnecting = connecting;
     peers = <Peer>[];
     connecting = <Peer>[];
-    for (Peer peer in oldPeers) removePeer(peer);
-    for (Peer peer in oldConnecting) removePeer(peer);
+    for (Peer peer in oldPeers) {
+      removePeer(peer);
+    }
+    for (Peer peer in oldConnecting) {
+      removePeer(peer);
+    }
   }
 }
 

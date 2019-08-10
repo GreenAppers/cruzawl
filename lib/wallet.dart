@@ -458,14 +458,14 @@ class Wallet extends WalletStorage {
       }
     } else if (privateKeys != null) {
       /// Create a non-HD wallet.
-      if (privateKeys.length <= 0) return;
+      if (privateKeys.isEmpty) return;
       for (PrivateKey key in privateKeys) {
         addAddress(currency.fromPrivateKey(key), load: false);
         await Future.delayed(Duration(seconds: 0));
       }
     } else if (publicKeys != null) {
       // Create a watch-only wallet.
-      if (publicKeys.length <= 0) return;
+      if (publicKeys.isEmpty) return;
       for (PublicAddress key in publicKeys) {
         addAddress(currency.fromPublicKey(key), load: false);
         await Future.delayed(Duration(seconds: 0));
@@ -500,7 +500,7 @@ class Wallet extends WalletStorage {
         _updateBalance(addresses[transaction.from.toJson()],
             transaction.amount + transaction.fee);
       }
-      _removePendingTransaction(record.key);
+      await _removePendingTransaction(record.key);
       pendingCount--;
     }
   }
@@ -541,13 +541,13 @@ class Wallet extends WalletStorage {
   /// For HD wallets get next [Account.reserveAddress]. Otherwise loop [nextAddressIndex].
   Address getNextReceiveAddress() {
     if (hdWallet) {
-      if (account.reserveAddress.length > 0) {
+      if (account.reserveAddress.isNotEmpty) {
         return account.reserveAddress.entries.first.value;
       } else {
         return addNextAddress();
       }
     } else {
-      if (addresses.length <= 0) return null;
+      if (addresses.isEmpty) return null;
       nextAddressIndex = ((nextAddressIndex ?? -1) + 1) % addresses.length;
       return addresses.values.toList()[nextAddressIndex];
     }
