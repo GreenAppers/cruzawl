@@ -369,6 +369,9 @@ abstract class Block {
 
   /// Computes an ID for this block.
   BlockId id();
+
+  /// Compute a hash list root of all transaction hashes.
+  TransactionId computeHashListRoot();
 }
 
 CRUZ cruz = CRUZ();

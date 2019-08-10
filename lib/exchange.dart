@@ -18,7 +18,7 @@ class ExchangeRates {
 
   ExchangeRates(
       {this.update = defaultExchangeRatesUpdate,
-      this.updateDuration = const Duration(minutes: 1),
+      this.updateDuration = const Duration(minutes: 10),
       this.debugPrint});
 
   /// Update [base] → [currency] exchange rate to [amount].

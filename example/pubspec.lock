@@ -35,7 +35,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "1.0.2+2"
+    version: "1.0.3+3"
   crypto:
     dependency: transitive
     description:
@@ -46,9 +46,11 @@ packages:
   ed25519_hd_key:
     dependency: transitive
     description:
-      name: ed25519_hd_key
-      url: "https://pub.dartlang.org"
-    source: hosted
+      path: "."
+      ref: HEAD
+      resolved-ref: e780a161d7fbe9e04c9fe4593f0fa516e5012c4a
+      url: "https://github.com/GreenAppers/dart-ed25519-hd-key"
+    source: git
     version: "1.0.1"
   fixnum:
     dependency: transitive
@@ -70,7 +72,7 @@ packages:
       name: json_annotation
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.4.0"
+    version: "3.0.0"
   logging:
     dependency: transitive
     description:
@@ -116,9 +118,11 @@ packages:
   tweetnacl:
     dependency: transitive
     description:
-      name: tweetnacl
-      url: "https://pub.dartlang.org"
-    source: hosted
+      path: "."
+      ref: HEAD
+      resolved-ref: "4976ae891fbb0b315b14446314f3d4e9011721c7"
+      url: "https://github.com/jspschool/tweetnacl-dart"
+    source: git
     version: "0.3.1"
   typed_data:
     dependency: transitive
@@ -128,4 +132,4 @@ packages:
     source: hosted
     version: "1.1.6"
 sdks:
-  dart: ">=2.2.0 <3.0.0"
+  dart: ">=2.3.0 <3.0.0"
