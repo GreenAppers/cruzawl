@@ -15,8 +15,7 @@ part 'preferences.g.dart';
 
 class CruzawlPreferences extends SembastPreferences {
   String walletsPassword;
-  bool testing;
-  CruzawlPreferences(Database db, {this.testing = false}) : super(db);
+  CruzawlPreferences(Database db) : super(db);
 
   String get theme => data['theme'] ?? 'teal';
   set theme(String value) => setPreference('theme', value);

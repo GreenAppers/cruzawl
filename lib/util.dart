@@ -12,6 +12,18 @@ typedef VoidCallback = void Function();
 
 Future<void> voidResult() async {}
 
+/// Interface for dart:io [File].
+abstract class FileSystem {
+  Future<bool> exists(String filename);
+  Future<void> remove(String filename);
+}
+
+/// Shim [FileSystem] for tests.
+class NullFileSystem extends FileSystem {
+  Future<bool> exists(String filename) async => false;
+  Future<void> remove(String filename) async => voidResult();
+}
+
 /// Optionally [debugPrint] failed assertions in-app.
 bool checkEquals(dynamic x, dynamic y, [StringCallback debugPrint]) {
   bool equals = x == y;

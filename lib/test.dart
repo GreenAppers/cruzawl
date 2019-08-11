@@ -100,6 +100,7 @@ class WalletTester extends TestRunner {
       Wallet wallet = Wallet.fromSeed(
           null,
           null,
+          null,
           'TestVector2',
           cruz,
           Seed(hex.decode(

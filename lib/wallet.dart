@@ -1,7 +1,6 @@
 // Copyright 2019 cruzawl developers
 // Use of this source code is governed by a MIT-style license that can be found in the LICENSE file.
 
-import 'dart:io';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
@@ -133,8 +132,8 @@ abstract class WalletStorage {
 
   /// The wallet file is always encrypted using [seed].
   /// The [seed] is randomly generated in the case of non-HD wallets.
-  Future<void> _openStorage(
-      sembast.DatabaseFactory databaseFactory, String filename) async {
+  Future<void> _openStorage(sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem, String filename, bool create) async {
     storage = await databaseFactory.openDatabase(filename,
         codec: getSecretBoxSembastCodec(
             Uint8List.fromList(seed.data.sublist(32))));
@@ -147,14 +146,14 @@ abstract class WalletStorage {
 
   /// The only permanent storage iteration of [Address] and [Account] records.
   Future<void> _readStorage(sembast.DatabaseFactory databaseFactory,
-      String filename, Account newDatabase, bool dontCheckFile) async {
+      FileSystem fileSystem, String filename, Account newDatabase) async {
     if (newDatabase != null &&
-        !dontCheckFile &&
-        await File(filename).exists()) {
-      throw FileSystemException('$filename already exists');
+        fileSystem != null &&
+        await fileSystem.exists(filename)) {
+      throw FormatException('$filename already exists');
     }
-
-    await _openStorage(databaseFactory, filename);
+    await _openStorage(
+        databaseFactory, fileSystem, filename, newDatabase != null);
 
     if (newDatabase != null) {
       await _storeHeader();
@@ -289,35 +288,59 @@ class Wallet extends WalletStorage {
   CruzawlPreferences preferences;
 
   /// Generate new HD [Wallet].
-  Wallet.generate(sembast.DatabaseFactory databaseFactory, String filename,
-      String name, Currency currency,
-      [CruzawlPreferences prefs, StringCallback debug, WalletCallback loaded])
-      : this.fromSeedPhrase(databaseFactory, filename, name, currency,
-            generateMnemonic(), prefs, debug, loaded);
+  Wallet.generate(sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem, String filename, String name, Currency currency,
+      [CruzawlPreferences prefileSystem,
+      StringCallback debug,
+      WalletCallback loaded])
+      : this.fromSeedPhrase(databaseFactory, fileSystem, filename, name,
+            currency, generateMnemonic(), prefileSystem, debug, loaded);
 
   /// Generate HD [Wallet] from BIP-0039 mnemonic code.
-  Wallet.fromSeedPhrase(sembast.DatabaseFactory databaseFactory,
-      String filename, String name, Currency currency, String seedPhrase,
-      [CruzawlPreferences prefs, StringCallback debug, WalletCallback loaded])
-      : this.fromSeed(databaseFactory, filename, name, currency,
-            Seed(mnemonicToSeed(seedPhrase)), seedPhrase, prefs, debug, loaded);
+  Wallet.fromSeedPhrase(
+      sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem,
+      String filename,
+      String name,
+      Currency currency,
+      String seedPhrase,
+      [CruzawlPreferences prefileSystem,
+      StringCallback debug,
+      WalletCallback loaded])
+      : this.fromSeed(
+            databaseFactory,
+            fileSystem,
+            filename,
+            name,
+            currency,
+            Seed(mnemonicToSeed(seedPhrase)),
+            seedPhrase,
+            prefileSystem,
+            debug,
+            loaded);
 
   /// Generate HD [Wallet] from SLIP-0010 seed.
-  Wallet.fromSeed(sembast.DatabaseFactory databaseFactory, String filename,
-      String name, Currency currency, Seed seed,
+  Wallet.fromSeed(
+      sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem,
+      String filename,
+      String name,
+      Currency currency,
+      Seed seed,
       [String seedPhrase,
       this.preferences,
       this.debugPrint,
       WalletCallback loaded])
       : super(name, currency, seed, seedPhrase) {
     if (filename != null) {
-      _openWalletStorage(databaseFactory, filename, true, loaded);
+      _openWalletStorage(databaseFactory, fileSystem, filename, true, loaded);
     }
   }
 
   /// Create non-HD [Wallet] from private key list.
   Wallet.fromPrivateKeyList(
       sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem,
       String filename,
       String name,
       Currency currency,
@@ -328,13 +351,15 @@ class Wallet extends WalletStorage {
       WalletCallback loaded])
       : super(name, currency, seed) {
     if (filename != null) {
-      _openWalletStorage(databaseFactory, filename, true, loaded, privateKeys);
+      _openWalletStorage(
+          databaseFactory, fileSystem, filename, true, loaded, privateKeys);
     }
   }
 
   /// Create watch-only [Wallet] from public key list.
   Wallet.fromPublicKeyList(
       sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem,
       String filename,
       String name,
       Currency currency,
@@ -345,17 +370,17 @@ class Wallet extends WalletStorage {
       WalletCallback loaded])
       : super(name, currency, seed) {
     if (filename != null) {
-      _openWalletStorage(
-          databaseFactory, filename, true, loaded, null, publicKeys);
+      _openWalletStorage(databaseFactory, fileSystem, filename, true, loaded,
+          null, publicKeys);
     }
   }
 
   /// Load arbitrary [Wallet] of arbitrary [Currency].
-  Wallet.fromFile(
-      sembast.DatabaseFactory databaseFactory, String filename, Seed seed,
+  Wallet.fromFile(sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem, String filename, Seed seed,
       [this.preferences, this.debugPrint, WalletCallback loaded])
       : super('loading', const LoadingCurrency(), seed) {
-    _openWalletStorage(databaseFactory, filename, false, loaded);
+    _openWalletStorage(databaseFactory, fileSystem, filename, false, loaded);
   }
 
   /// True if hierarchical deterministic wallet.
@@ -426,16 +451,15 @@ class Wallet extends WalletStorage {
 
   /// Synchronize storage either by creating a database or loading one,
   /// culminating once (per instance) in [reload] with [initialLoad] true.
-  Future<void> _openWalletStorage(
-      sembast.DatabaseFactory databaseFactory, String filename, bool create,
+  Future<void> _openWalletStorage(sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem, String filename, bool create,
       [WalletCallback openedCallback,
       List<PrivateKey> privateKeys,
       List<PublicAddress> publicKeys]) async {
-    bool testing = preferences != null && preferences.testing;
     try {
       debugPrint((create ? 'Creating' : 'Opening') + ' wallet $filename ...');
       await _readStorage(
-          databaseFactory, filename, create ? account : null, testing);
+          databaseFactory, fileSystem, filename, create ? account : null);
     } catch (error, stackTrace) {
       fatal = ErrorDetails(exception: error, stack: stackTrace);
       if (openedCallback != null) {
