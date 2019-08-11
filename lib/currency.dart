@@ -241,8 +241,8 @@ abstract class Transaction {
   /// Zero for uncomfirmed transactions.
   int height = 0;
 
-  /// e.g. Unix time.
-  int get time;
+  /// Time this transaction was created.
+  DateTime get dateTime;
 
   /// De-dupes similar transactions.
   int get nonce;
@@ -288,8 +288,9 @@ abstract class Transaction {
 
   /// Sorts by [time] and tie-break so only equivalent [Transaction] compare equal.
   static int timeCompare(Transaction a, Transaction b) {
-    int deltaT = -a.time + b.time;
-    return deltaT != 0 ? deltaT : a.id().toJson().compareTo(b.id().toJson());
+    if (a.dateTime.isBefore(b.dateTime)) return 1;
+    if (a.dateTime.isAfter(b.dateTime)) return -1;
+    return a.id().toJson().compareTo(b.id().toJson());
   }
 
   /// Sorts by [maturity] and tie-break so only equivalent [Transaction] compare equal.
@@ -320,8 +321,8 @@ abstract class BlockHeader {
   /// Checksum of all the transaction in this block.
   TransactionId get hashListRoot;
 
-  /// e.g. Unix time.
-  int get time;
+  /// Time this block was mined.
+  DateTime get dateTime;
 
   /// Threshold new [Block] must hash under for Proof of Work.
   BlockId get target;
@@ -350,7 +351,7 @@ abstract class BlockHeader {
   BigInt deltaWork(BlockHeader x);
 
   /// Difference in time between [x] and this block.
-  int deltaTime(BlockHeader x);
+  Duration deltaTime(BlockHeader x);
 
   /// Expected hashes per second from [x] to this block.
   int hashRate(BlockHeader x);

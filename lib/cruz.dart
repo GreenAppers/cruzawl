@@ -276,8 +276,12 @@ class CruzTransactionId extends TransactionId {
 @JsonSerializable(includeIfNull: false)
 class CruzTransaction extends Transaction {
   // Unix time
-  @override
   int time;
+
+  @override
+  @JsonKey(ignore: true)
+  DateTime get dateTime =>
+      DateTime.fromMillisecondsSinceEpoch(time * 1000);
 
   /// Collision prevention. Pseudorandom. Not used for crypto.
   @override
@@ -530,8 +534,12 @@ class CruzBlockHeader extends BlockHeader {
   CruzTransactionId hashListRoot;
 
   /// Unix time.
-  @override
   int time;
+
+  @override
+  @JsonKey(ignore: true)
+  DateTime get dateTime =>
+      DateTime.fromMillisecondsSinceEpoch(time * 1000);
 
   /// Threshold new [CruzBlock] must hash under for Proof of Work.
   @override
@@ -580,11 +588,11 @@ class CruzBlockHeader extends BlockHeader {
       chainWork.toBigInt() - x.chainWork.toBigInt();
 
   /// Difference in time between [x] and this block.
-  int deltaTime(BlockHeader x) => time - x.time;
+  Duration deltaTime(BlockHeader x) => dateTime.difference(x.dateTime);
 
   /// Expected hashes per second from [x] to this block.
   int hashRate(BlockHeader x) {
-    int dt = deltaTime(x);
+    int dt = deltaTime(x).inSeconds;
     return dt == 0 ? 0 : (deltaWork(x) ~/ BigInt.from(dt)).toInt();
   }
 }

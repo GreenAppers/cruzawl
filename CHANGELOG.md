@@ -15,3 +15,12 @@
 
 - Add [CruzTransaction.computeHashListRoot]
 
+## 1.0.4+4
+
+- Add [FileSystem] interface
+- Remove dart:io import
+
+## 1.0.5+5
+
+- Update tweetnacl.
+
