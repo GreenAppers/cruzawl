@@ -81,8 +81,11 @@ abstract class Currency {
   /// Unmarshals a JSON-encoded string to [PrivateKey].
   PrivateKey fromPrivateKeyJson(String text);
 
+  /// Unmarshals a JSON-encoded string to [BlockId].
+  BlockId fromBlockIdJson(String text, [bool pad = false]);
+
   /// Unmarshals a JSON-encoded string to [TransactionId].
-  TransactionId fromTransactionIdJson(String text);
+  TransactionId fromTransactionIdJson(String text, [bool pad = false]);
 
   /// Unmarshals a JSON-encoded string to [Transaction].
   Transaction fromTransactionJson(Map<String, dynamic> json);
@@ -113,7 +116,8 @@ class LoadingCurrency extends Currency {
   Address fromAddressJson(Map<String, dynamic> json) => null;
   PublicAddress fromPublicAddressJson(String text) => null;
   PrivateKey fromPrivateKeyJson(String text) => null;
-  TransactionId fromTransactionIdJson(String text) => null;
+  BlockId fromBlockIdJson(String text, [bool pad = false]) => null;
+  TransactionId fromTransactionIdJson(String text, [bool pad = false]) => null;
   Transaction fromTransactionJson(Map<String, dynamic> json) => null;
   Transaction signedTransaction(Address from, PublicAddress to, num amount,
           num fee, String memo, int height,
@@ -273,6 +277,9 @@ abstract class Transaction {
 
   /// Computes an ID for this transaction.
   TransactionId id();
+
+  /// Returns true if this transaction rewards mining.
+  bool isCoinbase();
 
   /// Verifies this transaction's signature.
   bool verify();

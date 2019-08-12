@@ -6,6 +6,7 @@ import 'dart:convert';
 
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
+import 'package:cruzawl/util.dart';
 import 'websocket_html.dart' if (dart.library.io) 'websocket_io.dart';
 
 typedef JsonCallback = void Function(Map<String, dynamic>);
@@ -77,7 +78,9 @@ abstract class PersistentWebSocketClient extends Peer {
   /// [WebSocket.send] message [x] expecting an in-order response for [responseCallback]
   void addJsonMessage(Map<String, dynamic> x, JsonCallback responseCallback) {
     String message = jsonEncode(x);
-    if (spec.debugPrint != null) spec.debugPrint('sending message: $message');
+    if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
+      spec.debugPrint('sending message: $message');
+    }
     if (responseCallback != null) jsonResponseQueue.add(responseCallback);
     ws.send(message);
   }

@@ -131,7 +131,7 @@ class CRUZ extends Currency {
 
   /// Parse CRUZ public key.
   @override
-  PublicAddress fromPublicAddressJson(String text) {
+  CruzPublicKey fromPublicAddressJson(String text) {
     try {
       Uint8List data = base64.decode(text);
       if (data.length != CruzPublicKey.size) return null;
@@ -143,20 +143,42 @@ class CRUZ extends Currency {
 
   /// Parse CRUZ private key.
   @override
-  PrivateKey fromPrivateKeyJson(String text) => CruzPrivateKey.fromJson(text);
+  CruzPrivateKey fromPrivateKeyJson(String text) {
+    try {
+      return CruzPrivateKey.fromJson(text);
+    } on Exception {
+      return null;
+    }
+  }
+
+  /// Parse CRUZ block id.
+  @override
+  CruzBlockId fromBlockIdJson(String text, [bool pad = false]) {
+    try {
+      return CruzBlockId.fromJson(text, pad);
+    } on Exception {
+      return null;
+    }
+  }
 
   /// Parse CRUZ transaction id.
-  TransactionId fromTransactionIdJson(String text) =>
-      CruzTransactionId.fromJson(text);
+  @override
+  CruzTransactionId fromTransactionIdJson(String text, [bool pad = false]) {
+    try {
+      return CruzTransactionId.fromJson(text, pad);
+    } on Exception {
+      return null;
+    }
+  }
 
   /// Parse CRUZ transaction.
   @override
-  Transaction fromTransactionJson(Map<String, dynamic> json) =>
+  CruzTransaction fromTransactionJson(Map<String, dynamic> json) =>
       CruzTransaction.fromJson(json);
 
   /// Creates signed CRUZ transaction.
   @override
-  Transaction signedTransaction(Address fromInput, PublicAddress toInput,
+  CruzTransaction signedTransaction(Address fromInput, PublicAddress toInput,
       num amount, num fee, String memo, int height,
       {int matures, int expires}) {
     if (!(fromInput is CruzAddress)) throw FormatException();
@@ -264,7 +286,8 @@ class CruzTransactionId extends TransactionId {
       : data = SHA3Digest(256).process(utf8.encode(transactionJson));
 
   /// Unmarshals a hex string to [CruzTransactionId].
-  CruzTransactionId.fromJson(String x) : this(hex.decode(x));
+  CruzTransactionId.fromJson(String x, [bool pad = false])
+      : this(pad ? zeroPadUint8List(hex.decode(x), size) : hex.decode(x));
 
   /// Marshals [CruzTransactionId] as a hex string.
   @override
@@ -280,8 +303,7 @@ class CruzTransaction extends Transaction {
 
   @override
   @JsonKey(ignore: true)
-  DateTime get dateTime =>
-      DateTime.fromMillisecondsSinceEpoch(time * 1000);
+  DateTime get dateTime => DateTime.fromMillisecondsSinceEpoch(time * 1000);
 
   /// Collision prevention. Pseudorandom. Not used for crypto.
   @override
@@ -330,7 +352,7 @@ class CruzTransaction extends Transaction {
       {this.matures, this.expires, this.series, this.height})
       : time = DateTime.now().millisecondsSinceEpoch ~/ 1000,
         nonce = Random.secure().nextInt(2147483647) {
-    if (series == null) series = computeTransactionSeries(from == null, height);
+    if (series == null) series = computeTransactionSeries(isCoinbase(), height);
     if (memo != null && memo.isEmpty) memo = null;
   }
 
@@ -365,7 +387,7 @@ class CruzTransaction extends Transaction {
 
   // The base64-encoded sender of this transaction, or 'cruzbase' if no sender.
   @override
-  String get fromText => from != null ? from.toJson() : 'cruzbase';
+  String get fromText => isCoinbase() ? 'cruzbase' : from.toJson();
 
   /// Computes an ID for this transaction.
   @override
@@ -378,6 +400,10 @@ class CruzTransaction extends Transaction {
           .sign(id().data)
           .buffer
           .asUint8List(0, 64));
+
+  /// Returns true if the transaction is a coinbase. A coinbase is the first
+  /// transaction in every block used to reward the miner for mining the block.
+  bool isCoinbase() => from == null;
 
   /// Verify only that the transaction is properly signed.
   @override
@@ -494,9 +520,8 @@ class CruzBlockId extends BlockId {
       : data = SHA3Digest(256).process(utf8.encode(blockHeaderJson));
 
   /// Unmarshals hex string to [CruzBlockId].
-  CruzBlockId.fromJson(String x) : data = hex.decode(x) {
-    if (data.length != size) throw FormatException('input=${x}');
-  }
+  CruzBlockId.fromJson(String x, [bool pad = false])
+      : this(pad ? zeroPadUint8List(hex.decode(x), size) : hex.decode(x));
 
   /// Marshals [CruzBlockId] as a hex string.
   @override
@@ -538,8 +563,7 @@ class CruzBlockHeader extends BlockHeader {
 
   @override
   @JsonKey(ignore: true)
-  DateTime get dateTime =>
-      DateTime.fromMillisecondsSinceEpoch(time * 1000);
+  DateTime get dateTime => DateTime.fromMillisecondsSinceEpoch(time * 1000);
 
   /// Threshold new [CruzBlock] must hash under for Proof of Work.
   @override
@@ -1035,8 +1059,8 @@ class CruzPeer extends PersistentWebSocketClient {
   /// GetTransactionMessage is used to request a confirmed transaction.
   /// Type: "get_transaction".
   @override
-  Future<Transaction> getTransaction(TransactionId id) {
-    Completer<Transaction> completer = Completer<Transaction>();
+  Future<TransactionMessage> getTransaction(TransactionId id) {
+    Completer<TransactionMessage> completer = Completer<TransactionMessage>();
     addJsonMessage(
       <String, dynamic>{
         'type': 'get_transaction',
@@ -1050,10 +1074,12 @@ class CruzPeer extends PersistentWebSocketClient {
           return;
         }
         checkEquals('transaction', response['type'], spec.debugPrint);
-        CruzTransaction transaction =
-            CruzTransaction.fromJson(response['body']['transaction']);
-        transaction.height = response['body']['height'];
-        completer.complete(transaction);
+        var body = response['body'];
+        var transaction = body != null ? body['transaction'] : null;
+        TransactionMessage ret = TransactionMessage(id,
+            transaction != null ? CruzTransaction.fromJson(transaction) : null);
+        if (ret.transaction != null) ret.transaction.height = body['height'];
+        completer.complete(ret);
       },
     );
     return completer.future;
@@ -1061,7 +1087,7 @@ class CruzPeer extends PersistentWebSocketClient {
 
   /// Handle the cruzbit.1 JSON message frame consisting of [type] and [body].
   void handleMessage(String message) {
-    if (spec.debugPrint != null) {
+    if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
       debugPrintLong('got message ' + message, spec.debugPrint);
     }
     Map<String, dynamic> json = jsonDecode(message);

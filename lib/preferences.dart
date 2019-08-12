@@ -106,6 +106,9 @@ class PeerPreference {
   @JsonKey(ignore: true)
   StringCallback debugPrint;
 
+  @JsonKey(ignore: true)
+  int debugLevel = debugLevelInfo;
+
   PeerPreference(this.name, this.url, this.currency, this.options,
       {this.debugPrint});
 

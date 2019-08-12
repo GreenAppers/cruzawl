@@ -88,7 +88,7 @@ abstract class Peer {
   Future<BlockMessage> getBlock({BlockId id, int height});
 
   /// Returns the [Transaction] with [id].
-  Future<Transaction> getTransaction(TransactionId id);
+  Future<TransactionMessage> getTransaction(TransactionId id);
 
   /// The [StateSetter] for [PeerState].
   void setState(PeerState x) {
@@ -304,6 +304,13 @@ class BlockHeaderMessage {
   BlockId id;
   BlockHeader header;
   BlockHeaderMessage(this.id, this.header);
+}
+
+/// Interface for message with [TransactionId] and [Transaction].
+class TransactionMessage {
+  TransactionId id;
+  Transaction transaction;
+  TransactionMessage(this.id, this.transaction);
 }
 
 /// Interface for iterating [Transaction] for [PublicAddress] by [height].

@@ -8,16 +8,17 @@ part of 'cruz.dart';
 
 CruzTransaction _$CruzTransactionFromJson(Map<String, dynamic> json) {
   return CruzTransaction(
-      json['from'] == null
-          ? null
-          : CruzPublicKey.fromJson(json['from'] as String),
-      json['to'] == null ? null : CruzPublicKey.fromJson(json['to'] as String),
-      json['amount'] as int,
-      json['fee'] as int,
-      json['memo'] as String,
-      matures: json['matures'] as int,
-      expires: json['expires'] as int,
-      series: json['series'] as int)
+    json['from'] == null
+        ? null
+        : CruzPublicKey.fromJson(json['from'] as String),
+    json['to'] == null ? null : CruzPublicKey.fromJson(json['to'] as String),
+    json['amount'] as int,
+    json['fee'] as int,
+    json['memo'] as String,
+    matures: json['matures'] as int,
+    expires: json['expires'] as int,
+    series: json['series'] as int,
+  )
     ..time = json['time'] as int
     ..nonce = json['nonce'] as int
     ..signature = json['signature'] == null
@@ -50,15 +51,16 @@ Map<String, dynamic> _$CruzTransactionToJson(CruzTransaction instance) {
 
 CruzAddress _$CruzAddressFromJson(Map<String, dynamic> json) {
   return CruzAddress(
-      json['publicKey'] == null
-          ? null
-          : CruzPublicKey.fromJson(json['publicKey'] as String),
-      json['privateKey'] == null
-          ? null
-          : CruzPrivateKey.fromJson(json['privateKey'] as String),
-      json['chainCode'] == null
-          ? null
-          : CruzChainCode.fromJson(json['chainCode'] as String))
+    json['publicKey'] == null
+        ? null
+        : CruzPublicKey.fromJson(json['publicKey'] as String),
+    json['privateKey'] == null
+        ? null
+        : CruzPrivateKey.fromJson(json['privateKey'] as String),
+    json['chainCode'] == null
+        ? null
+        : CruzChainCode.fromJson(json['chainCode'] as String),
+  )
     ..name = json['name'] as String
     ..state = _$enumDecodeNullable(_$AddressStateEnumMap, json['state'])
     ..accountId = json['accountId'] as int
@@ -90,31 +92,43 @@ Map<String, dynamic> _$CruzAddressToJson(CruzAddress instance) {
   return val;
 }
 
-T _$enumDecode<T>(Map<T, dynamic> enumValues, dynamic source) {
+T _$enumDecode<T>(
+  Map<T, dynamic> enumValues,
+  dynamic source, {
+  T unknownValue,
+}) {
   if (source == null) {
     throw ArgumentError('A value must be provided. Supported values: '
         '${enumValues.values.join(', ')}');
   }
-  return enumValues.entries
-      .singleWhere((e) => e.value == source,
-          orElse: () => throw ArgumentError(
-              '`$source` is not one of the supported values: '
-              '${enumValues.values.join(', ')}'))
-      .key;
+
+  final value = enumValues.entries
+      .singleWhere((e) => e.value == source, orElse: () => null)
+      ?.key;
+
+  if (value == null && unknownValue == null) {
+    throw ArgumentError('`$source` is not one of the supported values: '
+        '${enumValues.values.join(', ')}');
+  }
+  return value ?? unknownValue;
 }
 
-T _$enumDecodeNullable<T>(Map<T, dynamic> enumValues, dynamic source) {
+T _$enumDecodeNullable<T>(
+  Map<T, dynamic> enumValues,
+  dynamic source, {
+  T unknownValue,
+}) {
   if (source == null) {
     return null;
   }
-  return _$enumDecode<T>(enumValues, source);
+  return _$enumDecode<T>(enumValues, source, unknownValue: unknownValue);
 }
 
-const _$AddressStateEnumMap = <AddressState, dynamic>{
+const _$AddressStateEnumMap = {
   AddressState.reserve: 'reserve',
   AddressState.open: 'open',
   AddressState.used: 'used',
-  AddressState.remove: 'remove'
+  AddressState.remove: 'remove',
 };
 
 CruzBlockIds _$CruzBlockIdsFromJson(Map<String, dynamic> json) {
@@ -125,7 +139,9 @@ CruzBlockIds _$CruzBlockIdsFromJson(Map<String, dynamic> json) {
 }
 
 Map<String, dynamic> _$CruzBlockIdsToJson(CruzBlockIds instance) =>
-    <String, dynamic>{'ids': instance.ids};
+    <String, dynamic>{
+      'ids': instance.ids,
+    };
 
 CruzBlockHeader _$CruzBlockHeaderFromJson(Map<String, dynamic> json) {
   return CruzBlockHeader()
@@ -181,5 +197,5 @@ CruzBlock _$CruzBlockFromJson(Map<String, dynamic> json) {
 
 Map<String, dynamic> _$CruzBlockToJson(CruzBlock instance) => <String, dynamic>{
       'header': instance.header,
-      'transactions': instance.transactions
+      'transactions': instance.transactions,
     };

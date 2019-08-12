@@ -7,6 +7,10 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 
+const int debugLevelError = 0;
+const int debugLevelInfo = 1;
+const int debugLevelDebug = 2;
+
 typedef StringCallback = void Function(String);
 typedef VoidCallback = void Function();
 
@@ -39,6 +43,18 @@ bool equalUint8List(Uint8List x, Uint8List y) {
     if (x[i] != y[i]) return false;
   }
   return true;
+}
+
+/// Prepends [input] with zeros so [input.length] becomes [size].
+Uint8List zeroPadUint8List(Uint8List input, int size) {
+  if (input.length < size) {
+    return Uint8List.fromList(
+        List.filled(size - input.length, 0) + input.toList());
+  } else if (input.length == size) {
+    return input;
+  } else {
+    return null;
+  }
 }
 
 /// Returns [n] random bytes.

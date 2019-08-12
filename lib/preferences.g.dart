@@ -7,9 +7,12 @@ part of 'preferences.dart';
 // **************************************************************************
 
 PeerPreference _$PeerPreferenceFromJson(Map<String, dynamic> json) {
-  return PeerPreference(json['name'] as String, json['url'] as String,
-      json['currency'] as String, json['options'] as String)
-    ..priority = json['priority'] as int;
+  return PeerPreference(
+    json['name'] as String,
+    json['url'] as String,
+    json['currency'] as String,
+    json['options'] as String,
+  )..priority = json['priority'] as int;
 }
 
 Map<String, dynamic> _$PeerPreferenceToJson(PeerPreference instance) =>
@@ -18,5 +21,5 @@ Map<String, dynamic> _$PeerPreferenceToJson(PeerPreference instance) =>
       'url': instance.url,
       'currency': instance.currency,
       'options': instance.options,
-      'priority': instance.priority
+      'priority': instance.priority,
     };

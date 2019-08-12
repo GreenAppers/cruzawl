@@ -7,7 +7,9 @@ part of 'wallet.dart';
 // **************************************************************************
 
 Account _$AccountFromJson(Map<String, dynamic> json) {
-  return Account(json['id'] as int)..nextIndex = json['nextIndex'] as int;
+  return Account(
+    json['id'] as int,
+  )..nextIndex = json['nextIndex'] as int;
 }
 
 Map<String, dynamic> _$AccountToJson(Account instance) {
