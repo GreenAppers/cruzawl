@@ -22,12 +22,14 @@ class ExchangeRates {
       this.debugPrint});
 
   /// Update [base] → [currency] exchange rate to [amount].
-  ExchangeRate updateRate(String base, String currency, num amount) {
+  ExchangeRate updateRate(String base, String currency, num amount,
+      [String via]) {
     ExchangeRate rate = data[base];
     if (rate == null) rate = data[base] = ExchangeRate(base);
     rate.to[currency] = amount;
     rate.updated = DateTime.now();
-    debugPrint('Updated ${rate.from} -> $currency = $amount');
+    debugPrint('Updated ${rate.from} -> $currency = $amount' +
+        (via != null ? '(via $via)' : ''));
     return rate;
   }
 
@@ -58,7 +60,7 @@ class ExchangeRate {
 }
 
 /// Updates BTC → USD.
-void updateBtc2UsdWithCoinbase(ExchangeRates rates) {
+void updateBtcToUsdWithCoinbase(ExchangeRates rates) {
   /// {"data":{"base":"BTC","currency":"USD","amount":"11784.005"}}
   HttpRequest.request('https://api.coinbase.com/v2/prices/spot?currency=USD')
       .then((resp) {
@@ -66,7 +68,7 @@ void updateBtc2UsdWithCoinbase(ExchangeRates rates) {
     String base = data['base'], currency = data['currency'];
     assert(base == 'BTC');
     assert(currency == 'USD');
-    rates.updateRate(base, currency, num.parse(data['amount']));
+    rates.updateRate(base, currency, num.parse(data['amount']), 'Coinbase');
   });
 }
 
@@ -88,7 +90,7 @@ void updateCruzToBtcWithQtrade(ExchangeRates rates) {
     assert(base == 'CRUZ');
     assert(currency == 'BTC');
     rates.updateRate(
-        base, currency, num.parse(data['recent_trades'][0]['price']));
+        base, currency, num.parse(data['recent_trades'][0]['price']), 'qTrade');
   });
 }
 
@@ -102,17 +104,13 @@ void updateCruzToBtcWithVinex(ExchangeRates rates) {
         currency = data['tokenInfo1']['symbol'];
     assert(base == 'CRUZ');
     assert(currency == 'BTC');
-    rates.updateRate(base, currency, data['lastPrice']);
+    rates.updateRate(base, currency, data['lastPrice'], 'Vinex');
   });
 }
 
 /// Calls [updateBtc2UsdWithCoinbase()] and either [updateCurrenciesToBtcWithVinex] or
 /// [updateCurrenciesToBtcWithQtrade].
 void defaultExchangeRatesUpdate(ExchangeRates rates) {
-  updateBtc2UsdWithCoinbase(rates);
-  if (HttpRequest.type != 'io') {
-    updateCruzToBtcWithVinex(rates);
-  } else {
-    updateCruzToBtcWithQtrade(rates);
-  }
+  updateBtcToUsdWithCoinbase(rates);
+  updateCruzToBtcWithQtrade(rates);
 }
