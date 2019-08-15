@@ -426,7 +426,7 @@ class Wallet extends WalletStorage {
     addresses[x.publicKey.toJson()] = x;
     if (store) _storeAddress(x, txn);
     if (load) _filterNetworkFor(x);
-    if (x.chainIndex != null) {
+    if (hdWallet) {
       if (x.state == AddressState.reserve) {
         account.reserveAddress[x.chainIndex] = x;
       }
@@ -434,12 +434,17 @@ class Wallet extends WalletStorage {
         account.nextIndex = x.chainIndex + 1;
         _storeAccount(account, txn);
       }
-    } else {
-      x.accountId = 0;
-      x.state = AddressState.used;
     }
     return x;
   }
+
+  /// Calls [addAddress] with settings for a user-provided address.
+  Address addProvidedAddress(Address x, int index) => addAddress(
+      x
+        ..accountId = 0
+        ..chainIndex = index
+        ..state = AddressState.used,
+      load: false);
 
   /// Each [Address] in [Wallet] is associated with one [Account].
   Account addAccount(Account x, {bool store = true}) {
@@ -483,15 +488,17 @@ class Wallet extends WalletStorage {
     } else if (privateKeys != null) {
       /// Create a non-HD wallet.
       if (privateKeys.isEmpty) return;
-      for (PrivateKey key in privateKeys) {
-        addAddress(currency.fromPrivateKey(key), load: false);
+      for (int i = 0; i < privateKeys.length; i++) {
+        PrivateKey key = privateKeys[i];
+        addProvidedAddress(currency.fromPrivateKey(key), i);
         await Future.delayed(Duration(seconds: 0));
       }
     } else if (publicKeys != null) {
       // Create a watch-only wallet.
       if (publicKeys.isEmpty) return;
-      for (PublicAddress key in publicKeys) {
-        addAddress(currency.fromPublicKey(key), load: false);
+      for (int i = 0; i < publicKeys.length; i++) {
+        PublicAddress key = publicKeys[i];
+        addProvidedAddress(currency.fromPublicKey(key), i);
         await Future.delayed(Duration(seconds: 0));
       }
     }

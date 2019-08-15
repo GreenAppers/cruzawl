@@ -4,7 +4,7 @@
 # Build
 Follow the same procedure as [the continuous integration](https://github.com/GreenAppers/cruzawl/blob/master/.travis.yml)
 
-# Architecture
+# Project Map
 <img src="https://www.greenappers.com/cruzawl/diagram.svg" />
 
 ## License
@@ -14,3 +14,8 @@ cruzawl is released under the terms of the MIT license. See [LICENSE](https://gi
 ## Discussion
 
 * **[Discord server](https://discord.gg/MRrEHYw)** for general chat as well as updates, including development status.
+
+## Donations
+
+Right on!  [T83EkmIFNVJG+xK64Hm90GmQgrdR2V7BI=](https://www.cruzbase.com/#/address/RWEgB+NQs/T83EkmIFNVJG+xK64Hm90GmQgrdR2V7BI=)
+
