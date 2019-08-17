@@ -42,9 +42,8 @@ class WebSocket {
       io.HttpClientResponse response = await request.close()
         ..timeout(Duration(seconds: timeoutSeconds));
 
-      io.Socket socket = await response.detachSocket();
-
-      ws = io.WebSocket.fromUpgradedSocket(socket, serverSide: false);
+      ws = io.WebSocket.fromUpgradedSocket(await response.detachSocket(),
+          serverSide: false);
       onConnected(ws);
     } on Exception catch (error) {
       onError(error);
