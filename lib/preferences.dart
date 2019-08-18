@@ -4,7 +4,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:intl/intl.dart';
 import 'package:json_annotation/json_annotation.dart';
 import "package:pointycastle/digests/sha256.dart";
 import 'package:sembast/sembast.dart';
@@ -15,14 +14,15 @@ import 'package:cruzawl/util.dart';
 part 'preferences.g.dart';
 
 class CruzawlPreferences extends SembastPreferences {
+  StringFunction defaultLocalCurrency;
   String walletsPassword;
-  CruzawlPreferences(Database db) : super(db);
+  CruzawlPreferences(Database db, this.defaultLocalCurrency) : super(db);
 
   String get theme => data['theme'] ?? 'teal';
   set theme(String value) => setPreference('theme', value);
 
   String get localCurrency =>
-      data['localCurrency'] ?? NumberFormat.currency().currencyName;
+      data['localCurrency'] ?? defaultLocalCurrency();
   set localCurrency(String value) => setPreference('localCurrency', value);
 
   int get minimumReserveAddress => data['minimumReserveAddress'] ?? 5;
