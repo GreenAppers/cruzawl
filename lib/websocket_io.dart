@@ -5,17 +5,20 @@ import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:cruzawl/util.dart';
+import 'package:cruzawl/websocket.dart';
 
-/// dart:io WebSocket wrapper.
-class WebSocket {
+/// dart:io [WebSocket] implementation.
+class WebSocketImpl extends WebSocket {
   static const String type = 'io';
 
   io.WebSocket ws;
 
+  @override
   void close() {
     if (ws != null) ws.close();
   }
 
+  @override
   void connect(String address, Function onConnected, Function onError,
       {int timeoutSeconds = 15, bool ignoreBadCert = false}) async {
     if (!ignoreBadCert || !address.startsWith('wss://')) {
@@ -50,12 +53,16 @@ class WebSocket {
     }
   }
 
+  @override
   void handleError(Function errorHandler) =>
       ws.handleError((error, _) => errorHandler(error));
 
+  @override
   void handleDone(Function doneHandler) => ws.done.then(doneHandler);
 
+  @override
   void listen(Function messageHandler) => ws.listen(messageHandler);
 
+  @override
   void send(String text) => ws.addUtf8Text(utf8.encode(text));
 }

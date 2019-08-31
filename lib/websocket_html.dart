@@ -4,16 +4,20 @@
 import 'dart:async';
 import 'dart:html' as html;
 
-/// dart:html WebSocket wrapper.
-class WebSocket {
+import 'package:cruzawl/websocket.dart';
+
+/// dart:html [WebSocket] implementation.
+class WebSocketImpl extends WebSocket {
   static const String type = 'html';
 
   html.WebSocket ws;
   Function connectCallback;
   StreamSubscription connectErrorSubscription;
 
+  @override
   void close() => ws.close();
 
+  @override
   void connect(String address, Function onConnected, Function onError,
       {int timeoutSeconds = 15, bool ignoreBadCert = false}) {
     /// No way to allow self-signed certificates.
@@ -34,12 +38,16 @@ class WebSocket {
     connectCallback(x);
   }
 
+  @override
   void handleError(Function errorHandler) => ws.onError.listen(errorHandler);
 
+  @override
   void handleDone(Function doneHandler) => ws.onClose.listen(doneHandler);
 
+  @override
   void listen(Function messageHandler) =>
       ws.onMessage.listen((e) => messageHandler(e.data));
 
+  @override
   void send(String text) => ws.sendString(text);
 }

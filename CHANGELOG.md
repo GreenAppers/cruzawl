@@ -24,3 +24,7 @@
 
 - Update tweetnacl.
 
+## 1.0.6+6
+
+- Add TestWebSocket
+

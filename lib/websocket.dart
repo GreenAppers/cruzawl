@@ -11,6 +11,17 @@ import 'websocket_html.dart' if (dart.library.io) 'websocket_io.dart';
 
 typedef JsonCallback = void Function(Map<String, dynamic>);
 
+/// Interface for RFC6455 WebSocket protocol
+abstract class WebSocket {
+  void close();
+  void connect(String address, Function onConnected, Function onError,
+      {int timeoutSeconds = 15, bool ignoreBadCert = false});
+  void handleError(Function errorHandler);
+  void handleDone(Function doneHandler);
+  void listen(Function messageHandler);
+  void send(String text);
+}
+
 /// [Peer] integrating [html.Websocket] and [io.WebSocket]
 abstract class PersistentWebSocketClient extends Peer {
   /// The URI for [WebSocket.connect]
@@ -20,7 +31,7 @@ abstract class PersistentWebSocketClient extends Peer {
   int autoReconnectSeconds;
 
   /// The wrapped dart:html or dart:io [WebSocket].
-  WebSocket ws = WebSocket();
+  WebSocket ws = WebSocketImpl();
 
   /// [Queue] holding [JsonCallback] for expected in-order responses.
   Queue<JsonCallback> jsonResponseQueue = Queue<JsonCallback>();
@@ -96,4 +107,25 @@ abstract class PersistentWebSocketClient extends Peer {
       (jsonResponseQueue.removeFirst())(null);
     }
   }
+}
+
+/// Shim [WebSocket] for testing
+class TestWebSocket extends WebSocket {
+  bool connected = false, closed = false;
+  Function messageHandler, errorHandler, doneHandler;
+  Queue<String> sent = Queue<String>();
+
+  void close() => closed = true;
+
+  void connect(String address, Function onConnected, Function onError,
+      {int timeoutSeconds = 15, bool ignoreBadCert = false}) {
+    connected = true;
+    closed = false;
+    onConnected(this);
+  }
+
+  void handleError(Function errorHandler) => this.errorHandler = errorHandler;
+  void handleDone(Function doneHandler) => this.doneHandler = doneHandler;
+  void listen(Function messageHandler) => this.messageHandler = messageHandler;
+  void send(String text) => sent.add(text);
 }
