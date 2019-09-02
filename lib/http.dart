@@ -2,6 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:collection';
 
 export 'http_html.dart' if (dart.library.io) 'http_io.dart';
 
@@ -26,7 +27,7 @@ class HttpRequest {
 
 /// Shim [HttpClient] for testing
 class TestHttpClient extends HttpClient {
-  List<HttpRequest> requests = <HttpRequest>[];
+  Queue<HttpRequest> requests = Queue<HttpRequest>();
 
   @override
   Future<HttpResponse> request(String url, {String method, String data}) {
