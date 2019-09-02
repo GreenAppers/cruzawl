@@ -7,12 +7,12 @@ import 'dart:io' as io;
 
 import 'http.dart';
 
-/// HTTP request itegrating [io.HttpClient] and [html.HttpRequest].
-class HttpRequest {
+/// dart:io [HttpClient] implementation.
+class HttpClientImpl extends HttpClient {
   static const String type = 'io';
 
-  static Future<HttpResponse> request(String url,
-      {String method, String data}) async {
+  @override
+  Future<HttpResponse> request(String url, {String method, String data}) async {
     Uri uri = Uri.parse(url);
     var request;
     switch (method) {

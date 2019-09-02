@@ -21,8 +21,7 @@ class CruzawlPreferences extends SembastPreferences {
   String get theme => data['theme'] ?? 'teal';
   set theme(String value) => setPreference('theme', value);
 
-  String get localCurrency =>
-      data['localCurrency'] ?? defaultLocalCurrency();
+  String get localCurrency => data['localCurrency'] ?? defaultLocalCurrency();
   set localCurrency(String value) => setPreference('localCurrency', value);
 
   int get minimumReserveAddress => data['minimumReserveAddress'] ?? 5;

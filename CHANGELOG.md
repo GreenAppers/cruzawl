@@ -27,4 +27,5 @@
 ## 1.0.6+6
 
 - Add TestWebSocket
+- Add TestHttpClient
 

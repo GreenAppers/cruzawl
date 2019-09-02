@@ -6,12 +6,12 @@ import 'dart:html' as html;
 
 import 'http.dart';
 
-/// HTTP request itegrating [io.HttpClient] and [html.HttpRequest].
-class HttpRequest {
+/// dart:html [HttpClient] implementation.
+class HttpClientImpl extends HttpClient {
   static const String type = 'html';
 
-  static Future<HttpResponse> request(String url,
-      {String method, String data}) {
+  @override
+  Future<HttpResponse> request(String url, {String method, String data}) {
     Completer<HttpResponse> completer = Completer<HttpResponse>();
     html.HttpRequest.request(url, method: method).then(
         (r) => completer.complete(HttpResponse(r.status, r.responseText)));

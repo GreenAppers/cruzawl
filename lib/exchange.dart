@@ -11,6 +11,7 @@ typedef ExchangeRatesCallback = void Function(ExchangeRates);
 
 /// Container for [ExchangeRate].
 class ExchangeRates {
+  HttpClient httpClient;
   CruzawlPreferences preferences;
   StringCallback debugPrint;
   ExchangeRatesCallback update;
@@ -18,7 +19,7 @@ class ExchangeRates {
   Duration updateDuration;
   Map<String, ExchangeRate> data = Map<String, ExchangeRate>();
 
-  ExchangeRates(this.preferences,
+  ExchangeRates(this.httpClient, this.preferences,
       {this.update = defaultExchangeRatesUpdate,
       this.updateDuration = const Duration(minutes: 10),
       this.debugPrint});
@@ -85,11 +86,12 @@ class ExchangeRate {
 /// Updates BTC → [currency].
 void updateBtcToCurrencyWithCoinbase(String currencyCode, ExchangeRates rates,
     {bool rateLimit = false}) {
-  if (rates.prepareUpdateRate('BTC', currencyCode, rateLimit: rateLimit) == null) return;
+  if (rates.prepareUpdateRate('BTC', currencyCode, rateLimit: rateLimit) ==
+      null) return;
 
   /// {"data":{"base":"BTC","currency":"USD","amount":"11784.005"}}
-  HttpRequest.request(
-          'https://api.coinbase.com/v2/prices/spot?currency=$currencyCode')
+  rates.httpClient
+      .request('https://api.coinbase.com/v2/prices/spot?currency=$currencyCode')
       .then((resp) {
     Map<String, dynamic> data = jsonDecode(resp.text)['data'];
     String base = data['base'], currency = data['currency'];
@@ -101,14 +103,16 @@ void updateBtcToCurrencyWithCoinbase(String currencyCode, ExchangeRates rates,
 
 /// Updates CRUZ → BTC.
 void updateCruzToBtcWithQtrade(ExchangeRates rates, {bool rateLimit = false}) {
-  if (rates.prepareUpdateRate('CRUZ', 'BTC', rateLimit: rateLimit) == null) return;
+  if (rates.prepareUpdateRate('CRUZ', 'BTC', rateLimit: rateLimit) == null)
+    return;
 
   /// {"id":32,"market_currency":"CRUZ","base_currency":"BTC","maker_fee":"0","taker_fee":"0.015","metadata":{},"can_trade":true,"can_cancel":true,"can_view":true},
   /// Reference: https://api.qtrade.io/v1/markets
   int qtradeCruzMarketId = 32;
 
   /// {"data":{"market":{"id":32,"market_currency":"CRUZ","base_currency":"BTC","maker_fee":"0","taker_fee":"0.015","metadata":{},"can_trade":true,"can_cancel":true,"can_view":false},"recent_trades":[{"id":55989,"amount":"6.70380253","price":"0.00001499","created_at":"2019-08-09T11:27:24.430434Z"}]}}
-  HttpRequest.request('https://api.qtrade.io/v1/market/$qtradeCruzMarketId')
+  rates.httpClient
+      .request('https://api.qtrade.io/v1/market/$qtradeCruzMarketId')
       .then((resp) {
     /// Unfortunately it is a bit complicated to change the CORS policy for just
     /// the public endpoints with the way our backend is setup, but it is on our
@@ -125,10 +129,12 @@ void updateCruzToBtcWithQtrade(ExchangeRates rates, {bool rateLimit = false}) {
 
 /// Updates CRUZ → BTC.
 void updateCruzToBtcWithVinex(ExchangeRates rates, {bool rateLimit = false}) {
-  if (rates.prepareUpdateRate('CRUZ', 'BTC', rateLimit: rateLimit) == null) return;
+  if (rates.prepareUpdateRate('CRUZ', 'BTC', rateLimit: rateLimit) == null)
+    return;
 
   /// {"status":200,"data":{"id":4000027,"symbol":"BTC_CRUZ","assetId1":1,"assetId2":3000015,"lastPrice":0,"bidPrice":0,"askPrice":0,"volume":0,"weeklyVolume":0,"monthlyVolume":0,"volume24h":0,"asset2Volume24h":0,"change24h":0,"high24h":0,"low24h":0,"createdAt":1564564587,"updatedAt":1565380556,"status":true,"statusTrading":1,"threshold":0.001,"tradingFee":0.001,"makerFee":null,"takerFee":null,"decPrice":8,"decAmount":8,"totalVolume":0,"tokenInfo1":{"id":1,"name":"Bitcoin","symbol":"BTC"},"tokenInfo2":{"id":3000015,"name":"Cruzbit","symbol":"CRUZ"}}}
-  HttpRequest.request('https://api.vinex.network/api/v2/markets/BTC_CRUZ')
+  rates.httpClient
+      .request('https://api.vinex.network/api/v2/markets/BTC_CRUZ')
       .then((resp) {
     Map<String, dynamic> data = jsonDecode(resp.text)['data'];
     String base = data['tokenInfo2']['symbol'],
