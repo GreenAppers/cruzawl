@@ -25,6 +25,8 @@ part 'cruz.g.dart';
 /// cruzbit: A simple decentralized peer-to-peer ledger implementation.
 /// https://github.com/cruzbit/cruzbit
 class CRUZ extends Currency {
+  const CRUZ();
+
   /// 1 week in blocks.
   /// Reference: https://github.com/cruzbit/cruzbit/blob/master/constants.go#L42
   static const int blocksUntilNewSeries = 1008;
@@ -90,9 +92,11 @@ class CRUZ extends Currency {
   @override
   PublicAddress get nullAddress => CruzPublicKey(Uint8List(32));
 
-  /// The cruzbit [PeerNetwork].
+  /// Create a cruzbit.1 [PeerNetwork] instance.
   @override
-  CruzPeerNetwork network = CruzPeerNetwork();
+  CruzPeerNetwork createNetwork(
+          [VoidCallback peerChanged, VoidCallback tipChanged]) =>
+      CruzPeerNetwork(peerChanged, tipChanged);
 
   /// ID of the first [Block] in the chain. e.g. https://www.cruzbase.com/#/height/0
   @override
@@ -681,6 +685,12 @@ class CruzBlock extends Block {
 
 /// The cruzbit.1 [PeerNetwork] implementing a distributed ledger.
 class CruzPeerNetwork extends PeerNetwork {
+  CruzPeerNetwork(VoidCallback peerChanged, VoidCallback tipChanged)
+      : super(peerChanged, tipChanged);
+
+  @override
+  CRUZ get currency => cruz;
+
   /// Creates [Peer] ready to [Peer.connect()].
   @override
   Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId) =>

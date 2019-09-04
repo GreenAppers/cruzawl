@@ -22,9 +22,6 @@ abstract class Currency {
     }
   }
 
-  /// The only dynamic property.
-  PeerNetwork get network;
-
   /// Name of the currency. e.g. CRUZ.
   String get ticker;
 
@@ -58,6 +55,10 @@ abstract class Currency {
 
   /// Suggests a fee for [transaction].
   String suggestedFee(Transaction transaction) => null;
+
+  /// Create a [PeerNetwork] instance for this currency.
+  PeerNetwork createNetwork(
+      [VoidCallback peerChanged, VoidCallback tipChanged]);
 
   /// The [Block] with [Block.height] equal zero.
   Block genesisBlock();
@@ -101,12 +102,14 @@ abstract class Currency {
 class LoadingCurrency extends Currency {
   const LoadingCurrency();
 
-  PeerNetwork get network => null;
   String get ticker => 'CRUZ';
   int get bip44CoinType => 0;
   int get coinbaseMaturity => 0;
   PublicAddress get nullAddress => null;
 
+  PeerNetwork createNetwork(
+          [VoidCallback peerChanged, VoidCallback tipChanged]) =>
+      null;
   Block genesisBlock() => null;
   Address deriveAddress(Uint8List seed, String path,
           [StringCallback debugPrint]) =>
@@ -382,6 +385,8 @@ abstract class Block {
   TransactionId computeHashListRoot();
 }
 
-CRUZ cruz = CRUZ();
+LoadingCurrency loadingCurrency = const LoadingCurrency();
+
+CRUZ cruz = const CRUZ();
 
 List<Currency> currencies = <Currency>[cruz];

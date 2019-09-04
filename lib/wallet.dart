@@ -246,6 +246,9 @@ abstract class WalletStorage {
 /// [Block] storage isn't necessary if [Peer.filterAdd] correctly handles reorgs.
 /// See: [undoneByReorg] in [updateTransaction].
 class Wallet extends WalletStorage {
+  /// The [PeerNetwork] to query for this wallet.
+  PeerNetwork network;
+
   /// True if [_openWalletStorage] has completed and this [Wallet] is ready.
   bool opened = false;
 
@@ -289,12 +292,12 @@ class Wallet extends WalletStorage {
 
   /// Generate new HD [Wallet].
   Wallet.generate(sembast.DatabaseFactory databaseFactory,
-      FileSystem fileSystem, String filename, String name, Currency currency,
+      FileSystem fileSystem, String filename, String name, PeerNetwork network,
       [CruzawlPreferences prefileSystem,
       StringCallback debug,
       WalletCallback loaded])
       : this.fromSeedPhrase(databaseFactory, fileSystem, filename, name,
-            currency, generateMnemonic(), prefileSystem, debug, loaded);
+            network, generateMnemonic(), prefileSystem, debug, loaded);
 
   /// Generate HD [Wallet] from BIP-0039 mnemonic code.
   Wallet.fromSeedPhrase(
@@ -302,7 +305,7 @@ class Wallet extends WalletStorage {
       FileSystem fileSystem,
       String filename,
       String name,
-      Currency currency,
+      PeerNetwork network,
       String seedPhrase,
       [CruzawlPreferences prefileSystem,
       StringCallback debug,
@@ -312,7 +315,7 @@ class Wallet extends WalletStorage {
             fileSystem,
             filename,
             name,
-            currency,
+            network,
             Seed(mnemonicToSeed(seedPhrase)),
             seedPhrase,
             prefileSystem,
@@ -325,13 +328,13 @@ class Wallet extends WalletStorage {
       FileSystem fileSystem,
       String filename,
       String name,
-      Currency currency,
+      this.network,
       Seed seed,
       [String seedPhrase,
       this.preferences,
       this.debugPrint,
       WalletCallback loaded])
-      : super(name, currency, seed, seedPhrase) {
+      : super(name, network.currency, seed, seedPhrase) {
     if (filename != null) {
       _openWalletStorage(databaseFactory, fileSystem, filename, true, loaded);
     }
@@ -343,13 +346,13 @@ class Wallet extends WalletStorage {
       FileSystem fileSystem,
       String filename,
       String name,
-      Currency currency,
+      this.network,
       Seed seed,
       List<PrivateKey> privateKeys,
       [this.preferences,
       this.debugPrint,
       WalletCallback loaded])
-      : super(name, currency, seed) {
+      : super(name, network.currency, seed) {
     if (filename != null) {
       _openWalletStorage(
           databaseFactory, fileSystem, filename, true, loaded, privateKeys);
@@ -362,13 +365,13 @@ class Wallet extends WalletStorage {
       FileSystem fileSystem,
       String filename,
       String name,
-      Currency currency,
+      this.network,
       Seed seed,
       List<PublicAddress> publicKeys,
       [this.preferences,
       this.debugPrint,
       WalletCallback loaded])
-      : super(name, currency, seed) {
+      : super(name, network.currency, seed) {
     if (filename != null) {
       _openWalletStorage(databaseFactory, fileSystem, filename, true, loaded,
           null, publicKeys);
@@ -376,11 +379,18 @@ class Wallet extends WalletStorage {
   }
 
   /// Load arbitrary [Wallet] of arbitrary [Currency].
-  Wallet.fromFile(sembast.DatabaseFactory databaseFactory,
-      FileSystem fileSystem, String filename, Seed seed,
-      [this.preferences, this.debugPrint, WalletCallback loaded])
-      : super('loading', const LoadingCurrency(), seed) {
-    _openWalletStorage(databaseFactory, fileSystem, filename, false, loaded);
+  Wallet.fromFile(
+      sembast.DatabaseFactory databaseFactory,
+      List<PeerNetwork> networks,
+      FileSystem fileSystem,
+      String filename,
+      Seed seed,
+      [this.preferences,
+      this.debugPrint,
+      WalletCallback loaded])
+      : super('loading', loadingCurrency, seed) {
+    _openWalletStorage(databaseFactory, fileSystem, filename, false, loaded,
+        null, null, networks);
   }
 
   /// True if hierarchical deterministic wallet.
@@ -460,7 +470,8 @@ class Wallet extends WalletStorage {
       FileSystem fileSystem, String filename, bool create,
       [WalletCallback openedCallback,
       List<PrivateKey> privateKeys,
-      List<PublicAddress> publicKeys]) async {
+      List<PublicAddress> publicKeys,
+      List<PeerNetwork> networks]) async {
     try {
       debugPrint((create ? 'Creating' : 'Opening') + ' wallet $filename ...');
       await _readStorage(
@@ -472,6 +483,11 @@ class Wallet extends WalletStorage {
       } else {
         rethrow;
       }
+    }
+
+    if (network == null) {
+      network = findPeerNetworkForCurrency(networks, currency);
+      if (network == null) throw FormatException('Wallet missing PeerNetwork');
     }
 
     if (hdWallet) {
@@ -549,9 +565,9 @@ class Wallet extends WalletStorage {
 
   /// When new [Block]s come out, use their [BlockHeader.height] as a timer.
   void updateTip() {
-    assert(currency.network.tipHeight != null);
-    expirePendingTransactions(currency.network.tipHeight);
-    completeMaturingTransactions(currency.network.tipHeight);
+    assert(network.tipHeight != null);
+    expirePendingTransactions(network.tipHeight);
+    completeMaturingTransactions(network.tipHeight);
     if (notifyListeners != null) notifyListeners();
   }
 
@@ -602,16 +618,16 @@ class Wallet extends WalletStorage {
       await reloading[i];
     }
 
-    if (currency.network.hasPeer) {
-      await (await currency.network.getPeer()).filterTransactionQueue();
+    if (network.hasPeer) {
+      await (await network.getPeer()).filterTransactionQueue();
     }
   }
 
   /// Synchronizes our database [x] with the [PeerNetwork] and tracks updates.
   Future<void> _filterNetworkFor(Address x) async {
     /// Abort if we're offline or lose network.  We'll [reload] when we reconnect.
-    if (!currency.network.hasPeer) return voidResult();
-    Peer peer = await currency.network.getPeer();
+    if (!network.hasPeer) return voidResult();
+    Peer peer = await network.getPeer();
     if (peer == null) return voidResult();
 
     /// Start filtering [PeerNetwork] for [x].
@@ -672,7 +688,7 @@ class Wallet extends WalletStorage {
     }
     bool balanceChanged =
         transactionsChanged && (newTransaction || undoneByReorg);
-    bool mature = transaction.maturity <= currency.network.tipHeight;
+    bool mature = transaction.maturity <= network.tipHeight;
 
     /// Track [Address].[state] changes.
     Address from =

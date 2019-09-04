@@ -146,6 +146,9 @@ abstract class Peer {
 /// Interface controlling (re)connection policy for a collection of [Peer]s.
 /// Defines a type of network via [createPeerWithSpec], e.g. [CruzPeerNetwork].
 abstract class PeerNetwork {
+  /// The [Currency] for this network.
+  Currency currency;
+
   /// The [Peer] we've connected to.
   List<Peer> peers = <Peer>[];
 
@@ -164,7 +167,8 @@ abstract class PeerNetwork {
   /// Triggers [reconnectPeer] on [PeerState.disconnected].
   int autoReconnectSeconds;
 
-  PeerNetwork({this.autoReconnectSeconds = 15});
+  PeerNetwork(this.peerChanged, this.tipChanged,
+      {this.autoReconnectSeconds = 15});
 
   /// True if a [Peer] is connected.
   bool get hasPeer => peers.isNotEmpty;
@@ -327,4 +331,10 @@ class TransactionIteratorResults extends TransactionIterator {
   List<Transaction> transactions;
   TransactionIteratorResults(int height, int index, this.transactions)
       : super(height, index);
+}
+
+/// Filters [networks] for a [PeerNetwork] with [Currency] matching [x].
+PeerNetwork findPeerNetworkForCurrency(List<PeerNetwork> networks, Currency x) {
+  if (networks == null) return null;
+  return networks.singleWhere((n) => n.currency == x, orElse: () => null);
 }
