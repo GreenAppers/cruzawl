@@ -385,8 +385,8 @@ abstract class Block {
   TransactionId computeHashListRoot();
 }
 
-LoadingCurrency loadingCurrency = const LoadingCurrency();
+const LoadingCurrency loadingCurrency = const LoadingCurrency();
 
-CRUZ cruz = const CRUZ();
+const CRUZ cruz = const CRUZ();
 
-List<Currency> currencies = <Currency>[cruz];
+const List<Currency> currencies = const <Currency>[ cruz ];

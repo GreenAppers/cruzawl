@@ -9,6 +9,7 @@ import 'dart:typed_data';
 import "package:convert/convert.dart";
 import 'package:ed25519_hd_key/ed25519_hd_key.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:meta/meta.dart';
 import "package:pointycastle/digests/sha256.dart";
 import "package:pointycastle/src/utils.dart";
 import 'package:tweetnacl/tweetnacl.dart' as tweetnacl;
@@ -196,6 +197,7 @@ class CRUZ extends Currency {
 }
 
 /// Ed25519 public key, 32 bytes.
+@immutable
 class CruzPublicKey extends PublicAddress {
   final Uint8List data;
   static const int size = 32;
@@ -214,6 +216,7 @@ class CruzPublicKey extends PublicAddress {
 }
 
 /// Ed25519 private key (pair), 64 bytes.
+@immutable
 class CruzPrivateKey extends PrivateKey {
   final Uint8List data;
   static const int size = 64;
@@ -241,6 +244,7 @@ class CruzPrivateKey extends PrivateKey {
 }
 
 /// Ed25519 signature, 64 bytes.
+@immutable
 class CruzSignature extends Signature {
   final Uint8List data;
   static const int size = 64;
@@ -258,6 +262,7 @@ class CruzSignature extends Signature {
 }
 
 /// SLIP-0010 chain code.
+@immutable
 class CruzChainCode extends ChainCode {
   final Uint8List data;
   static const int size = 32;
@@ -276,6 +281,7 @@ class CruzChainCode extends ChainCode {
 }
 
 /// SHA3-256 of the CRUZ transaction JSON.
+@immutable
 class CruzTransactionId extends TransactionId {
   final Uint8List data;
   static const int size = 32;
@@ -510,6 +516,7 @@ class CruzAddress extends Address {
 
 /// Unique identifier for [Block].
 /// e.g. the SHA3-256 of [CruzBlockHeader] JSON.
+@immutable
 class CruzBlockId extends BlockId {
   final Uint8List data;
   static const int size = 32;
