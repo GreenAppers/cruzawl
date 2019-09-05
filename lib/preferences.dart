@@ -18,7 +18,7 @@ class CruzawlPreferences extends SembastPreferences {
   String walletsPassword;
   CruzawlPreferences(Database db, this.defaultLocalCurrency) : super(db);
 
-  String get theme => data['theme'] ?? 'teal';
+  String get theme => data['theme'] ?? 'blue';
   set theme(String value) => setPreference('theme', value);
 
   String get localCurrency => data['localCurrency'] ?? defaultLocalCurrency();
