@@ -29,3 +29,7 @@
 - Add TestWebSocket
 - Add TestHttpClient
 
+## 1.0.7+7
+
+- pub.dev Health suggestions.
+

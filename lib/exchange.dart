@@ -34,8 +34,9 @@ class ExchangeRates {
     } else {
       ExchangeRateTo rateTo = rate.to[currency];
       DateTime now = DateTime.now();
-      if (rateLimit && now.isBefore(rateTo.updated.add(updateDuration)))
+      if (rateLimit && now.isBefore(rateTo.updated.add(updateDuration))) {
         return null;
+      }
       rateTo.updated = now;
     }
     return rate;
@@ -103,8 +104,9 @@ void updateBtcToCurrencyWithCoinbase(String currencyCode, ExchangeRates rates,
 
 /// Updates CRUZ → BTC.
 void updateCruzToBtcWithQtrade(ExchangeRates rates, {bool rateLimit = false}) {
-  if (rates.prepareUpdateRate('CRUZ', 'BTC', rateLimit: rateLimit) == null)
+  if (rates.prepareUpdateRate('CRUZ', 'BTC', rateLimit: rateLimit) == null) {
     return;
+  }
 
   /// {"id":32,"market_currency":"CRUZ","base_currency":"BTC","maker_fee":"0","taker_fee":"0.015","metadata":{},"can_trade":true,"can_cancel":true,"can_view":true},
   /// Reference: https://api.qtrade.io/v1/markets
@@ -129,8 +131,9 @@ void updateCruzToBtcWithQtrade(ExchangeRates rates, {bool rateLimit = false}) {
 
 /// Updates CRUZ → BTC.
 void updateCruzToBtcWithVinex(ExchangeRates rates, {bool rateLimit = false}) {
-  if (rates.prepareUpdateRate('CRUZ', 'BTC', rateLimit: rateLimit) == null)
+  if (rates.prepareUpdateRate('CRUZ', 'BTC', rateLimit: rateLimit) == null) {
     return;
+  }
 
   /// {"status":200,"data":{"id":4000027,"symbol":"BTC_CRUZ","assetId1":1,"assetId2":3000015,"lastPrice":0,"bidPrice":0,"askPrice":0,"volume":0,"weeklyVolume":0,"monthlyVolume":0,"volume24h":0,"asset2Volume24h":0,"change24h":0,"high24h":0,"low24h":0,"createdAt":1564564587,"updatedAt":1565380556,"status":true,"statusTrading":1,"threshold":0.001,"tradingFee":0.001,"makerFee":null,"takerFee":null,"decPrice":8,"decAmount":8,"totalVolume":0,"tokenInfo1":{"id":1,"name":"Bitcoin","symbol":"BTC"},"tokenInfo2":{"id":3000015,"name":"Cruzbit","symbol":"CRUZ"}}}
   rates.httpClient

@@ -4,6 +4,7 @@
 import 'dart:io';
 
 import 'package:cruzawl/currency.dart';
+import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
 
 // bash-3.2$ dart example.dart 
@@ -13,21 +14,22 @@ import 'package:cruzawl/preferences.dart';
 // Previous: 000000000002b57d4e0db7eb1209b289112bc4af5d81e15d5ce3700ee646f28b
 // Transactions: 4
 void main() {
+  PeerNetwork network = cruz.createNetwork();
 
   /// Print the latest [BlockHeader] in the block chain.
-  cruz.network.tipChanged = () {
-    BlockHeader block = cruz.network.tip;
+  network.tipChanged = () {
+    BlockHeader block = network.tip;
     print('*** Latest Block ***');
     print('Height: ${block.height}');
-    print('Id: ${cruz.network.tipId.toJson()}');
+    print('Id: ${network.tipId.toJson()}');
     print('Previous: ${block.previous.toJson()}');
     print('Transactions: ${block.transactionCount}');
     exit(0);
   };
 
-  /// Connect [CruzNetwork] to public seeder.
-  cruz.network
-      .addPeer(cruz.network.createPeerWithSpec(
+  /// Connect [PeerNetwork] to public seeder.
+  network
+      .addPeer(network.createPeerWithSpec(
           PeerPreference('SatoshiLocomoco', 'wallet.cruzbit.xyz', 'CRUZ', '',
               debugPrint: (x) { /* print('DEBUG: $x'); */ }),
           cruz.genesisBlock().id().toJson()))

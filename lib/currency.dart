@@ -314,8 +314,6 @@ typedef TransactionCallback = void Function(Transaction);
 
 /// Interface for e.g. SHA3-256 of [BlockHeader] data
 abstract class BlockId {
-  Uint8List data;
-
   /// Marshals this [BlockId] as a JSON-encoded string.
   String toJson();
 
@@ -389,4 +387,4 @@ const LoadingCurrency loadingCurrency = const LoadingCurrency();
 
 const CRUZ cruz = const CRUZ();
 
-const List<Currency> currencies = const <Currency>[ cruz ];
+const List<Currency> currencies = const <Currency>[cruz];
