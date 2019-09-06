@@ -14,7 +14,7 @@ dependencies:
   ed25519_hd_key: ^1.0.1
   fixnum: ^0.10.9
   json_annotation: ^3.0.0
-  meta: ^1.1.7
+  meta: ^1.1.6
   pointycastle: ^1.0.1
   sembast: ^2.0.1
   tweetnacl: ^0.3.2
