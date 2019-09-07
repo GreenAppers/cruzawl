@@ -13,16 +13,24 @@ before_install:
   - echo $TRAVIS_OS_NAME
   - echo ${HOME}
   - echo ${TRAVIS_BUILD_DIR}
+  - echo "repo_token:" $COVERALLS_REPO_TOKEN > .coveralls.yml
+  - gem install coveralls-lcov
   - git clone https://github.com/flutter/flutter.git -b stable --depth 1 ${HOME}/flutter
   - ${HOME}/flutter/bin/flutter doctor -v
   - ${HOME}/flutter/bin/flutter packages get
-  - ${HOME}/flutter/bin/flutter pub get
+  - ${HOME}/flutter/bin/flutter pub global activate coverage
 
 script:
   - ${HOME}/flutter/bin/flutter pub run test
+  - ./test-coverage.sh
 
 after_success:
   - echo "success"
+  - coveralls-lcov coverage/lcov.info
 
 after_failure:
   - echo "failure"
+
+env:
+  global:
+    secure: KLSpKJfWnjIDZHMcQTPlEimMcR14MuOeUhfotrALnmYvKBztcKP9uA5OLdXYUMv6ZYiz7imx7xsBjLc0/HzNrJYXCar9IbYtMrxtLv6ZMBuGT7mlQTgt1zocxFiZDUF7t/QEkzAS0G5G+HpLPD4oQ8zj97F1llIJMFccixmfigyMTwaUhIL0EV86MF6uTKRbmgq0PseM5PrQ8KHdAeJRKD1zg20T5v90UwO1OO8H8QdU1IXPZVn0iKLcdYA75lUB6dzjEfTvELULzdzVvCTc00W+MHSteaBxDvKJuzTPVVsPOYJ0lfW0/KkR8IpewnCfVeoC2d6n2n4Wn/gVvEbNG5niukVO3tRA8ySh0TJB0lxhgUmPKwht2gx3quveu8/Q/1WfNH2CmQrnSSHjnxwD2bOV8PjPHEsS7nR5MTaoUlRlxzn5jiuk/I6qv0GDnT2msHcCHaw4BpBXAvooNkyv1LU/x8Tbbljj7LyiVKJlbyXDFrRwlW3ouANnMnNUViegSGUi113dbPzv9MKRiE//4gRMG3e9mASSvq3WBrPx+FuGhKoXRseL/C5cG6WJl0lf4eSv3teBjLUFVVRt91+LENN3rf5of4j4YkwraFk2xpT7IEkzmV0wYFTotjzB0H+6DoDWN7j4JbB+nnBkjNA8bnY99yrpBIxzXQaLQYr5NqM=
