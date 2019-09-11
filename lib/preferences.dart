@@ -92,6 +92,19 @@ class CruzawlPreferences extends SembastPreferences {
     setPreference('peers', value.map((v) => v.toJson()).toList());
   }
 
+  Map<String, Contact> get contacts {
+    Map<String, Contact> ret = {};
+    var contacts = data['contacts'];
+    if (contacts == null) return ret;
+    for (Contact contact in contacts.map<Contact>((v) => Contact.fromJson(v))) {
+      ret[contact.addressText] = contact;
+    }
+    return ret;
+  }
+
+  set contacts(Map<String, Contact> value) =>
+      setPreference('contacts', value.values.map((v) => v.toJson()).toList());
+
   void encryptWallets(String password) {
     bool enabled = password != null && password.isNotEmpty;
     if (enabled == walletsEncrypted) return;
@@ -131,4 +144,17 @@ class PeerPreference {
   }
 
   static int comparePriority(dynamic a, dynamic b) => b.priority - a.priority;
+}
+
+@JsonSerializable()
+class Contact {
+  String name, url, icon, currency, options, addressText;
+
+  Contact(this.name, this.url, this.icon, this.currency, this.options,
+      this.addressText);
+
+  factory Contact.fromJson(Map<String, dynamic> json) =>
+      _$ContactFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ContactToJson(this);
 }
