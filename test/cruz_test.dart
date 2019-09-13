@@ -23,8 +23,8 @@ void main() {
     network.tipChanged = () => completer.complete(null);
     network
         .addPeer(network.createPeerWithSpec(
-            PeerPreference('SatoshiLocomoco', 'wallet.cruzbit.xyz', 'CRUZ', ',ignoreBadCert,',
-                debugPrint: (x) { /* print('DEBUG: $x'); */ }),
+            PeerPreference('SatoshiLocomoco', 'wallet.cruzbit.xyz', 'CRUZ',
+                ',ignoreBadCert,', debugPrint: (x) {/* print('DEBUG: $x'); */}),
             cruz.genesisBlock().id().toJson()))
         .connect();
 

@@ -4,15 +4,15 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:test/test.dart';
-
 import 'package:bip39/bip39.dart';
 import 'package:sembast/sembast_memory.dart';
+import 'package:test/test.dart';
 
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/cruz.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
+import 'package:cruzawl/sembast.dart';
 import 'package:cruzawl/test.dart';
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/websocket.dart';
@@ -26,23 +26,26 @@ void main() {
   CruzawlPreferences preferences;
   TestWebSocket socket = TestWebSocket();
   PeerNetwork network = cruz.createNetwork();
-  String moneyAddr, moneySender = 'xRL0D9U+jav9NxOwz4LsXe8yZ8KSS7Hst4/P8ChciAI=';
+  String moneyAddr,
+      moneySender = 'xRL0D9U+jav9NxOwz4LsXe8yZ8KSS7Hst4/P8ChciAI=';
   int money = 13, moneyBalance = money * CRUZ.cruzbitsPerCruz;
-  
+
   test('Create CruzawlPreferences', () async {
     preferences = CruzawlPreferences(
-        await databaseFactoryMemoryFs.openDatabase('settings.db'), () => 'USD');
-    await preferences.load();
-    preferences.networkEnabled = false;
-    preferences.minimumReserveAddress = 3;
+        SembastPreferences(
+            await databaseFactoryMemoryFs.openDatabase('settings.db')),
+        () => 'USD');
+    await preferences.storage.load();
+    await preferences.setNetworkEnabled(false);
+    await preferences.setMinimumReserveAddress(3);
   });
 
   test('Create CruzPeer', () {
-		PeerPreference peerPref = preferences.peers[0];
+    PeerPreference peerPref = preferences.peers[0];
     peerPref.debugPrint = print;
     peerPref.debugLevel = debugLevelDebug;
-		peer = network.addPeer(
-        network.createPeerWithSpec(peerPref, cruz.genesisBlock().id().toJson()));
+    peer = network.addPeer(network.createPeerWithSpec(
+        peerPref, cruz.genesisBlock().id().toJson()));
     peer.ws = socket;
   });
 
@@ -63,11 +66,13 @@ void main() {
 
     expect(network.length, 1);
     expect(network.tipHeight, 25352);
-    expect(network.tipId.toJson(), '0000000000000ab4ac72b9b6061cb19195fe1a8a6d5b961f793f6b61f6f9aa9c');
+    expect(network.tipId.toJson(),
+        '0000000000000ab4ac72b9b6061cb19195fe1a8a6d5b961f793f6b61f6f9aa9c');
     expect(network.minFee, 1000000);
     expect(network.minAmount, 1000000);
     expect(network.peerState, PeerState.ready);
-    expect(network.peerAddress, 'wss://wallet.cruzbit.xyz:8831/00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb');
+    expect(network.peerAddress,
+        'wss://wallet.cruzbit.xyz:8831/00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb');
   });
 
   test('CRUZ HD Wallet create', () async {
@@ -80,7 +85,8 @@ void main() {
         network,
         generateMnemonic(),
         preferences,
-        print, (_) => completer.complete(null));
+        print,
+        (_) => completer.complete(null));
     await completer.future;
     expect(wallet.addresses.length, 3);
     for (var address in wallet.addresses.values) {
@@ -147,18 +153,19 @@ void main() {
   });
 
   test('CRUZ HD Wallet reload', () async {
-    preferences.minimumReserveAddress = 0;
+    preferences.setMinimumReserveAddress(0);
     Seed seed = wallet.seed;
     List<Address> addresses = wallet.addresses.values.toList();
     Completer<void> completer = Completer<void>();
     wallet = Wallet.fromFile(
         databaseFactoryMemoryFs,
-        <PeerNetwork>[ network ],
+        <PeerNetwork>[network],
         NullFileSystem(),
         'wallet.cruzall',
         seed,
         preferences,
-        print, (_) => completer.complete(null));
+        print,
+        (_) => completer.complete(null));
     await completer.future;
     expect(wallet.addresses.length, 3);
     for (var address in wallet.addresses.values) {
@@ -167,9 +174,11 @@ void main() {
     List<Address> reloadAddresses = wallet.addresses.values.toList();
     addresses.sort(Address.compareIndex);
     reloadAddresses.sort(Address.compareIndex);
-    for (int i = 0; i < addresses.length; i++) { 
-      expect(reloadAddresses[i].publicKey.toJson(), addresses[i].publicKey.toJson());
-      expect(reloadAddresses[i].privateKey.toJson(), addresses[i].privateKey.toJson());
+    for (int i = 0; i < addresses.length; i++) {
+      expect(reloadAddresses[i].publicKey.toJson(),
+          addresses[i].publicKey.toJson());
+      expect(reloadAddresses[i].privateKey.toJson(),
+          addresses[i].privateKey.toJson());
       expect(reloadAddresses[i].balance, addresses[i].balance);
     }
   });

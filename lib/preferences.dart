@@ -6,75 +6,98 @@ import 'dart:typed_data';
 
 import 'package:json_annotation/json_annotation.dart';
 import "package:pointycastle/digests/sha256.dart";
-import 'package:sembast/sembast.dart';
 
 import 'package:cruzawl/sembast.dart';
 import 'package:cruzawl/util.dart';
 
 part 'preferences.g.dart';
 
-class CruzawlPreferences extends SembastPreferences {
+/// Interface for preference storage
+abstract class PreferenceStorage {
+  /// Loads the preferences and returns [this].
+  Future<PreferenceStorage> load();
+
+  /// Update a preference and [save()] when (by default) [store] is set.
+  Future<void> setPreference(String key, dynamic value, {bool store = true});
+
+  /// Retrieve cached preference for [key]
+  dynamic getPreference(String key);
+}
+
+class CruzawlPreferences {
+  PreferenceStorage storage;
   StringFunction defaultLocalCurrency;
   String walletsPassword;
-  CruzawlPreferences(Database db, this.defaultLocalCurrency) : super(db);
+  CruzawlPreferences(this.storage, this.defaultLocalCurrency);
 
-  String get theme => data['theme'] ?? 'blue';
-  set theme(String value) => setPreference('theme', value);
+  String get theme => storage.getPreference('theme') ?? 'blue';
+  Future<void> setTheme(String value) => storage.setPreference('theme', value);
 
-  String get localCurrency => data['localCurrency'] ?? defaultLocalCurrency();
-  set localCurrency(String value) => setPreference('localCurrency', value);
+  String get localCurrency =>
+      storage.getPreference('localCurrency') ?? defaultLocalCurrency();
+  Future<void> setLocalCurrency(String value) =>
+      storage.setPreference('localCurrency', value);
 
-  int get minimumReserveAddress => data['minimumReserveAddress'] ?? 5;
-  set minimumReserveAddress(int value) =>
-      setPreference('minimumReserveAddress', value);
+  int get minimumReserveAddress =>
+      storage.getPreference('minimumReserveAddress') ?? 5;
+  Future<void> setMinimumReserveAddress(int value) =>
+      storage.setPreference('minimumReserveAddress', value);
 
-  bool get networkEnabled => data['networkEnabled'] ?? true;
-  set networkEnabled(bool value) => setPreference('networkEnabled', value);
+  bool get networkEnabled => storage.getPreference('networkEnabled') ?? true;
+  Future<void> setNetworkEnabled(bool value) =>
+      storage.setPreference('networkEnabled', value);
 
-  bool get debugLog => data['debugLog'] ?? false;
-  set debugLog(bool value) => setPreference('debugLog', value);
+  bool get debugLog => storage.getPreference('debugLog') ?? false;
+  Future<void> setDebugLog(bool value) => storage.setPreference('debugLog', value);
 
-  bool get insecureDeviceWarning => data['insecureDeviceWarning'] ?? true;
-  set insecureDeviceWarning(bool value) =>
-      setPreference('insecureDeviceWarning', value);
+  bool get insecureDeviceWarning =>
+      storage.getPreference('insecureDeviceWarning') ?? true;
+  Future<void> setInsecureDeviceWarning(bool value) =>
+      storage.setPreference('insecureDeviceWarning', value);
 
-  bool get unitTestBeforeCreating => data['unitTestBeforeCreating'] ?? false;
-  set unitTestBeforeCreating(bool value) =>
-      setPreference('unitTestBeforeCreating', value);
+  bool get unitTestBeforeCreating =>
+      storage.getPreference('unitTestBeforeCreating') ?? false;
+  Future<void> setUnitTestBeforeCreating(bool value) =>
+      storage.setPreference('unitTestBeforeCreating', value);
 
-  bool get verifyAddressEveryLoad => data['verifyAddressEveryLoad'] ?? false;
-  set verifyAddressEveryLoad(bool value) =>
-      setPreference('verifyAddressEveryLoad', value);
+  bool get verifyAddressEveryLoad =>
+      storage.getPreference('verifyAddressEveryLoad') ?? false;
+  Future<void> setVerifyAddressEveryLoad(bool value) =>
+      storage.setPreference('verifyAddressEveryLoad', value);
 
-  bool get walletNameInTitle => data['walletNameInTitle'] ?? false;
-  set walletNameInTitle(bool value) =>
-      setPreference('walletNameInTitle', value);
+  bool get walletNameInTitle =>
+      storage.getPreference('walletNameInTitle') ?? false;
+  Future<void> setWalletNameInTitle(bool value) =>
+      storage.setPreference('walletNameInTitle', value);
 
-  bool get walletsEncrypted => data['walletsEncrypted'] ?? false;
+  bool get walletsEncrypted =>
+      storage.getPreference('walletsEncrypted') ?? false;
 
   Map<String, String> get wallets {
     if (walletsEncrypted) {
       assert(walletsPassword != null);
       Uint8List password = SHA256Digest().process(utf8.encode(walletsPassword));
       return Map<String, String>.from(
-          SecretBoxDecoder(password).convert(data['wallets']));
+          SecretBoxDecoder(password).convert(storage.getPreference('wallets')));
     } else {
-      return Map<String, String>.from(data['wallets'] ?? Map<String, String>());
+      return Map<String, String>.from(
+          storage.getPreference('wallets') ?? Map<String, String>());
     }
   }
 
-  set wallets(Map<String, String> value) {
+  Future<void> setWallets(Map<String, String> value) {
     if (walletsEncrypted) {
       assert(walletsPassword != null);
       Uint8List password = SHA256Digest().process(utf8.encode(walletsPassword));
-      setPreference('wallets', SecretBoxEncoder(password).convert(value));
+      return storage.setPreference(
+          'wallets', SecretBoxEncoder(password).convert(value));
     } else {
-      setPreference('wallets', value);
+      return storage.setPreference('wallets', value);
     }
   }
 
   List<PeerPreference> get peers {
-    var peers = data['peers'];
+    var peers = storage.getPreference('peers');
     if (peers == null) {
       return <PeerPreference>[
         PeerPreference('Satoshi Locomoco', 'wallet.cruzbit.xyz', 'CRUZ', '')
@@ -84,17 +107,17 @@ class CruzawlPreferences extends SembastPreferences {
       ..sort(PeerPreference.comparePriority);
   }
 
-  set peers(List<PeerPreference> value) {
+  Future<void> setPeers(List<PeerPreference> value) {
     int priority = 10;
     for (int i = value.length - 1; i >= 0; i--, priority += 10) {
       value[i].priority = priority;
     }
-    setPreference('peers', value.map((v) => v.toJson()).toList());
+    return storage.setPreference('peers', value.map((v) => v.toJson()).toList());
   }
 
   Map<String, Contact> get contacts {
     Map<String, Contact> ret = {};
-    var contacts = data['contacts'];
+    var contacts = storage.getPreference('contacts');
     if (contacts == null) return ret;
     for (Contact contact in contacts.map<Contact>((v) => Contact.fromJson(v))) {
       ret[contact.addressText] = contact;
@@ -102,16 +125,16 @@ class CruzawlPreferences extends SembastPreferences {
     return ret;
   }
 
-  set contacts(Map<String, Contact> value) =>
-      setPreference('contacts', value.values.map((v) => v.toJson()).toList());
+  Future<void> setContacts(Map<String, Contact> value) => storage.setPreference(
+      'contacts', value.values.map((v) => v.toJson()).toList());
 
-  void encryptWallets(String password) {
+  Future<void> encryptWallets(String password) {
     bool enabled = password != null && password.isNotEmpty;
-    if (enabled == walletsEncrypted) return;
+    if (enabled == walletsEncrypted) return voidResult();
     Map<String, String> loadedWallets = wallets;
-    setPreference('walletsEncrypted', enabled, store: false);
+    storage.setPreference('walletsEncrypted', enabled, store: false);
     walletsPassword = password;
-    wallets = loadedWallets;
+    return setWallets(loadedWallets);
   }
 }
 

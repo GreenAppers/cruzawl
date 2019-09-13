@@ -9,9 +9,10 @@ import 'package:sembast/sembast.dart';
 import 'package:tweetnacl/tweetnacl.dart';
 
 import 'package:cruzawl/util.dart';
+import 'package:cruzawl/preferences.dart';
 
 /// Not [SharedPreferences] but [SembastPreferences].
-class SembastPreferences {
+class SembastPreferences extends PreferenceStorage {
   /// sembast: Simple Embedded Application Store database.
   Database db;
 
@@ -28,17 +29,21 @@ class SembastPreferences {
   Future<void> save() async => await store.record('preferences').put(db, data);
 
   /// Reads the preferences from [store] into [data]
+  @override
   Future<SembastPreferences> load() async {
     data = Map<String, dynamic>.from(
         await store.record('preferences').get(db) ?? Map<String, dynamic>());
     return this;
   }
 
-  /// Update a preference and [save()] when (by default) [store] is set.
+  @override
   Future<void> setPreference(String key, dynamic value, {bool store = true}) {
     data[key] = value;
     return store ? save() : voidResult();
   }
+
+  @override
+  dynamic getPreference(String key) => data[key];
 }
 
 /// Secretbox uses XSalsa20 and Poly1305 to encrypt and authenticate messages with
