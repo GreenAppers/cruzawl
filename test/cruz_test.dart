@@ -14,7 +14,22 @@ void main() {
   CruzTester(group, test, expect).run();
 
   test('LoadingCurrency', () {
+    expect(loadingCurrency.ticker, cruz.ticker);
     expect(loadingCurrency.bip44CoinType, 0);
+    expect(loadingCurrency.coinbaseMaturity, 0);
+    expect(loadingCurrency.nullAddress, null);
+    expect(loadingCurrency.createNetwork(), null);
+    expect(loadingCurrency.genesisBlock(), null);
+    expect(loadingCurrency.deriveAddress(null, null), null);
+    expect(loadingCurrency.fromPrivateKey(null), null);
+    expect(loadingCurrency.fromPublicKey(null), null);
+    expect(loadingCurrency.fromAddressJson(null), null);
+    expect(loadingCurrency.fromPublicAddressJson(null), null);
+    expect(loadingCurrency.fromPrivateKeyJson(null), null);
+    expect(loadingCurrency.fromBlockIdJson(null), null);
+    expect(loadingCurrency.fromTransactionIdJson(null), null);
+    expect(loadingCurrency.fromTransactionJson(null), null);
+    expect(loadingCurrency.signedTransaction(null, null, null, null, null, null), null);
   });
 
   test('WebSocket connection to public seeder', () async {

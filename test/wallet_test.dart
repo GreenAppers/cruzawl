@@ -152,6 +152,12 @@ void main() {
     expect(wallet.balance, moneyBalance);
   });
 
+  test('CRUZ HD Wallet new tip', () {
+    socket.messageHandler('{"type":"inv_block","body":{"block_ids":["0000000000002942708257841501a15b56f11aeb670b95a5b113216ca6dbba1a"]}}');
+    socket.messageHandler('{"type":"filter_block","body":{"block_id":"0000000000002942708257841501a15b56f11aeb670b95a5b113216ca6dbba1a","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":1568351002,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"00000000000000000000000000000000000000000000000042c188bd69f5d21a","nonce":197164610255140,"height":25353,"transaction_count":1},"transactions":null}}');
+    expect(network.tipHeight, 25353);
+  });
+
   test('CRUZ HD Wallet reload', () async {
     preferences.setMinimumReserveAddress(0);
     Seed seed = wallet.seed;
@@ -166,7 +172,9 @@ void main() {
         preferences,
         print,
         (_) => completer.complete(null));
+    expect(wallet.currency, loadingCurrency);
     await completer.future;
+    expect(wallet.currency, cruz);
     expect(wallet.addresses.length, 3);
     for (var address in wallet.addresses.values) {
       address.state = AddressState.used;
