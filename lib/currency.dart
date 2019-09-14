@@ -352,6 +352,9 @@ abstract class BlockHeader {
   /// Marshals this [BlockHeader] as a JSON-encoded string.
   Map<String, dynamic> toJson();
 
+  /// Computes an ID for this block.
+  BlockId id();
+
   /// Expected number of random hashes before mining this block.
   BigInt blockWork();
 

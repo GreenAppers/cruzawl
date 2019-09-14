@@ -48,7 +48,8 @@ class CruzawlPreferences {
       storage.setPreference('networkEnabled', value);
 
   bool get debugLog => storage.getPreference('debugLog') ?? false;
-  Future<void> setDebugLog(bool value) => storage.setPreference('debugLog', value);
+  Future<void> setDebugLog(bool value) =>
+      storage.setPreference('debugLog', value);
 
   bool get insecureDeviceWarning =>
       storage.getPreference('insecureDeviceWarning') ?? true;
@@ -112,7 +113,8 @@ class CruzawlPreferences {
     for (int i = value.length - 1; i >= 0; i--, priority += 10) {
       value[i].priority = priority;
     }
-    return storage.setPreference('peers', value.map((v) => v.toJson()).toList());
+    return storage.setPreference(
+        'peers', value.map((v) => v.toJson()).toList());
   }
 
   Map<String, Contact> get contacts {

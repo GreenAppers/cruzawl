@@ -609,6 +609,7 @@ class CruzBlockHeader extends BlockHeader {
   Map<String, dynamic> toJson() => _$CruzBlockHeaderToJson(this);
 
   /// Computes an ID for this block.
+  @override
   CruzBlockId id() => CruzBlockId.compute(jsonEncode(this));
 
   /// Expected number of random hashes before mining this block.
