@@ -9,6 +9,7 @@ import 'dart:typed_data';
 import 'package:bip39/bip39.dart';
 import 'package:collection/collection.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:pedantic/pedantic.dart';
 import 'package:sembast/sembast.dart' as sembast;
 
 import 'package:cruzawl/currency.dart';
@@ -121,10 +122,10 @@ abstract class WalletStorage {
   WalletStorage(this.name, this.currency, this.seed, [this.seedPhrase]);
 
   /// Interface used by [_readStoredAccounts()].
-  Account addAccount(Account x, {bool store = true});
+  Future<Account> addAccount(Account x, {bool store = true});
 
   /// Interface used by [_readStoredAddresses].
-  Address addAddress(Address x,
+  Future<Address> addAddress(Address x,
       {bool store = true, bool load = true, sembast.Transaction txn});
 
   /// Interface used by [_readPendingTransactions()].
@@ -196,7 +197,7 @@ abstract class WalletStorage {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await accountStore.find(storage, finder: finder);
     for (var record in records) {
-      addAccount(Account.fromJson(record.value), store: false);
+      await addAccount(Account.fromJson(record.value), store: false);
     }
   }
 
@@ -212,7 +213,7 @@ abstract class WalletStorage {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await addressStore.find(storage, finder: finder);
     for (var record in records) {
-      Address x = addAddress(currency.fromAddressJson(record.value),
+      Address x = await addAddress(currency.fromAddressJson(record.value),
           store: false, load: load);
       accounts[x.accountId].balance += x.balance;
       balance += x.balance;
@@ -417,7 +418,7 @@ class Wallet extends WalletStorage {
         ..chainIndex = index;
 
   /// Grow the pool of [Address] with [Address.state] equal [AddressState.reserve] by one.
-  Address addNextAddress(
+  Future<Address> addNextAddress(
       {bool load = true, Account account, sembast.Transaction txn}) {
     if (!hdWallet) return null;
     account ??= this.account;
@@ -426,30 +427,30 @@ class Wallet extends WalletStorage {
   }
 
   /// Store [Address] and [_filterNetworkFor] it.
-  Address addAddress(Address x,
-      {bool store = true, bool load = true, sembast.Transaction txn}) {
+  Future<Address> addAddress(Address x,
+      {bool store = true, bool load = true, sembast.Transaction txn}) async {
     if (preferences != null &&
         preferences.verifyAddressEveryLoad &&
         !x.verify()) {
       throw FormatException('${x.publicKey.toJson()} verify failed');
     }
     addresses[x.publicKey.toJson()] = x;
-    if (store) _storeAddress(x, txn);
-    if (load) _filterNetworkFor(x);
+    if (store) await _storeAddress(x, txn);
     if (hdWallet) {
       if (x.state == AddressState.reserve) {
         account.reserveAddress[x.chainIndex] = x;
       }
       if (x.chainIndex >= account.nextIndex) {
         account.nextIndex = x.chainIndex + 1;
-        _storeAccount(account, txn);
+        await _storeAccount(account, txn);
       }
     }
+    if (load) unawaited(_filterNetworkFor(x));
     return x;
   }
 
   /// Calls [addAddress] with settings for a user-provided address.
-  Address addProvidedAddress(Address x, int index) => addAddress(
+  Future<Address> addProvidedAddress(Address x, int index) => addAddress(
       x
         ..accountId = 0
         ..chainIndex = index
@@ -457,10 +458,10 @@ class Wallet extends WalletStorage {
       load: false);
 
   /// Each [Address] in [Wallet] is associated with one [Account].
-  Account addAccount(Account x, {bool store = true}) {
+  Future<Account> addAccount(Account x, {bool store = true}) async {
     accounts[x.id] = x;
     activeAccountId = x.id;
-    if (store) _storeAccount(x);
+    if (store) await _storeAccount(x);
     return x;
   }
 
@@ -497,7 +498,7 @@ class Wallet extends WalletStorage {
       for (Account account in accounts.values) {
         while (account.reserveAddress.length <
             (preferences.minimumReserveAddress ?? 5)) {
-          addNextAddress(account: account, load: false);
+          await addNextAddress(account: account, load: false);
           await Future.delayed(Duration(seconds: 0));
         }
       }
@@ -506,7 +507,7 @@ class Wallet extends WalletStorage {
       if (privateKeys.isEmpty) return;
       for (int i = 0; i < privateKeys.length; i++) {
         PrivateKey key = privateKeys[i];
-        addProvidedAddress(currency.fromPrivateKey(key), i);
+        await addProvidedAddress(currency.fromPrivateKey(key), i);
         await Future.delayed(Duration(seconds: 0));
       }
     } else if (publicKeys != null) {
@@ -514,7 +515,7 @@ class Wallet extends WalletStorage {
       if (publicKeys.isEmpty) return;
       for (int i = 0; i < publicKeys.length; i++) {
         PublicAddress key = publicKeys[i];
-        addProvidedAddress(currency.fromPublicKey(key), i);
+        await addProvidedAddress(currency.fromPublicKey(key), i);
         await Future.delayed(Duration(seconds: 0));
       }
     }
@@ -544,7 +545,7 @@ class Wallet extends WalletStorage {
           transactions.find(currency.fromTransactionJson(record.value));
       if (transaction != null &&
           (transaction.height == null || transaction.height == 0)) {
-        _updateBalance(addresses[transaction.from.toJson()],
+        await _updateBalance(addresses[transaction.from.toJson()],
             transaction.amount + transaction.fee);
       }
       await _removePendingTransaction(record.key);
@@ -553,13 +554,13 @@ class Wallet extends WalletStorage {
   }
 
   /// When a [Transaction] matures move the [Transaction.amount] from [maturesBalance] to [balance].
-  void completeMaturingTransactions(int height) {
+  Future<void> completeMaturingTransactions(int height) async {
     if (!opened) return;
     while (maturing.length > 0 && maturing.first.maturity <= height) {
       Transaction transaction = maturing.removeFirst();
       Address to = addresses[transaction.to.toJson()];
       _applyMaturesBalanceDelta(to, -transaction.amount);
-      _updateBalance(to, transaction.amount);
+      await _updateBalance(to, transaction.amount);
     }
   }
 
@@ -572,26 +573,26 @@ class Wallet extends WalletStorage {
   }
 
   /// When an [Address] changes state, update [Account.reserveAddress] tracking.
-  void updateAddressState(Address x, AddressState newState,
-      {bool store = true}) {
+  Future<void> updateAddressState(Address x, AddressState newState,
+      {bool store = true}) async {
     if (x.state == newState) return;
     bool wasReserve = x.state == AddressState.reserve;
     if (wasReserve) accounts[x.accountId].reserveAddress.remove(x.chainIndex);
     x.state = newState;
     if (store) {
-      _storeAddress(x);
+      await _storeAddress(x);
       if (notifyListeners != null) notifyListeners();
     }
-    if (wasReserve) addNextAddress(account: accounts[x.accountId]);
+    if (wasReserve) await addNextAddress(account: accounts[x.accountId]);
   }
 
   /// For HD wallets get next [Account.reserveAddress]. Otherwise loop [nextAddressIndex].
-  Address getNextReceiveAddress() {
+  Address get receiveAddress {
     if (hdWallet) {
       if (account.reserveAddress.isNotEmpty) {
         return account.reserveAddress.entries.first.value;
       } else {
-        return addNextAddress();
+        return null;
       }
     } else {
       if (addresses.isEmpty) return null;
@@ -651,7 +652,7 @@ class Wallet extends WalletStorage {
     /// [newBalance] and [newMatureBalance] account for possibly receiving new
     /// transactions for [x] as we're loading.
     _applyMaturesBalanceDelta(x, -x.maturesBalance + x.newMaturesBalance);
-    _updateBalance(x, -x.balance + x.newBalance);
+    await _updateBalance(x, -x.balance + x.newBalance);
     x.newBalance = x.newMaturesBalance = null;
 
     /// Stream [Wallet] changes.
@@ -666,7 +667,7 @@ class Wallet extends WalletStorage {
         await peer.getTransactions(x.publicKey, x.loadIterator);
     if (results == null) return null;
     for (Transaction transaction in results.transactions) {
-      updateTransaction(transaction, newTransaction: false);
+      await updateTransaction(transaction, newTransaction: false);
     }
 
     x.loadIterator = TransactionIterator(results.height, results.index);
@@ -675,8 +676,8 @@ class Wallet extends WalletStorage {
 
   /// All [Transaction] updates go through [updateTransaction].
   /// From either [getNextTransactions], [Peer.filterAdd] results, or [_readPendingTransactions].
-  void updateTransaction(Transaction transaction,
-      {bool newTransaction = true}) {
+  Future<void> updateTransaction(Transaction transaction,
+      {bool newTransaction = true}) async {
     int height = transaction.height ?? 0;
     bool undoneByReorg = height < 0, transactionsChanged;
     if (undoneByReorg) {
@@ -696,21 +697,21 @@ class Wallet extends WalletStorage {
     Address to = addresses[transaction.to.toJson()];
     if (from != null) {
       if (height > 0) from.updateSeenHeight(height);
-      updateAddressState(from, AddressState.used, store: !balanceChanged);
+      await updateAddressState(from, AddressState.used, store: !balanceChanged);
     }
     if (to != null) {
       if (height > 0) to.updateSeenHeight(height);
-      updateAddressState(to, AddressState.used, store: !balanceChanged);
+      await updateAddressState(to, AddressState.used, store: !balanceChanged);
     }
 
     /// Track [Address].[balance] changes.
     if (balanceChanged) {
       if (from != null) {
         num cost = transaction.amount + transaction.fee;
-        _updateBalance(from, undoneByReorg ? cost : -cost);
+        await _updateBalance(from, undoneByReorg ? cost : -cost);
       }
       if (to != null && mature) {
-        _updateBalance(
+        await _updateBalance(
             to, undoneByReorg ? -transaction.amount : transaction.amount);
       }
     }
@@ -729,10 +730,10 @@ class Wallet extends WalletStorage {
   }
 
   /// Makes the only call to [_applyBalanceDelta].
-  void _updateBalance(Address x, num delta) {
+  Future<void> _updateBalance(Address x, num delta) async {
     if (x == null || delta == 0) return;
     _applyBalanceDelta(x, delta);
-    _storeAddress(x);
+    await _storeAddress(x);
     if (notifyListeners != null) notifyListeners();
     if (balanceChanged != null) balanceChanged();
   }
