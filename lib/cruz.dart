@@ -293,7 +293,7 @@ class CruzTransactionId extends TransactionId {
 
   /// Computes the hash of [transactionJson].
   CruzTransactionId.compute(String transactionJson)
-      : data = SHA3Digest(256).process(utf8.encode(transactionJson));
+      : data = SHA3Digest(256, false).process(utf8.encode(transactionJson));
 
   /// Unmarshals a hex string to [CruzTransactionId].
   CruzTransactionId.fromJson(String x, [bool pad = false])
@@ -528,7 +528,7 @@ class CruzBlockId extends BlockId {
 
   /// Computes the hash of [blockHeaderJson].
   CruzBlockId.compute(String blockHeaderJson)
-      : data = SHA3Digest(256).process(utf8.encode(blockHeaderJson));
+      : data = SHA3Digest(256, false).process(utf8.encode(blockHeaderJson));
 
   /// Unmarshals hex string to [CruzBlockId].
   CruzBlockId.fromJson(String x, [bool pad = false])
@@ -663,7 +663,7 @@ class CruzBlock extends Block {
   /// Compute a hash list root of all transaction hashes.
   @override
   CruzTransactionId computeHashListRoot() {
-    SHA3Digest hasher = SHA3Digest(256);
+    SHA3Digest hasher = SHA3Digest(256, false);
     for (int i = 1; i < transactions.length; i++) {
       CruzTransactionId id = transactions[i].id();
       hasher.update(id.data, 0, id.data.length);
@@ -678,7 +678,7 @@ class CruzBlock extends Block {
   /// Add the coinbase to the hash list root.
   CruzTransactionId addCoinbaseToHashListRoot(
       CruzTransactionId rootHashWithoutCoinbase) {
-    SHA3Digest hasher = SHA3Digest(256);
+    SHA3Digest hasher = SHA3Digest(256, false);
     CruzTransactionId coinbase = transactions[0].id();
     hasher.update(coinbase.data, 0, coinbase.data.length);
     hasher.update(
@@ -1146,7 +1146,18 @@ class CruzPeer extends PersistentWebSocketClient {
       if (spec.debugPrint != null) {
         spec.debugPrint('got undo!  reorg occurring.');
       }
-    } else {
+    }
+
+    /// Call [handleNewTransaction] before [tipChanged] so
+    /// [Wallet._expirePendingTransactions] will see transactions in this block.
+    if (block.transactions != null) {
+      for (CruzTransaction transaction in block.transactions) {
+        transaction.height = undo ? -1 : block.header.height;
+        handleNewTransaction(transaction);
+      }
+    }
+
+    if (!undo) {
       int expectedHeight = tip.height + 1;
       tipId = id;
       tip = block.header;
@@ -1155,13 +1166,6 @@ class CruzPeer extends PersistentWebSocketClient {
             (expectedHeight == tip.height ? 'as expected' : 'reorg'));
       }
       if (tipChanged != null) tipChanged();
-    }
-
-    if (block.transactions != null) {
-      for (CruzTransaction transaction in block.transactions) {
-        transaction.height = undo ? -1 : block.header.height;
-        handleNewTransaction(transaction);
-      }
     }
   }
 

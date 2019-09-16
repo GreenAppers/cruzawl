@@ -18,12 +18,15 @@ import 'package:cruzawl/util.dart';
 import 'package:cruzawl/websocket.dart';
 import 'package:cruzawl/wallet.dart';
 
-num sendMoney = 3.29, feeMoney = 0.01;
-int money = 13, moneyBalance = money * CRUZ.cruzbitsPerCruz;
-int sendMoneyBalance = (sendMoney * CRUZ.cruzbitsPerCruz).toInt();
-int feeMoneyBalance = (feeMoney * CRUZ.cruzbitsPerCruz).toInt();
-String moneyAddr, moneySender = 'xRL0D9U+jav9NxOwz4LsXe8yZ8KSS7Hst4/P8ChciAI=';
-String sendTo = '5lojzpXqrpAfrYSxF0s8vyRSQ0SlhiovzacD+tI1oK8=';
+const num sendMoney = 3.29, feeMoney = 0.01, startingTipHeight = 25352;
+const int money = 13, moneyBalance = money * CRUZ.cruzbitsPerCruz;
+const int sendMoneyBalance = (sendMoney * CRUZ.cruzbitsPerCruz) ~/ 1;
+const int feeMoneyBalance = (feeMoney * CRUZ.cruzbitsPerCruz) ~/ 1;
+const int sentMoneyBalance = moneyBalance - sendMoneyBalance - feeMoneyBalance;
+const int rewardMoneyBalance = 50 * CRUZ.cruzbitsPerCruz;
+const String moneySender = 'xRL0D9U+jav9NxOwz4LsXe8yZ8KSS7Hst4/P8ChciAI=';
+const String sendTo = '5lojzpXqrpAfrYSxF0s8vyRSQ0SlhiovzacD+tI1oK8=';
+String moneyAddr;
 
 void main() {
   WalletTester(group, test, expect).run();
@@ -32,7 +35,10 @@ void main() {
   CruzPeer peer;
   CruzawlPreferences preferences;
   TestWebSocket socket = TestWebSocket();
-  PeerNetwork network = cruz.createNetwork();
+  PeerNetwork network = cruz.createNetwork(null, () {
+    if (wallet != null) wallet.updateTip();
+  });
+  Transaction sendTransaction;
 
   test('Create CruzawlPreferences', () async {
     preferences = CruzawlPreferences(
@@ -53,14 +59,14 @@ void main() {
     peer.ws = socket;
   });
 
-  test('CruzPeer connect', () {
+  test('Connect CruzPeer', () {
     peer.connect();
     expect(socket.sent.length, 2);
     var msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_tip_header');
     socket.sent.removeFirst();
     socket.messageHandler(
-        '{"type":"tip_header","body":{"block_id":"0000000000000ab4ac72b9b6061cb19195fe1a8a6d5b961f793f6b61f6f9aa9c","header":{"previous":"0000000000003e69ff6f9e82aed1edf4fbeff282f483a155f15993a1d5b388f1","hash_list_root":"e621df23f3d1cbf31ff55eb35b58f149e1119f9bcaaeddbfd50a0492d761b3fe","time":1567226693,"target":"0000000000005a51944cead8d0ecf64b7b699564debb11582725296e08f6907b","chain_work":"0000000000000000000000000000000000000000000000001cac236eabb61ced","nonce":1339749016450629,"height":25352,"transaction_count":20},"time_seen":1567226903}}');
+        '{"type":"tip_header","body":{"block_id":"0000000000000ab4ac72b9b6061cb19195fe1a8a6d5b961f793f6b61f6f9aa9c","header":{"previous":"0000000000003e69ff6f9e82aed1edf4fbeff282f483a155f15993a1d5b388f1","hash_list_root":"e621df23f3d1cbf31ff55eb35b58f149e1119f9bcaaeddbfd50a0492d761b3fe","time":1567226693,"target":"0000000000005a51944cead8d0ecf64b7b699564debb11582725296e08f6907b","chain_work":"0000000000000000000000000000000000000000000000001cac236eabb61ced","nonce":1339749016450629,"height":$startingTipHeight,"transaction_count":20},"time_seen":1567226903}}');
 
     msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_transaction_relay_policy');
@@ -69,7 +75,7 @@ void main() {
         '{"type":"transaction_relay_policy","body":{"min_fee":1000000,"min_amount":1000000}}');
 
     expect(network.length, 1);
-    expect(network.tipHeight, 25352);
+    expect(network.tipHeight, startingTipHeight);
     expect(network.tipId.toJson(),
         '0000000000000ab4ac72b9b6061cb19195fe1a8a6d5b961f793f6b61f6f9aa9c');
     expect(network.minFee, 1000000);
@@ -79,7 +85,7 @@ void main() {
         'wss://wallet.cruzbit.xyz:8831/00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb');
   });
 
-  test('CRUZ HD Wallet create', () async {
+  test('Create CRUZ HD Wallet', () async {
     Completer<void> completer = Completer<void>();
     wallet = Wallet.fromSeedPhrase(
         databaseFactoryMemoryFs,
@@ -95,23 +101,62 @@ void main() {
     expect(wallet.addresses.length, 3);
     for (var address in wallet.addresses.values) {
       address.state = AddressState.used;
+      expect(address.verify(), true);
     }
 
-    await expectWalletLoadProtocol(wallet, socket);
+    await expectWalletLoadProtocol(wallet.addresses, socket,
+        setMoneyAddr: true);
     await pumpEventQueue();
     expect(socket.sent.length, 0);
     expect(wallet.balance, moneyBalance);
+    expect(wallet.maturesBalance, rewardMoneyBalance);
   });
 
-  test('CRUZ HD Wallet new tip', () {
+  test('Send from CRUZ HD Wallet', () async {
+    Address fromAddress = wallet.addresses[moneyAddr];
+    expect(wallet.balance, moneyBalance);
+    expect(fromAddress.balance, moneyBalance);
+    sendTransaction = await wallet.createTransaction(wallet.currency
+        .signedTransaction(
+            fromAddress,
+            wallet.currency.fromPublicAddressJson(sendTo),
+            sendMoneyBalance,
+            feeMoneyBalance,
+            'memofoo',
+            wallet.network.tipHeight,
+            expires: wallet.network.tipHeight + 1));
+    expect(sendTransaction.verify(), true);
+    Future<TransactionId> sendTransactionId =
+        peer.putTransaction(sendTransaction);
+
+    expect(socket.sent.length, 1);
+    var msg = jsonDecode(socket.sent.first);
+    expect(msg['type'], 'push_transaction');
+    CruzTransaction pushedTransaction =
+        CruzTransaction.fromJson(msg['body']['transaction']);
+    expect(pushedTransaction.from.toJson(), moneyAddr);
+    expect(pushedTransaction.to.toJson(), sendTo);
+    expect(pushedTransaction.amount, sendMoneyBalance);
+    expect(pushedTransaction.verify(), true);
+
+    String pushedTransactionId = pushedTransaction.id().toJson();
+    socket.sent.removeFirst();
     socket.messageHandler(
-        '{"type":"inv_block","body":{"block_ids":["0000000000002942708257841501a15b56f11aeb670b95a5b113216ca6dbba1a"]}}');
+        '{"type":"push_transaction_result","body":{"transaction_id":"$pushedTransactionId"}}');
+    await pumpEventQueue();
+    expect(socket.sent.length, 0);
+    expect((await sendTransactionId).toJson(), pushedTransactionId);
+    expect(wallet.pendingCount, 1);
+
     socket.messageHandler(
-        '{"type":"filter_block","body":{"block_id":"0000000000002942708257841501a15b56f11aeb670b95a5b113216ca6dbba1a","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":1568351002,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"00000000000000000000000000000000000000000000000042c188bd69f5d21a","nonce":197164610255140,"height":25353,"transaction_count":1},"transactions":null}}');
-    expect(network.tipHeight, 25353);
+        '{"type":"push_transaction","body":{"transaction":${jsonEncode(sendTransaction)}}}');
+    await pumpEventQueue();
+    expect(socket.sent.length, 0);
+    expect(wallet.pendingCount, 1);
+    expect(wallet.balance, sentMoneyBalance);
   });
 
-  test('CRUZ HD Wallet reload', () async {
+  test('Reload CRUZ HD Wallet', () async {
     await preferences.setMinimumReserveAddress(0);
     Seed seed = wallet.seed;
     List<Address> addresses = wallet.addresses.values.toList();
@@ -131,6 +176,7 @@ void main() {
     expect(wallet.addresses.length, 3);
     for (var address in wallet.addresses.values) {
       address.state = AddressState.used;
+      expect(address.verify(), true);
     }
     List<Address> reloadAddresses = wallet.addresses.values.toList();
     addresses.sort(Address.compareIndex);
@@ -143,103 +189,182 @@ void main() {
       expect(reloadAddresses[i].balance, addresses[i].balance);
     }
 
-    await expectWalletLoadProtocol(wallet, socket);
+    await expectWalletLoadProtocol(wallet.addresses, socket);
     await pumpEventQueue();
     expect(socket.sent.length, 0);
-    expect(wallet.balance, moneyBalance);
+    expect(wallet.balance, sentMoneyBalance);
+    expect(wallet.pendingCount, 1);
   });
 
-  test('CRUZ HD Wallet send', () async {
-    Address fromAddress = wallet.addresses[moneyAddr];
-    Transaction transaction = await wallet.createTransaction(wallet.currency
-        .signedTransaction(
-            fromAddress,
-            wallet.currency.fromPublicAddressJson(sendTo),
-            sendMoneyBalance,
-            feeMoneyBalance,
-            'memofoo',
-            wallet.network.tipHeight,
-            expires: wallet.network.tipHeight + 3));
-    expect(transaction.verify(), true);
-    Future<TransactionId> transactionId = peer.putTransaction(transaction);
-
-    expect(socket.sent.length, 1);
-    var msg = jsonDecode(socket.sent.first);
-    expect(msg['type'], 'push_transaction');
-    CruzTransaction pushedTransaction =
-        CruzTransaction.fromJson(msg['body']['transaction']);
-    expect(pushedTransaction.from.toJson(), moneyAddr);
-    expect(pushedTransaction.to.toJson(), sendTo);
-    expect(pushedTransaction.amount, sendMoneyBalance);
-    expect(pushedTransaction.verify(), true);
-
-    String pushedTransactionId = pushedTransaction.id().toJson();
-    socket.sent.removeFirst();
+  test('New tip for CRUZ HD Wallet', () async {
+    expect(network.tipHeight, startingTipHeight);
+    expect(wallet.pendingCount, 1);
+    expect(wallet.balance, sentMoneyBalance);
+    expect(wallet.maturesBalance, rewardMoneyBalance);
     socket.messageHandler(
-        '{"type":"push_transaction_result","body":{"transaction_id":"$pushedTransactionId"}}');
+        '{"type":"inv_block","body":{"block_ids":["0000000000002942708257841501a15b56f11aeb670b95a5b113216ca6dbba1a"]}}');
+    socket.messageHandler(
+        '{"type":"filter_block","body":{"block_id":"0000000000002942708257841501a15b56f11aeb670b95a5b113216ca6dbba1a","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":1568351002,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"00000000000000000000000000000000000000000000000042c188bd69f5d21a","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}');
     await pumpEventQueue();
-    expect(socket.sent.length, 0);
-    expect((await transactionId).toJson(), pushedTransactionId);
+    expect(network.tipHeight, startingTipHeight + 1);
+    expect(wallet.pendingCount, 0);
+    expect(wallet.balance, sentMoneyBalance + rewardMoneyBalance);
+    expect(wallet.maturesBalance, 0);
   });
 
-  test('CruzPeerNetwork shutdown', () async {
+  test('Create new CRUZ HD Wallet address', () async {
+    Map<String, Address> addresses =
+        Map<String, Address>.from(wallet.addresses);
+    expect(addresses.length, 3);
+    Address receiveAddress = wallet.receiveAddress;
+    String receiveAddressText = receiveAddress.publicKey.toJson();
+    expect(addresses.containsKey(receiveAddressText), true);
+    wallet.addresses[receiveAddressText].state = AddressState.reserve;
+    await preferences.setMinimumReserveAddress(3);
+    await wallet.updateAddressState(receiveAddress, AddressState.open);
+    expect(wallet.addresses.length, 4);
+    Address newReceiveAddress = wallet.receiveAddress;
+    String newReceiveAddressText = newReceiveAddress.publicKey.toJson();
+    expect(addresses.containsKey(newReceiveAddressText), true);
+    expect(receiveAddressText == newReceiveAddressText, false);
+    Set<String> newAddr =
+        Set.of(wallet.addresses.keys).difference(Set.of(addresses.keys));
+    expect(newAddr.length, 1);
+    String newAddressText = newAddr.first;
+    Address newAddress = wallet.addresses[newAddressText];
+    expect(newAddress.publicKey.toJson(), newAddressText);
+    await preferences.setMinimumReserveAddress(0);
+    await expectWalletLoadProtocol({newAddressText: newAddress}, socket,
+        filterTxnQueue: false);
+    await pumpEventQueue();
+    expect(socket.sent.length, 0);
+  });
+
+  test('Create CRUZ non-HD Wallet', () async {
+    await preferences.setMinimumReserveAddress(3);
+    Completer<void> completer = Completer<void>();
+    Seed seed = Seed(randBytes(64));
+    Wallet watchOnlyWallet = Wallet.fromPrivateKeyList(
+        databaseFactoryMemoryFs,
+        NullFileSystem(),
+        'non-hd-wallet.cruzall',
+        'non-hd-wallet',
+        network,
+        seed,
+        <PrivateKey>[wallet.addresses[moneyAddr].privateKey],
+        preferences,
+        print,
+        (_) => completer.complete(null));
+    await completer.future;
+    expect(watchOnlyWallet.addresses.length, 1);
+    for (var address in watchOnlyWallet.addresses.values) {
+      expect(address.state, AddressState.used);
+      expect(address.verify(), true);
+    }
+
+    await expectWalletLoadProtocol(watchOnlyWallet.addresses, socket);
+    await pumpEventQueue();
+    expect(socket.sent.length, 0);
+    expect(watchOnlyWallet.balance, moneyBalance);
+    expect(watchOnlyWallet.maturesBalance, 0);
+  });
+
+  test('Create CRUZ watch-only Wallet', () async {
+    await preferences.setMinimumReserveAddress(3);
+    Completer<void> completer = Completer<void>();
+    Seed seed = Seed(randBytes(64));
+    Wallet watchOnlyWallet = Wallet.fromPublicKeyList(
+        databaseFactoryMemoryFs,
+        NullFileSystem(),
+        'watch-only-wallet.cruzall',
+        'watch-only-wallet',
+        network,
+        seed,
+        <PublicAddress>[wallet.addresses[moneyAddr].publicKey],
+        preferences,
+        print,
+        (_) => completer.complete(null));
+    await completer.future;
+    expect(watchOnlyWallet.addresses.length, 1);
+    for (var address in watchOnlyWallet.addresses.values) {
+      expect(address.state, AddressState.used);
+      expect(address.verify(), false);
+    }
+
+    await expectWalletLoadProtocol(watchOnlyWallet.addresses, socket);
+    await pumpEventQueue();
+    expect(socket.sent.length, 0);
+    expect(watchOnlyWallet.balance, moneyBalance);
+    expect(watchOnlyWallet.maturesBalance, 0);
+  });
+
+  test('Shutdown CruzPeerNetwork', () async {
     expect(network.hasPeer, true);
     network.shutdown();
     expect(network.hasPeer, false);
   });
 }
 
-void expectWalletLoadProtocol(Wallet wallet, TestWebSocket socket) async {
+void expectWalletLoadProtocol(
+    Map<String, Address> addresses, TestWebSocket socket,
+    {bool setMoneyAddr = false, bool filterTxnQueue = true}) async {
+  int length = addresses.length;
+  expect(length > 0, true);
+
   // filter_add
   await pumpEventQueue();
-  expect(socket.sent.length, 3);
-  for (int i = 0; i < 3; i++) {
+  expect(socket.sent.length, length);
+  for (int i = 0; i < length; i++) {
     var msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'filter_add');
-    expect(wallet.addresses.containsKey(msg['body']['public_keys'][0]), true);
+    expect(addresses.containsKey(msg['body']['public_keys'][0]), true);
     socket.sent.removeFirst();
     socket.messageHandler('{"type":"filter_result"}');
   }
 
   // get_balance
   await pumpEventQueue();
-  expect(socket.sent.length, 3);
-  for (int i = 0; i < 3; i++) {
+  expect(socket.sent.length, length);
+  for (int i = 0; i < length; i++) {
     var msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_balance');
     String addr = msg['body']['public_key'];
-    if (i == 0) moneyAddr = addr;
+    if (i == 0 && setMoneyAddr) moneyAddr = addr;
     int balance = i == 0 ? moneyBalance : 0;
-    expect(wallet.addresses.containsKey(addr), true);
+    expect(addresses.containsKey(addr), true);
     socket.sent.removeFirst();
     socket.messageHandler(
-        '{"type":"balance","body":{"block_id":"0000000000000ab4ac72b9b6061cb19195fe1a8a6d5b961f793f6b61f6f9aa9c","height":25352,"public_key":"$addr","balance":$balance}}');
+        '{"type":"balance","body":{"block_id":"0000000000000ab4ac72b9b6061cb19195fe1a8a6d5b961f793f6b61f6f9aa9c","height":$startingTipHeight,"public_key":"$addr","balance":$balance}}');
   }
 
   // get_public_key_transactions
   await pumpEventQueue();
-  expect(socket.sent.length, 3);
-  for (int i = 0; i < 3; i++) {
+  expect(socket.sent.length, length);
+  for (int i = 0; i < length; i++) {
     var msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_public_key_transactions');
     String addr = msg['body']['public_key'];
-    expect(wallet.addresses.containsKey(addr), true);
+    expect(addresses.containsKey(addr), true);
     socket.sent.removeFirst();
     if (addr == moneyAddr) {
+      /// Give [moneyAddr] 13 CRUZ with 50 CRUZ maturing the next block.
+      int blockHeight = startingTipHeight - 99;
       socket.messageHandler(
-          '{"type":"public_key_transactions","body":{"public_key":"$addr","start_height":25352,"stop_height":0,"stop_index":0,"filter_blocks":[{"block_id":"00000000000555de1d28a55fd2d5d2069c61fd46c4618cfea16c5adf6d902f4d","header":{"previous":"000000000001e0313c0536e700a8e6c02b2fc6bbddb755d749d6e00746d52b2b","hash_list_root":"3c1b3f728653444e8bca498bf5a6d76a259637e592f749ad881f1f1da0087db0","time":1564553276,"target":"000000000007a38c469f3be96898a11435ea27592c2bae351147392e9cd3408d","chain_work":"00000000000000000000000000000000000000000000000000faa7649c97e894","nonce":1989109050083893,"height":17067,"transaction_count":2},"transactions":[{"time":1564550817,"nonce":1130916028,"from":"$moneySender","to":"$addr","amount":$moneyBalance,"fee":1000000,"expires":17068,"series":17,"signature":"mcvGJ59Q9U9j5Tbjk/gIKYPFmz3lXNb3t8DwkznINJWI7uFPymmywBJjE18UzL2+MMicm0xbyKVJ3XEvQiQ5BQ=="}]}]}}');
+          '{"type":"public_key_transactions","body":{"public_key":"$addr","start_height":$startingTipHeight,"stop_height":0,"stop_index":0,"filter_blocks":[{"block_id":"00000000000555de1d28a55fd2d5d2069c61fd46c4618cfea16c5adf6d902f4d","header":{"previous":"000000000001e0313c0536e700a8e6c02b2fc6bbddb755d749d6e00746d52b2b","hash_list_root":"3c1b3f728653444e8bca498bf5a6d76a259637e592f749ad881f1f1da0087db0","time":1564553276,"target":"000000000007a38c469f3be96898a11435ea27592c2bae351147392e9cd3408d","chain_work":"00000000000000000000000000000000000000000000000000faa7649c97e894","nonce":1989109050083893,"height":$blockHeight,"transaction_count":2},"transactions":[{"time":1564510000,"nonce":1130919999,"to":"$addr","amount":$rewardMoneyBalance,"fee":0,"expires":17068,"series":17,"signature":"mcvGJ59Q9U9j5Tbjk/gIKYPFmz3lXNb3t8DwkznINJWI7uFPymmywBJjE18UzL2+MMicm0xbyKVJ3XEvQiQ5BQ=="},{"time":1564550817,"nonce":1130916028,"from":"$moneySender","to":"$addr","amount":$moneyBalance,"fee":1000000,"expires":17068,"series":17,"signature":"mcvGJ59Q9U9j5Tbjk/gIKYPFmz3lXNb3t8DwkznINJWI7uFPymmywBJjE18UzL2+MMicm0xbyKVJ3XEvQiQ5BQ=="}]}]}}');
     } else {
       socket.messageHandler(
-          '{"type":"public_key_transactions","body":{"public_key":"$addr","start_height":25352,"stop_height":0,"stop_index":0,"filter_blocks":null}}');
+          '{"type":"public_key_transactions","body":{"public_key":"$addr","start_height":$startingTipHeight,"stop_height":0,"stop_index":0,"filter_blocks":null}}');
     }
   }
 
-  // get_filter_transaction_queue
-  await pumpEventQueue();
-  expect(socket.sent.length, 1);
-  var msg = jsonDecode(socket.sent.first);
-  expect(msg['type'], 'get_filter_transaction_queue');
-  socket.sent.removeFirst();
-  socket.messageHandler(
-      '{"type":"filter_transaction_queue","body":{"transactions":null}}');
+  if (filterTxnQueue) {
+    // get_filter_transaction_queue
+    await pumpEventQueue();
+    expect(socket.sent.length, 1);
+    var msg = jsonDecode(socket.sent.first);
+    expect(msg['type'], 'get_filter_transaction_queue');
+    socket.sent.removeFirst();
+    socket.messageHandler(
+        '{"type":"filter_transaction_queue","body":{"transactions":null}}');
+  }
 }

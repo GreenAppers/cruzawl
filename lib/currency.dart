@@ -284,6 +284,9 @@ abstract class Transaction {
   /// Returns true if this transaction rewards mining.
   bool isCoinbase();
 
+  /// Returns true if the transaction cannot be mined at the given height
+  bool isExpired(int height) => (expires ?? 0) == 0 ? false : expires < height;
+
   /// Verifies this transaction's signature.
   bool verify();
 

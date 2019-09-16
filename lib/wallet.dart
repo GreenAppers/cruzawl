@@ -166,7 +166,7 @@ abstract class WalletStorage {
     }
   }
 
-  /// Write [Wallet] vital information to [walletStore]
+  /// Write [Wallet] vital information to [walletStore].
   Future<void> _storeHeader() async {
     await walletStore.record('header').put(
         storage,
@@ -178,7 +178,7 @@ abstract class WalletStorage {
         })));
   }
 
-  /// Read single "header" from [walletStore] with [Wallet] vital information
+  /// Read single "header" from [walletStore] with [Wallet] vital information.
   Future<void> _readStoredHeader() async {
     var header = await walletStore.record('header').get(storage);
     name = header['name'] as String;
@@ -187,12 +187,12 @@ abstract class WalletStorage {
     currency = Currency.fromJson(header['currency']);
   }
 
-  /// Write single [Account] to [accountStore]
+  /// Write single [Account] to [accountStore].
   Future<void> _storeAccount(Account x, [sembast.Transaction txn]) async {
     await accountStore.record(x.id).put(txn ?? storage, x.toJson());
   }
 
-  /// Read entire [accountStore] and [addAccount]
+  /// Read entire [accountStore] and [addAccount].
   Future<void> _readStoredAccounts() async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await accountStore.find(storage, finder: finder);
@@ -201,14 +201,14 @@ abstract class WalletStorage {
     }
   }
 
-  /// Write single [Address] to [addressStore]
+  /// Write single [Address] to [addressStore].
   Future<void> _storeAddress(Address x, [sembast.Transaction txn]) async {
     await addressStore
         .record(x.publicKey.toJson())
         .put(txn ?? storage, jsonDecode(jsonEncode(x)));
   }
 
-  /// Read entire [addressStore] and [addAddress]
+  /// Read entire [addressStore] and [addAddress].
   Future<void> _readStoredAddresses({bool load = true}) async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await addressStore.find(storage, finder: finder);
@@ -220,23 +220,26 @@ abstract class WalletStorage {
     }
   }
 
-  /// Remove [Transaction.id()] matching [id] from [pendingStore]
+  /// Remove [Transaction.id()] matching [id] from [pendingStore].
   Future<void> _removePendingTransaction(String id) async =>
       pendingStore.record(id).delete(storage);
 
-  /// Write single [Transaction] to [pendingStore]
+  /// Write single [Transaction] to [pendingStore].
   Future<void> _storePendingTransaction(Transaction tx) async {
     String id = tx.id().toJson();
     await pendingStore.record(id).put(storage, jsonDecode(jsonEncode(tx)));
   }
 
-  /// Read entire [pendingStore] and [updateTransaction]
-  Future<void> _readPendingTransactions() async {
+  /// Read entire [pendingStore] and [updateTransaction].
+  Future<void> _readPendingTransactions(int height) async {
     var finder = sembast.Finder(sortOrders: [sembast.SortOrder('id')]);
     var records = await pendingStore.find(storage, finder: finder);
     for (var record in records) {
-      updateTransaction(currency.fromTransactionJson(record.value),
-          newTransaction: false);
+      Transaction transaction = currency.fromTransactionJson(record.value);
+
+      /// If we've already seen this [transaction] then [updateTransaction] has no effect.
+      updateTransaction(transaction,
+          newTransaction: height == 0 || !transaction.isExpired(height));
       pendingCount++;
     }
   }
@@ -253,7 +256,7 @@ class Wallet extends WalletStorage {
   /// True if [_openWalletStorage] has completed and this [Wallet] is ready.
   bool opened = false;
 
-  /// Active [Account] context for [addAddress()]
+  /// Active [Account] context for [addAddress()].
   int activeAccountId = 0;
 
   /// For non-HD wallets. Cycles through [addresses].
@@ -536,7 +539,7 @@ class Wallet extends WalletStorage {
   void expirePendingTransactions(int height) async {
     if (!opened) return;
     var finder = sembast.Finder(
-      filter: sembast.Filter.lessThan('expires', height),
+      filter: sembast.Filter.lessThanOrEquals('expires', height),
       sortOrders: [sembast.SortOrder('expires')],
     );
     var records = await pendingStore.find(storage, finder: finder);
@@ -608,7 +611,6 @@ class Wallet extends WalletStorage {
     opened = true;
     pendingCount = 0;
     transactions.clear();
-    await _readPendingTransactions();
 
     List<Address> reloadAddresses = addresses.values.toList();
     List<Future<void>> reloading = List<Future<void>>(reloadAddresses.length);
@@ -622,6 +624,10 @@ class Wallet extends WalletStorage {
     if (network.hasPeer) {
       await (await network.getPeer()).filterTransactionQueue();
     }
+
+    /// Read pending transations last, so we know if they've already been
+    /// applied to our balance.
+    await _readPendingTransactions(network.tipHeight ?? 0);
   }
 
   /// Synchronizes our database [x] with the [PeerNetwork] and tracks updates.
@@ -675,7 +681,8 @@ class Wallet extends WalletStorage {
   }
 
   /// All [Transaction] updates go through [updateTransaction].
-  /// From either [getNextTransactions], [Peer.filterAdd] results, or [_readPendingTransactions].
+  /// From either [getNextTransactions], [Peer.filterAdd] results, or [_readPendingTraRsactions].
+  /// Balance changes only if [transactionsChanged] and [newTransaction] (or [undoneByreorg]).
   Future<void> updateTransaction(Transaction transaction,
       {bool newTransaction = true}) async {
     int height = transaction.height ?? 0;
@@ -724,9 +731,9 @@ class Wallet extends WalletStorage {
           transaction);
     }
 
-    /*debugPrint('${transaction.fromText} -> ${transaction.toText} ' +
-               currency.format(transaction.amount) +
-               ' mature=$mature, changed=$balanceChanged');*/
+    debugPrint('${transaction.fromText} -> ${transaction.toText} ' +
+        currency.format(transaction.amount) +
+        ' mature=$mature, newTxn=$newTransaction txnChanged=$transactionsChanged');
   }
 
   /// Makes the only call to [_applyBalanceDelta].

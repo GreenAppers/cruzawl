@@ -85,9 +85,10 @@ class SHA3Digest extends BaseDigest implements Digest {
 
   int _bitsInQueue;
   bool _squeezing;
+  bool _keccak;
   int _bitsAvailableForSqueezing;
 
-  SHA3Digest([int bitLength = 0]) {
+  SHA3Digest([int bitLength = 0, this._keccak = true]) {
     _init(bitLength);
   }
 
@@ -108,7 +109,10 @@ class SHA3Digest extends BaseDigest implements Digest {
   }
 
   int doFinal(Uint8List out, int outOff) {
-    absorbBits(0x02, 2);
+    if (!_keccak) {
+      // FIPS 202 SHA3 https://github.com/PointyCastle/pointycastle/issues/128
+      absorbBits(0x02, 2);
+    }
 
     _squeeze(out, outOff, _fixedOutputLength);
 
