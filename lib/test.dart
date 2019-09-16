@@ -40,7 +40,7 @@ class CruzTester extends TestRunner {
           'YkJHRtoQDa1TIKhN7gKCx54bavXouJy4orHwcRntcZY=');
       CruzTransaction tx = CruzTransaction(pubKey, pubKey2,
           50 * CRUZ.cruzbitsPerCruz, 2 * CRUZ.cruzbitsPerCruz, 'for lunch',
-          height: 0);
+          seriesForHeight: 0);
       tx.time = 1558565474;
       tx.nonce = 2019727887;
 
@@ -131,7 +131,7 @@ class WalletTester extends TestRunner {
       test('transaction', () {
         CruzTransaction tx = CruzTransaction(addr1.publicKey, addr2.publicKey,
             50 * CRUZ.cruzbitsPerCruz, 0, 'for lunch',
-            height: 0);
+            seriesForHeight: 0);
         tx.sign(addr1.privateKey);
         expect(tx.verify(), true);
         tx.sign(addr2.privateKey);

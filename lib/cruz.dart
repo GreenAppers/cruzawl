@@ -191,7 +191,7 @@ class CRUZ extends Currency {
     CruzAddress from = fromInput;
     CruzPublicKey to = toInput;
     return CruzTransaction(from.publicKey, to, amount, fee, memo,
-        matures: matures, expires: expires, height: height)
+        matures: matures, expires: expires, seriesForHeight: height)
       ..sign(from.privateKey);
   }
 }
@@ -297,7 +297,9 @@ class CruzTransactionId extends TransactionId {
 
   /// Unmarshals a hex string to [CruzTransactionId].
   CruzTransactionId.fromJson(String x, [bool pad = false])
-      : this(pad ? zeroPadUint8List(hex.decode(x), size) : hex.decode(x));
+      : this(pad
+            ? zeroPadUint8List(hex.decode(zeroPadOddLengthString(x)), size)
+            : hex.decode(x));
 
   /// Marshals [CruzTransactionId] as a hex string.
   @override
@@ -359,10 +361,11 @@ class CruzTransaction extends Transaction {
 
   /// Creates an arbitrary unsigned [CruzTransaction].
   CruzTransaction(this.from, this.to, this.amount, this.fee, this.memo,
-      {this.matures, this.expires, this.series, this.height})
+      {this.matures, this.expires, this.series, int seriesForHeight})
       : time = DateTime.now().millisecondsSinceEpoch ~/ 1000,
         nonce = Random.secure().nextInt(2147483647) {
-    if (series == null) series = computeTransactionSeries(isCoinbase(), height);
+    if (series == null)
+      series = computeTransactionSeries(isCoinbase(), seriesForHeight);
     if (memo != null && memo.isEmpty) memo = null;
   }
 
@@ -532,7 +535,9 @@ class CruzBlockId extends BlockId {
 
   /// Unmarshals hex string to [CruzBlockId].
   CruzBlockId.fromJson(String x, [bool pad = false])
-      : this(pad ? zeroPadUint8List(hex.decode(x), size) : hex.decode(x));
+      : this(pad
+            ? zeroPadUint8List(hex.decode(zeroPadOddLengthString(x)), size)
+            : hex.decode(x));
 
   /// Marshals [CruzBlockId] as a hex string.
   @override
