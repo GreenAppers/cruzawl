@@ -364,8 +364,9 @@ class CruzTransaction extends Transaction {
       {this.matures, this.expires, this.series, int seriesForHeight})
       : time = DateTime.now().millisecondsSinceEpoch ~/ 1000,
         nonce = Random.secure().nextInt(2147483647) {
-    if (series == null)
+    if (series == null) {
       series = computeTransactionSeries(isCoinbase(), seriesForHeight);
+    }
     if (memo != null && memo.isEmpty) memo = null;
   }
 
@@ -551,7 +552,7 @@ class CruzBlockId extends BlockId {
 /// List of [CruzBlockId]
 @JsonSerializable()
 class CruzBlockIds {
-  List<CruzBlockId> ids;
+  List<CruzBlockId> block_ids;
   CruzBlockIds();
 
   /// Unmarshals a base64-encoded string to [CruzBlockIds].

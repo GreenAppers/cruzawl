@@ -133,14 +133,14 @@ const _$AddressStateEnumMap = {
 
 CruzBlockIds _$CruzBlockIdsFromJson(Map<String, dynamic> json) {
   return CruzBlockIds()
-    ..ids = (json['ids'] as List)
+    ..block_ids = (json['block_ids'] as List)
         ?.map((e) => e == null ? null : CruzBlockId.fromJson(e as String))
         ?.toList();
 }
 
 Map<String, dynamic> _$CruzBlockIdsToJson(CruzBlockIds instance) =>
     <String, dynamic>{
-      'ids': instance.ids,
+      'block_ids': instance.block_ids,
     };
 
 CruzBlockHeader _$CruzBlockHeaderFromJson(Map<String, dynamic> json) {
