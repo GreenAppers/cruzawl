@@ -116,9 +116,6 @@ void updateCruzToBtcWithQtrade(ExchangeRates rates, {bool rateLimit = false}) {
   rates.httpClient
       .request('https://api.qtrade.io/v1/market/$qtradeCruzMarketId')
       .then((resp) {
-    /// Unfortunately it is a bit complicated to change the CORS policy for just
-    /// the public endpoints with the way our backend is setup, but it is on our
-    /// list of improvements -Eric @ qTrade
     Map<String, dynamic> data = jsonDecode(resp.text)['data'],
         market = data['market'];
     String base = market['market_currency'], currency = market['base_currency'];

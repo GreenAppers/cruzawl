@@ -90,14 +90,12 @@ void main() {
     network.tipChanged = () => completer.complete(null);
     network.addPeer(network.createPeerWithSpec(
         PeerPreference('SatoshiLocomoco', 'wallet.cruzbit.xyz', 'CRUZ', '',
-            debugPrint: (x) {/* print('DEBUG: $x'); */}),
-        cruz.genesisBlock().id().toJson()))
+            debugPrint: (x) {/* print('DEBUG: $x'); */})))
       ..connectAfter(1)
       ..connectAfter(0);
     await completer.future;
-    BlockHeader block = network.tip;
-    print('Found live tip height = ${block.height}');
-    expect(block.height > 0, true);
+    print('Found live tip height = ${network.tipHeight}');
+    expect(network.tipHeight > 0, true);
     network.shutdown();
   });
 
@@ -106,18 +104,18 @@ void main() {
     PeerNetwork network = cruz.createNetwork();
     network.autoReconnectSeconds = 0;
     network.tipChanged = () => completer.complete(null);
-    Peer peer = network.addPeer(network.createPeerWithSpec(
-        PeerPreference('SatoshiLocomoco', 'wallet.cruzbit.xyz', 'CRUZ',
-            PeerPreference.formatOptions(ignoreBadCert: true),
-            debugPrint: (x) {/* print('DEBUG: $x'); */}),
-        cruz.genesisBlock().id().toJson()));
+    Peer peer = network.addPeer(network.createPeerWithSpec(PeerPreference(
+        'SatoshiLocomoco',
+        'wallet.cruzbit.xyz',
+        'CRUZ',
+        PeerPreference.formatOptions(ignoreBadCert: true),
+        debugPrint: (x) {/* print('DEBUG: $x'); */})));
     network.peerStateChanged(
         peer, PeerState.connecting, PeerState.disconnected);
 
     await completer.future;
-    BlockHeader block = network.tip;
-    print('Found live tip height = ${block.height}');
-    expect(block.height > 0, true);
+    print('Found live tip height = ${network.tipHeight}');
+    expect(network.tipHeight > 0, true);
     network.shutdown();
   });
 }

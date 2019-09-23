@@ -71,8 +71,7 @@ void main() {
     PeerPreference peerPref = preferences.peers[0];
     peerPref.debugPrint = print;
     peerPref.debugLevel = debugLevelDebug;
-    peer = network.addPeer(network.createPeerWithSpec(
-        peerPref, cruz.genesisBlock().id().toJson()));
+    peer = network.addPeer(network.createPeerWithSpec(peerPref));
     peer.ws = socket;
     expect(network.peerState, PeerState.disconnected);
     expect(network.peerAddress, peer.address);

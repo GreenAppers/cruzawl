@@ -101,7 +101,9 @@ class CruzawlPreferences {
     var peers = storage.getPreference('peers');
     if (peers == null) {
       return <PeerPreference>[
-        PeerPreference('Satoshi Locomoco', 'wallet.cruzbit.xyz', 'CRUZ', '')
+        PeerPreference('Satoshi Locomoco', 'wallet.cruzbit.xyz', 'CRUZ', ''),
+        //PeerPreference('BLOCKCHAIN', 'ws.blockchain.info', 'BTC', ''),
+        //PeerPreference('INFURA', 'mainnet.infura.io', 'ETH', ''),
       ];
     }
     return peers.map<PeerPreference>((v) => PeerPreference.fromJson(v)).toList()

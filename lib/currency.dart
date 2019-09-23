@@ -15,8 +15,12 @@ abstract class Currency {
   /// Called by [Wallet.fromFile] to load a wallet for an arbitrary [Currency]
   factory Currency.fromJson(String x) {
     switch (x) {
+      case 'BTC':
+        return null;
       case 'CRUZ':
         return cruz;
+      case 'ETH':
+        return null;
       default:
         return null;
     }
@@ -139,9 +143,6 @@ abstract class PrivateKey {
   /// Marshals this key as a JSON-encoded string.
   String toJson();
 
-  /// Retrieve the [PublicAddress] associated with this [PrivateKey].
-  PublicAddress getPublicKey();
-
   /// Derive the [PublicAddress] associated with this [PrivateKey].
   PublicAddress derivePublicKey();
 }
@@ -248,16 +249,16 @@ abstract class Transaction {
   /// Zero for uncomfirmed transactions.
   int height = 0;
 
-  /// Time this transaction was created.
+  /// Time this transaction was created for CRUZ or epoch.
   DateTime get dateTime;
 
-  /// De-dupes similar transactions.
+  /// De-dupes similar transactions for CRUZ or null.
   int get nonce;
 
-  /// Public key this transaction transfers value from.
+  /// [PublicAddress] this transaction transfers value from.
   PublicAddress get from;
 
-  /// Public key this transaction transfers value to.
+  /// [PublicAddress] this transaction transfers value to.
   PublicAddress get to;
 
   /// Amount of value this transaction transfers.

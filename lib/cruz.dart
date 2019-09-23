@@ -160,7 +160,11 @@ class CRUZ extends Currency {
   @override
   CruzBlockId fromBlockIdJson(String text, [bool pad = false]) {
     try {
-      return CruzBlockId.fromJson(text, pad);
+      if (pad) {
+        return CruzBlockId.fromString(text);
+      } else {
+        return CruzBlockId.fromJson(text);
+      }
     } on Exception {
       return null;
     }
@@ -170,7 +174,11 @@ class CRUZ extends Currency {
   @override
   CruzTransactionId fromTransactionIdJson(String text, [bool pad = false]) {
     try {
-      return CruzTransactionId.fromJson(text, pad);
+      if (pad) {
+        return CruzTransactionId.fromString(text);
+      } else {
+        return CruzTransactionId.fromJson(text);
+      }
     } on Exception {
       return null;
     }
@@ -296,10 +304,11 @@ class CruzTransactionId extends TransactionId {
       : data = SHA3Digest(256, false).process(utf8.encode(transactionJson));
 
   /// Unmarshals a hex string to [CruzTransactionId].
-  CruzTransactionId.fromJson(String x, [bool pad = false])
-      : this(pad
-            ? zeroPadUint8List(hex.decode(zeroPadOddLengthString(x)), size)
-            : hex.decode(x));
+  CruzTransactionId.fromJson(String x) : this(hex.decode(x));
+
+  /// Unmarshals a hex string (with leading zeros optionally truncated) to [CruzTransactionId].
+  CruzTransactionId.fromString(String x)
+      : this(zeroPadUint8List(hex.decode(zeroPadOddLengthString(x)), size));
 
   /// Marshals [CruzTransactionId] as a hex string.
   @override
@@ -489,7 +498,7 @@ class CruzAddress extends Address {
 
   /// Element of non-HD [Wallet].
   CruzAddress.fromPrivateKey(this.privateKey) {
-    publicKey = privateKey.getPublicKey();
+    publicKey = privateKey.derivePublicKey();
   }
 
   /// Element of HD [Wallet].
@@ -514,8 +523,8 @@ class CruzAddress extends Address {
   /// Verifies [privateKey] produces [publicKey].
   bool verify() =>
       privateKey != null &&
-      equalUint8List(
-          privateKey.getPublicKey().data, privateKey.derivePublicKey().data);
+      equalUint8List(publicKey.data, privateKey.derivePublicKey().data) &&
+      equalUint8List(publicKey.data, privateKey.getPublicKey().data);
 }
 
 /// Unique identifier for [Block].
@@ -535,10 +544,11 @@ class CruzBlockId extends BlockId {
       : data = SHA3Digest(256, false).process(utf8.encode(blockHeaderJson));
 
   /// Unmarshals hex string to [CruzBlockId].
-  CruzBlockId.fromJson(String x, [bool pad = false])
-      : this(pad
-            ? zeroPadUint8List(hex.decode(zeroPadOddLengthString(x)), size)
-            : hex.decode(x));
+  CruzBlockId.fromJson(String x) : this(hex.decode(x));
+
+  /// Unmarshals hex string (with leading zeros optionally truncated) to [CruzBlockId].
+  CruzBlockId.fromString(String x)
+      : this(zeroPadUint8List(hex.decode(zeroPadOddLengthString(x)), size));
 
   /// Marshals [CruzBlockId] as a hex string.
   @override
@@ -620,19 +630,23 @@ class CruzBlockHeader extends BlockHeader {
 
   /// Expected number of random hashes before mining this block.
   /// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go#L150-L161
+  @override
   BigInt blockWork() {
     BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0] = 1);
     return twoTo256 ~/ (target.toBigInt() + BigInt.from(1));
   }
 
   /// Difference in work between [x] and this block.
+  @override
   BigInt deltaWork(BlockHeader x) =>
       chainWork.toBigInt() - x.chainWork.toBigInt();
 
   /// Difference in time between [x] and this block.
+  @override
   Duration deltaTime(BlockHeader x) => dateTime.difference(x.dateTime);
 
   /// Expected hashes per second from [x] to this block.
+  @override
   int hashRate(BlockHeader x) {
     int dt = deltaTime(x).inSeconds;
     return dt == 0 ? 0 : (deltaWork(x) ~/ BigInt.from(dt)).toInt();
@@ -707,8 +721,8 @@ class CruzPeerNetwork extends PeerNetwork {
 
   /// Creates [Peer] ready to [Peer.connect()].
   @override
-  Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId) =>
-      CruzPeer(spec, parseUri(spec.url, genesisBlockId));
+  Peer createPeerWithSpec(PeerPreference spec) =>
+      CruzPeer(spec, parseUri(spec.url, cruz.genesisBlock().id().toJson()));
 
   /// Valid CRUZ URI: 'wallet.cruzbit.xyz', 'wallet:8832', 'wss://wallet:8832'.
   String parseUri(String uriText, String genesisId) {
@@ -726,12 +740,16 @@ class CruzPeer extends PersistentWebSocketClient {
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
 
+  @override
+
+  /// [Block.height] of tip [CruzBlock] according to this peer.
+  int get tipHeight => tip != null ? tip.height : 0;
+
   /// ID of tip [CruzBlock] according to this peer.
   @override
   CruzBlockId tipId;
 
   /// Header of tip [CruzBlock] according to this peer.
-  @override
   CruzBlockHeader tip;
 
   /// The minimum [CruzTransaction.amount] for the [CruzPeerNetwork].
@@ -1112,7 +1130,7 @@ class CruzPeer extends PersistentWebSocketClient {
   /// Handle the cruzbit.1 JSON message frame consisting of [type] and [body].
   void handleMessage(String message) {
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
-      debugPrintLong('got message ' + message, spec.debugPrint);
+      debugPrintLong('got cruzabit.1 message ' + message, spec.debugPrint);
     }
     Map<String, dynamic> json = jsonDecode(message);
     Map<String, dynamic> body = json['body'];

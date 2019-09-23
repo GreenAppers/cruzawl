@@ -87,7 +87,7 @@ abstract class PersistentWebSocketClient extends Peer {
   }
 
   /// [WebSocket.send] message [x] expecting an in-order response for [responseCallback]
-  void addJsonMessage(Map<String, dynamic> x, JsonCallback responseCallback) {
+  void addJsonMessage(Map<String, dynamic> x, [JsonCallback responseCallback]) {
     String message = jsonEncode(x);
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
       spec.debugPrint('sending message: $message');

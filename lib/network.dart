@@ -45,11 +45,11 @@ abstract class Peer {
   /// Number of in-flight queries.
   int get numOutstanding;
 
+  /// [BlockHeader.height] of the most recently mined [Block].
+  int get tipHeight;
+
   /// [BlockId] of the most recently mined [Block].
   BlockId get tipId;
-
-  /// [BlockHeader] of the most recently mined [Block].
-  BlockHeader get tip;
 
   /// The minimum [Transaction.amount] that the network allows.
   num get minAmount;
@@ -177,10 +177,7 @@ abstract class PeerNetwork {
   int get length => peers.length + connecting.length;
 
   /// [Block.height] of the most recently mined [Block].
-  int get tipHeight => hasPeer ? tip.height : 0;
-
-  /// [BlockHeader] of the most recently mined [Block].
-  BlockHeader get tip => hasPeer ? peers[0].tip : null;
+  int get tipHeight => hasPeer ? peers[0].tipHeight : 0;
 
   /// [BlockId] of the most recently mined [Block].
   BlockId get tipId => hasPeer ? peers[0].tipId : null;
@@ -202,7 +199,7 @@ abstract class PeerNetwork {
       : (connecting.isNotEmpty ? connecting[0].address : '');
 
   /// [Peer] factory interface.
-  Peer createPeerWithSpec(PeerPreference spec, String genesisBlockId);
+  Peer createPeerWithSpec(PeerPreference spec);
 
   /// Subscribe [Peer.setState] handler [peerStateChanged].
   Peer addPeer(Peer x) {

@@ -653,7 +653,7 @@ class Wallet extends WalletStorage {
     do {
       if (await getNextTransactions(peer, x) == null) return voidResult();
     } while (x.loadIterator.height >
-        max(0, peer.tip.height - currency.coinbaseMaturity));
+        max(0, peer.tipHeight - currency.coinbaseMaturity));
 
     /// [newBalance] and [newMatureBalance] account for possibly receiving new
     /// transactions for [x] as we're loading.
@@ -731,9 +731,9 @@ class Wallet extends WalletStorage {
           transaction);
     }
 
-    debugPrint('${transaction.fromText} -> ${transaction.toText} ' +
+    /*debugPrint('${transaction.fromText} -> ${transaction.toText} ' +
         currency.format(transaction.amount) +
-        ' mature=$mature, newTxn=$newTransaction txnChanged=$transactionsChanged');
+        ' mature=$mature, newTxn=$newTransaction txnChanged=$transactionsChanged');*/
   }
 
   /// Makes the only call to [_applyBalanceDelta].
