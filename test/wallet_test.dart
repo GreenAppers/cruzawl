@@ -44,13 +44,11 @@ String moneyTransaction2(String addr) =>
     '{"time":1564550817,"nonce":1130916028,"from":"$moneySender","to":"$addr","amount":$moneyBalance,"fee":1000000,"expires":17068,"series":17,"signature":"mcvGJ59Q9U9j5Tbjk/gIKYPFmz3lXNb3t8DwkznINJWI7uFPymmywBJjE18UzL2+MMicm0xbyKVJ3XEvQiQ5BQ=="}';
 
 void main() {
-  WalletTester(group, test, expect).run();
-
   Wallet wallet;
   CruzPeer peer;
   CruzawlPreferences preferences;
   TestWebSocket socket = TestWebSocket();
-  PeerNetwork network = cruz.createNetwork(null, () {
+  PeerNetwork network = cruz.createNetwork(tipChanged: () {
     if (wallet != null) wallet.updateTip();
   });
   Transaction sendTransaction;
@@ -225,8 +223,8 @@ void main() {
     addresses.sort(Address.compareIndex);
     reloadAddresses.sort(Address.compareIndex);
     for (int i = 0; i < addresses.length; i++) {
-      expect(reloadAddresses[i].publicKey.toJson(),
-          addresses[i].publicKey.toJson());
+      expect(reloadAddresses[i].publicAddress.toJson(),
+          addresses[i].publicAddress.toJson());
       expect(reloadAddresses[i].privateKey.toJson(),
           addresses[i].privateKey.toJson());
       expect(reloadAddresses[i].balance, addresses[i].balance);
@@ -304,7 +302,8 @@ void main() {
     expect(socket.sent.length, 0);
     TransactionMessage transaction = await transactionFuture;
     expect(transaction.id.toJson(), pushedTransactionId);
-    expect(transaction.transaction.fromText, moneyAddr);
+    expect(transaction.transaction.inputs.length, 1);
+    expect(transaction.transaction.inputs[0].address.toJson(), moneyAddr);
     expect(
         Transaction.maturityCompare(
             transaction.transaction, transaction.transaction),
@@ -346,14 +345,14 @@ void main() {
         Map<String, Address>.from(wallet.addresses);
     expect(addresses.length, 3);
     Address receiveAddress = wallet.receiveAddress;
-    String receiveAddressText = receiveAddress.publicKey.toJson();
+    String receiveAddressText = receiveAddress.publicAddress.toJson();
     expect(addresses.containsKey(receiveAddressText), true);
     wallet.addresses[receiveAddressText].state = AddressState.reserve;
     await preferences.setMinimumReserveAddress(3);
     await wallet.updateAddressState(receiveAddress, AddressState.open);
     expect(wallet.addresses.length, 4);
     Address newReceiveAddress = wallet.receiveAddress;
-    String newReceiveAddressText = newReceiveAddress.publicKey.toJson();
+    String newReceiveAddressText = newReceiveAddress.publicAddress.toJson();
     expect(addresses.containsKey(newReceiveAddressText), true);
     expect(receiveAddressText == newReceiveAddressText, false);
     Set<String> newAddr =
@@ -361,7 +360,7 @@ void main() {
     expect(newAddr.length, 1);
     String newAddressText = newAddr.first;
     Address newAddress = wallet.addresses[newAddressText];
-    expect(newAddress.publicKey.toJson(), newAddressText);
+    expect(newAddress.publicAddress.toJson(), newAddressText);
     await preferences.setMinimumReserveAddress(0);
     await expectWalletLoadProtocol({newAddressText: newAddress}, socket,
         filterTxnQueue: false);
@@ -396,7 +395,7 @@ void main() {
     expect(socket.sent.length, 0);
     expect(nonHdWallet.balance, moneyBalance);
     expect(nonHdWallet.maturesBalance, 0);
-    expect(nonHdWallet.receiveAddress.publicKey.toJson(), moneyAddr);
+    expect(nonHdWallet.receiveAddress.publicAddress.toJson(), moneyAddr);
   });
 
   test('Create CRUZ watch-only Wallet - throttled', () async {
@@ -419,7 +418,7 @@ void main() {
         'watch-only-wallet',
         network,
         seed,
-        <PublicAddress>[wallet.addresses[moneyAddr].publicKey],
+        <PublicAddress>[wallet.addresses[moneyAddr].publicAddress],
         preferences,
         print,
         (_) => completer.complete(null));
@@ -433,7 +432,8 @@ void main() {
     expect(socket.sent.length, 1);
     TransactionMessage transaction = await transactionFuture;
     expect(transaction.id.toJson(), pushedTransactionId);
-    expect(transaction.transaction.fromText, moneyAddr);
+    expect(transaction.transaction.inputs.length, 1);
+    expect(transaction.transaction.inputs[0].address.toJson(), moneyAddr);
 
     // And complete wallet load
     await completer.future;
@@ -448,7 +448,7 @@ void main() {
     expect(socket.sent.length, 0);
     expect(watchOnlyWallet.balance, moneyBalance);
     expect(watchOnlyWallet.maturesBalance, 0);
-    expect(watchOnlyWallet.receiveAddress.publicKey.toJson(), moneyAddr);
+    expect(watchOnlyWallet.receiveAddress.publicAddress.toJson(), moneyAddr);
   });
 
   test('Shutdown CruzPeerNetwork', () async {
@@ -462,12 +462,20 @@ void expectTransactionEqual(Transaction txn1, Transaction txn2) {
   //expect(txn1.height, txn2.height);
   expect(txn1.dateTime, txn2.dateTime);
   expect(txn1.nonce, txn2.nonce);
-  if (txn1.from == null || txn2.from == null) {
-    expect(txn1.from, txn2.from);
+  if (txn1.inputs == null || txn2.inputs == null) {
+    expect(txn1.inputs, txn2.inputs);
   } else {
-    expect(txn1.from.toJson(), txn2.from.toJson());
+    expect(txn1.inputs.length, txn2.inputs.length);
+    for (int i = 0; i < txn1.inputs.length; i++) {
+      expect(txn1.inputs[i].value, txn2.inputs[i].value);
+      expect(txn1.inputs[i].address.toJson(), txn2.inputs[i].address.toJson());
+    }
   }
-  expect(txn1.to.toJson(), txn2.to.toJson());
+  expect(txn1.outputs.length, txn2.outputs.length);
+  for (int i = 0; i < txn1.outputs.length; i++) {
+    expect(txn1.outputs[i].value, txn2.outputs[i].value);
+    expect(txn1.outputs[i].address.toJson(), txn2.outputs[i].address.toJson());
+  }
   expect(txn1.amount, txn2.amount);
   expect(txn1.fee, txn2.fee);
   expect(txn1.memo, txn2.memo);

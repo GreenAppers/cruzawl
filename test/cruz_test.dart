@@ -15,6 +15,7 @@ import 'package:cruzawl/websocket_html.dart'
 
 void main() {
   CruzTester(group, test, expect).run();
+  CruzWalletTester(group, test, expect).run();
 
   test('CRUZ currency', () {
     Currency currency = cruz;

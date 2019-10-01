@@ -68,6 +68,12 @@ class Seed {
     assert(data.length == size);
   }
 
+  /// Create [Seed] without the usually required 64 bytes
+  Seed.anyLength(this.data) {
+    assert(data.length >= 16);
+    assert(data.length <= 64);
+  }
+
   /// Unmarshals a JSON-encoded string to [Seed].
   Seed.fromJson(String x) : this(base64.decode(x));
 
@@ -204,7 +210,7 @@ abstract class WalletStorage {
   /// Write single [Address] to [addressStore].
   Future<void> _storeAddress(Address x, [sembast.Transaction txn]) async {
     await addressStore
-        .record(x.publicKey.toJson())
+        .record(x.publicAddress.toJson())
         .put(txn ?? storage, jsonDecode(jsonEncode(x)));
   }
 
@@ -435,9 +441,9 @@ class Wallet extends WalletStorage {
     if (preferences != null &&
         preferences.verifyAddressEveryLoad &&
         !x.verify()) {
-      throw FormatException('${x.publicKey.toJson()} verify failed');
+      throw FormatException('${x.publicAddress.toJson()} verify failed');
     }
-    addresses[x.publicKey.toJson()] = x;
+    addresses[x.publicAddress.toJson()] = x;
     if (store) await _storeAddress(x, txn);
     if (hdWallet) {
       if (x.state == AddressState.reserve) {
@@ -548,8 +554,11 @@ class Wallet extends WalletStorage {
           transactions.find(currency.fromTransactionJson(record.value));
       if (transaction != null &&
           (transaction.height == null || transaction.height == 0)) {
-        await _updateBalance(addresses[transaction.from.toJson()],
-            transaction.amount + transaction.fee);
+        for (TransactionInput input in transaction.inputs) {
+          Address from = addresses[input.address.toJson()];
+          if (from == null) continue;
+          await _updateBalance(from, input.value);
+        }
       }
       await _removePendingTransaction(record.key);
       pendingCount--;
@@ -561,9 +570,12 @@ class Wallet extends WalletStorage {
     if (!opened) return;
     while (maturing.length > 0 && maturing.first.maturity <= height) {
       Transaction transaction = maturing.removeFirst();
-      Address to = addresses[transaction.to.toJson()];
-      _applyMaturesBalanceDelta(to, -transaction.amount);
-      await _updateBalance(to, transaction.amount);
+      for (TransactionOutput output in transaction.outputs) {
+        Address to = addresses[output.address.toJson()];
+        if (to == null) continue;
+        _applyMaturesBalanceDelta(to, -output.value);
+        await _updateBalance(to, output.value);
+      }
     }
   }
 
@@ -639,12 +651,12 @@ class Wallet extends WalletStorage {
 
     /// Start filtering [PeerNetwork] for [x].
     x.newBalance = x.newMaturesBalance = 0;
-    bool filtering = await peer.filterAdd(x.publicKey, updateTransaction);
+    bool filtering = await peer.filterAdd(x.publicAddress, updateTransaction);
     if (filtering == null) return voidResult();
     assert(filtering == true);
 
     /// Now (that we're filtering) query [x]'s balance.
-    num newBalance = await peer.getBalance(x.publicKey);
+    num newBalance = await peer.getBalance(x.publicAddress);
     if (newBalance == null) return voidResult();
     x.loadIterator = null;
     x.newBalance += newBalance;
@@ -670,7 +682,7 @@ class Wallet extends WalletStorage {
       Peer peer, Address x) async {
     /// Fetch next block with [Peer.getTransactions] iterator and [updateTransaction].
     TransactionIteratorResults results =
-        await peer.getTransactions(x.publicKey, x.loadIterator);
+        await peer.getTransactions(x.publicAddress, x.loadIterator);
     if (results == null) return null;
     for (Transaction transaction in results.transactions) {
       await updateTransaction(transaction, newTransaction: false);
@@ -698,37 +710,43 @@ class Wallet extends WalletStorage {
         transactionsChanged && (newTransaction || undoneByReorg);
     bool mature = transaction.maturity <= network.tipHeight;
 
-    /// Track [Address].[state] changes.
-    Address from =
-        transaction.from == null ? null : addresses[transaction.from.toJson()];
-    Address to = addresses[transaction.to.toJson()];
-    if (from != null) {
-      if (height > 0) from.updateSeenHeight(height);
-      await updateAddressState(from, AddressState.used, store: !balanceChanged);
+    if (transaction.inputs != null) {
+      for (TransactionInput input in transaction.inputs) {
+        Address from =
+            input.address == null ? null : addresses[input.address.toJson()];
+        if (from == null) continue;
+
+        /// Track [Address].[state] changes.
+        if (height > 0) from.updateSeenHeight(height);
+        await updateAddressState(from, AddressState.used,
+            store: !balanceChanged);
+
+        /// Track [Address].[balance] changes.
+        if (balanceChanged) {
+          await _updateBalance(
+              from, undoneByReorg ? input.value : -input.value);
+        }
+      }
     }
-    if (to != null) {
+
+    for (TransactionOutput output in transaction.outputs) {
+      Address to = addresses[output.address.toJson()];
+      if (to == null) continue;
+
+      /// Track [Address].[state] changes.
       if (height > 0) to.updateSeenHeight(height);
       await updateAddressState(to, AddressState.used, store: !balanceChanged);
-    }
 
-    /// Track [Address].[balance] changes.
-    if (balanceChanged) {
-      if (from != null) {
-        num cost = transaction.amount + transaction.fee;
-        await _updateBalance(from, undoneByReorg ? cost : -cost);
+      /// Track [Address].[balance] changes.
+      if (balanceChanged && mature) {
+        await _updateBalance(to, undoneByReorg ? -output.value : output.value);
       }
-      if (to != null && mature) {
-        await _updateBalance(
-            to, undoneByReorg ? -transaction.amount : transaction.amount);
-      }
-    }
 
-    /// Track [Address].[maturesBalance] changes.
-    if (to != null && !mature && transactionsChanged) {
-      _applyMaturesBalanceDelta(
-          to,
-          undoneByReorg ? -transaction.amount : transaction.amount,
-          transaction);
+      /// Track [Address].[maturesBalance] changes.
+      if (!mature && transactionsChanged) {
+        _applyMaturesBalanceDelta(
+            to, undoneByReorg ? -output.value : output.value, transaction);
+      }
     }
 
     /*debugPrint('${transaction.fromText} -> ${transaction.toText} ' +

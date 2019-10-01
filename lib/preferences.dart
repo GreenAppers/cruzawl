@@ -102,7 +102,8 @@ class CruzawlPreferences {
     if (peers == null) {
       return <PeerPreference>[
         PeerPreference('Satoshi Locomoco', 'wallet.cruzbit.xyz', 'CRUZ', ''),
-        //PeerPreference('BLOCKCHAIN', 'ws.blockchain.info', 'BTC', ''),
+        PeerPreference('BLOCKCHAIN', 'ws.blockchain.info', 'BTC', '',
+            root: 'https://blockchain.info'),
         //PeerPreference('INFURA', 'mainnet.infura.io', 'ETH', ''),
       ];
     }
@@ -142,9 +143,9 @@ class CruzawlPreferences {
   }
 }
 
-@JsonSerializable()
+@JsonSerializable(includeIfNull: false)
 class PeerPreference {
-  String name, url, currency, options;
+  String name, url, root, currency, options;
   int priority = 100;
 
   @JsonKey(ignore: true)
@@ -154,7 +155,7 @@ class PeerPreference {
   int debugLevel = debugLevelInfo;
 
   PeerPreference(this.name, this.url, this.currency, this.options,
-      {this.debugPrint});
+      {this.root, this.debugPrint});
 
   factory PeerPreference.fromJson(Map<String, dynamic> json) =>
       _$PeerPreferenceFromJson(json);

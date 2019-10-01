@@ -14,10 +14,11 @@ import "package:pointycastle/digests/sha256.dart";
 import "package:pointycastle/src/utils.dart";
 import 'package:tweetnacl/tweetnacl.dart' as tweetnacl;
 
-import 'package:cruzawl/sha3.dart';
 import 'package:cruzawl/currency.dart';
+import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
+import 'package:cruzawl/sha3.dart';
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/websocket.dart';
 
@@ -96,10 +97,12 @@ class CRUZ extends Currency {
   /// Create a cruzbit.1 [PeerNetwork] instance.
   @override
   CruzPeerNetwork createNetwork(
-          [VoidCallback peerChanged, VoidCallback tipChanged]) =>
+          {VoidCallback peerChanged,
+          VoidCallback tipChanged,
+          HttpClient httpClient}) =>
       CruzPeerNetwork(peerChanged, tipChanged);
 
-  /// ID of the first [Block] in the chain. e.g. https://www.cruzbase.com/#/height/0
+  /// The first [Block] in the chain. e.g. https://www.cruzbase.com/#/height/0
   @override
   CruzBlock genesisBlock() => CruzBlock.fromJson(jsonDecode(genesisBlockJson));
 
@@ -118,6 +121,10 @@ class CRUZ extends Currency {
         CruzChainCode(data.chainCode));
   }
 
+  /// Cruz addresses are public keys.
+  @override
+  CruzAddress fromPublicAddress(PublicAddress addr) => fromPublicKey(addr);
+
   /// For Watch-only wallets.
   @override
   CruzAddress fromPublicKey(PublicAddress addr) {
@@ -134,9 +141,13 @@ class CRUZ extends Currency {
   CruzAddress fromAddressJson(Map<String, dynamic> json) =>
       CruzAddress.fromJson(json);
 
+  /// CRUZ addresses are public keys.
+  @override
+  CruzPublicKey fromPublicAddressJson(String text) => fromPublicKeyJson(text);
+
   /// Parse CRUZ public key.
   @override
-  CruzPublicKey fromPublicAddressJson(String text) {
+  CruzPublicKey fromPublicKeyJson(String text) {
     try {
       Uint8List data = base64.decode(text);
       if (data.length != CruzPublicKey.size) return null;
@@ -315,6 +326,28 @@ class CruzTransactionId extends TransactionId {
   String toJson() => hex.encode(data);
 }
 
+/// Shim [TransactionInput] for CRUZ which has only a single input and output.
+class CruzTransactionInput extends TransactionInput {
+  @override
+  CruzPublicKey address;
+
+  @override
+  int value;
+
+  CruzTransactionInput(this.address, this.value);
+}
+
+/// Shim [TransactionOutput] for CRUZ which has only a single input and output.
+class CruzTransactionOutput extends TransactionOutput {
+  @override
+  CruzPublicKey address;
+
+  @override
+  int value;
+
+  CruzTransactionOutput(this.address, this.value);
+}
+
 /// A ledger transaction representation. It transfers value from one public key to another.
 /// Reference: https://github.com/cruzbit/cruzbit/blob/master/transaction.go
 @JsonSerializable(includeIfNull: false)
@@ -367,6 +400,14 @@ class CruzTransaction extends Transaction {
   /// Used by [Wallet].  Not marshaled.
   @JsonKey(ignore: true)
   int height = 0;
+
+  @override
+  List<CruzTransactionInput> get inputs =>
+      from == null ? null : [CruzTransactionInput(from, amount + fee)];
+
+  @override
+  List<CruzTransactionOutput> get outputs =>
+      [CruzTransactionOutput(to, amount)];
 
   /// Creates an arbitrary unsigned [CruzTransaction].
   CruzTransaction(this.from, this.to, this.amount, this.fee, this.memo,
@@ -452,8 +493,11 @@ class CruzTransaction extends Transaction {
 /// CRUZ implementation of the [Wallet] entry [Address] abstraction.
 @JsonSerializable(includeIfNull: false)
 class CruzAddress extends Address {
-  /// The public key of this [CruzAddress].
+  /// In cruzbit public keys are the addresses.
   @override
+  PublicAddress get publicAddress => publicKey;
+
+  /// The public key of this [CruzAddress].
   CruzPublicKey publicKey;
 
   /// The private key for this address, if not watch-only.
@@ -565,7 +609,7 @@ class CruzBlockIds {
   List<CruzBlockId> block_ids;
   CruzBlockIds();
 
-  /// Unmarshals a base64-encoded string to [CruzBlockIds].
+  /// Unmarshals a JSON-encoded string to [CruzBlockIds].
   factory CruzBlockIds.fromJson(Map<String, dynamic> json) =>
       _$CruzBlockIdsFromJson(json);
 
@@ -583,7 +627,7 @@ class CruzBlockHeader extends BlockHeader {
 
   /// Hash of all the transactions in this block.
   @JsonKey(name: 'hash_list_root')
-  CruzTransactionId hashListRoot;
+  CruzTransactionId hashRoot;
 
   /// Unix time.
   int time;
@@ -627,30 +671,6 @@ class CruzBlockHeader extends BlockHeader {
   /// Computes an ID for this block.
   @override
   CruzBlockId id() => CruzBlockId.compute(jsonEncode(this));
-
-  /// Expected number of random hashes before mining this block.
-  /// Reference: https://github.com/cruzbit/cruzbit/blob/master/block.go#L150-L161
-  @override
-  BigInt blockWork() {
-    BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0] = 1);
-    return twoTo256 ~/ (target.toBigInt() + BigInt.from(1));
-  }
-
-  /// Difference in work between [x] and this block.
-  @override
-  BigInt deltaWork(BlockHeader x) =>
-      chainWork.toBigInt() - x.chainWork.toBigInt();
-
-  /// Difference in time between [x] and this block.
-  @override
-  Duration deltaTime(BlockHeader x) => dateTime.difference(x.dateTime);
-
-  /// Expected hashes per second from [x] to this block.
-  @override
-  int hashRate(BlockHeader x) {
-    int dt = deltaTime(x).inSeconds;
-    return dt == 0 ? 0 : (deltaWork(x) ~/ BigInt.from(dt)).toInt();
-  }
 }
 
 /// Represents a block in the block chain. It has a header and a list of transactions.
@@ -682,7 +702,7 @@ class CruzBlock extends Block {
 
   /// Compute a hash list root of all transaction hashes.
   @override
-  CruzTransactionId computeHashListRoot() {
+  CruzTransactionId computeHashRoot() {
     SHA3Digest hasher = SHA3Digest(256, false);
     for (int i = 1; i < transactions.length; i++) {
       CruzTransactionId id = transactions[i].id();

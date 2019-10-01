@@ -5,11 +5,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 
-import 'http.dart';
+import 'package:cruzawl/http.dart';
+import 'package:cruzawl/util.dart';
 
 /// dart:io [HttpClient] implementation.
 class HttpClientImpl extends HttpClient {
   static const String type = 'io';
+  io.HttpClient client = io.HttpClient();
+
+  HttpClientImpl({StringFilter userAgent}) {
+    if (userAgent != null) client.userAgent = userAgent(client.userAgent);
+  }
 
   @override
   Future<HttpResponse> request(String url, {String method, String data}) async {
@@ -17,11 +23,11 @@ class HttpClientImpl extends HttpClient {
     var request;
     switch (method) {
       case 'POST':
-        request = await io.HttpClient().postUrl(uri);
+        request = await client.postUrl(uri);
         break;
 
       default:
-        request = await io.HttpClient().getUrl(uri);
+        request = await client.getUrl(uri);
         break;
     }
 

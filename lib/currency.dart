@@ -4,7 +4,11 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import "package:pointycastle/src/utils.dart";
+
+import 'package:cruzawl/btc.dart';
 import 'package:cruzawl/cruz.dart';
+import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/util.dart';
 
@@ -62,7 +66,9 @@ abstract class Currency {
 
   /// Create a [PeerNetwork] instance for this currency.
   PeerNetwork createNetwork(
-      [VoidCallback peerChanged, VoidCallback tipChanged]);
+      {VoidCallback peerChanged,
+      VoidCallback tipChanged,
+      HttpClient httpClient});
 
   /// The [Block] with [Block.height] equal zero.
   Block genesisBlock();
@@ -77,11 +83,17 @@ abstract class Currency {
   /// Creates a watch-only [Address] specified by [key].
   Address fromPublicKey(PublicAddress key);
 
+  /// Creates a watch-only [Address] specified by [address].
+  Address fromPublicAddress(PublicAddress address);
+
   /// Unmarshals a JSON-encoded string to [Address].
   Address fromAddressJson(Map<String, dynamic> json);
 
   /// Unmarshals a JSON-encoded string to [PublicAddress].
   PublicAddress fromPublicAddressJson(String text);
+
+  /// Unmarshals a JSON-encoded string to [PublicAddress].
+  PublicAddress fromPublicKeyJson(String text);
 
   /// Unmarshals a JSON-encoded string to [PrivateKey].
   PrivateKey fromPrivateKeyJson(String text);
@@ -112,7 +124,9 @@ class LoadingCurrency extends Currency {
   PublicAddress get nullAddress => null;
 
   PeerNetwork createNetwork(
-          [VoidCallback peerChanged, VoidCallback tipChanged]) =>
+          {VoidCallback peerChanged,
+          VoidCallback tipChanged,
+          HttpClient httpClient}) =>
       null;
   Block genesisBlock() => null;
   Address deriveAddress(Uint8List seed, String path,
@@ -120,8 +134,10 @@ class LoadingCurrency extends Currency {
       null;
   Address fromPrivateKey(PrivateKey key) => null;
   Address fromPublicKey(PublicAddress key) => null;
+  Address fromPublicAddress(PublicAddress address) => null;
   Address fromAddressJson(Map<String, dynamic> json) => null;
   PublicAddress fromPublicAddressJson(String text) => null;
+  PublicAddress fromPublicKeyJson(String text) => null;
   PrivateKey fromPrivateKeyJson(String text) => null;
   BlockId fromBlockIdJson(String text, [bool pad = false]) => null;
   TransactionId fromTransactionIdJson(String text, [bool pad = false]) => null;
@@ -200,6 +216,9 @@ abstract class Address {
   TransactionIterator loadIterator;
 
   /// The [PublicAddress] defines this [Address].
+  PublicAddress get publicAddress;
+
+  /// The public key (if any) associated with this [Address].
   PublicAddress get publicKey;
 
   /// The [PrivateKey] (if any) assocaited with [publicKey].
@@ -243,6 +262,16 @@ abstract class TransactionId {
   String toJson();
 }
 
+abstract class TransactionInput {
+  int get value;
+  PublicAddress get address;
+}
+
+abstract class TransactionOutput {
+  int get value;
+  PublicAddress get address;
+}
+
 /// Interface for a transaction transfering value between parties.
 abstract class Transaction {
   /// [BlockHeader.height] where this transaction appears in the blockchain.
@@ -255,11 +284,11 @@ abstract class Transaction {
   /// De-dupes similar transactions for CRUZ or null.
   int get nonce;
 
-  /// [PublicAddress] this transaction transfers value from.
-  PublicAddress get from;
+  /// The [PublicAddress] this transaction transfers value from.
+  List<TransactionInput> get inputs;
 
-  /// [PublicAddress] this transaction transfers value to.
-  PublicAddress get to;
+  /// The [PublicAddress] this transaction transfers value to.
+  List<TransactionOutput> get outputs;
 
   /// Amount of value this transaction transfers.
   num get amount;
@@ -291,14 +320,8 @@ abstract class Transaction {
   /// Verifies this transaction's signature.
   bool verify();
 
-  /// The JSON-encoded sender of this transaction.
-  String get fromText => from.toJson();
-
-  /// The JSON-encoded receiver of this transaction.
-  String get toText => to.toJson();
-
   /// Block height after which this transaction can be spent.
-  int get maturity => max(matures ?? 0, from != null ? 0 : height + 100);
+  int get maturity => max(matures ?? 0, inputs != null ? 0 : height + 100);
 
   /// Sorts by [time] and tie-break so only equivalent [Transaction] compare equal.
   static int timeCompare(Transaction a, Transaction b) {
@@ -331,7 +354,7 @@ abstract class BlockHeader {
   BlockId get previous;
 
   /// Checksum of all the transaction in this block.
-  TransactionId get hashListRoot;
+  TransactionId get hashRoot;
 
   /// Time this block was mined.
   DateTime get dateTime;
@@ -360,16 +383,23 @@ abstract class BlockHeader {
   BlockId id();
 
   /// Expected number of random hashes before mining this block.
-  BigInt blockWork();
+  BigInt blockWork() {
+    BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0] = 1);
+    return twoTo256 ~/ (target.toBigInt() + BigInt.from(1));
+  }
 
   /// Difference in work between [x] and this block.
-  BigInt deltaWork(BlockHeader x);
+  BigInt deltaWork(BlockHeader x) =>
+      chainWork.toBigInt() - x.chainWork.toBigInt();
 
   /// Difference in time between [x] and this block.
-  Duration deltaTime(BlockHeader x);
+  Duration deltaTime(BlockHeader x) => dateTime.difference(x.dateTime);
 
   /// Expected hashes per second from [x] to this block.
-  int hashRate(BlockHeader x);
+  int hashRate(BlockHeader x) {
+    int dt = deltaTime(x).inSeconds;
+    return dt == 0 ? 0 : (deltaWork(x) ~/ BigInt.from(dt)).toInt();
+  }
 
   /// Compare [BlockHeader.height] of [a] and [b].
   static int compareHeight(dynamic a, dynamic b) => b.height - a.height;
@@ -387,11 +417,13 @@ abstract class Block {
   BlockId id();
 
   /// Compute a hash list root of all transaction hashes.
-  TransactionId computeHashListRoot();
+  TransactionId computeHashRoot();
 }
 
 const LoadingCurrency loadingCurrency = LoadingCurrency();
 
 const CRUZ cruz = CRUZ();
 
-const List<Currency> currencies = <Currency>[cruz];
+const BTC btc = BTC();
+
+const List<Currency> currencies = <Currency>[cruz, btc];

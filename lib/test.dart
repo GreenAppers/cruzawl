@@ -2,11 +2,15 @@
 // Use of this source code is governed by a MIT-style license that can be found in the LICENSE file.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:bs58check/bs58check.dart' as bs58check;
 import 'package:convert/convert.dart';
 
+import 'package:cruzawl/btc.dart' hide genesisBlockJson;
 import 'package:cruzawl/currency.dart';
-import 'package:cruzawl/cruz.dart';
+import 'package:cruzawl/cruz.dart' as cruzImpl show genesisBlockJson;
+import 'package:cruzawl/cruz.dart' hide genesisBlockJson;
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/wallet.dart';
 
@@ -25,13 +29,148 @@ abstract class TestRunner {
   void run();
 }
 
+/// Runs bitcoin test vectors and unit tests
+class BitcoinTester extends TestRunner {
+  BitcoinTester(TestCallback group, TestCallback test, ExpectCallback expect)
+      : super(group, test, expect);
+
+  void run() {
+    test('Bitcoin address test', () {
+      /// https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses
+      BitcoinAddress addr = BitcoinAddress.fromPrivateKey(BitcoinPrivateKey(
+          Uint8List.fromList(hex.decode(
+              '18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725'))));
+      expect(addr.publicKey.toJson(),
+          '0250863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352');
+      expect(
+          addr.identifier.toJson(), 'f54a5851e9372b87810a8e60cdd2e7cfd80b6e31');
+      expect(hex.encode(addr.publicAddress.data),
+          '00f54a5851e9372b87810a8e60cdd2e7cfd80b6e31c7f18fe8');
+      expect(addr.publicAddress.toJson(), '1PMycacnJaSqwwJqjawXBErnLsZ7RkXUAs');
+    });
+
+    test('Test Genesis', () {
+      BitcoinBlock genesis = btc.genesisBlock();
+      BitcoinBlockId genesisId = genesis.id();
+      expect(genesisId.toJson(),
+          '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f');
+      expect(genesis.header.bits, 0x1d00ffff);
+      expect(genesis.header.target.toJson(),
+          '00000000ffff0000000000000000000000000000000000000000000000000000');
+      expect(genesisId.toBigInt() <= genesis.header.target.toBigInt(), true);
+      expect(genesis.header.hashRoot.toJson(),
+          '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b');
+      expect(
+          genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());
+    });
+  }
+}
+
+/// Runs BTC wallet test vectors and unit tests
+class BitcoinWalletTester extends TestRunner {
+  BitcoinWalletTester(
+      TestCallback group, TestCallback test, ExpectCallback expect)
+      : super(group, test, expect);
+
+  /// Reference: https://en.bitcoin.it/wiki/BIP_0032_TestVectors
+  void run() {
+    group('BIP 0032 TestVector 1', () {
+      Seed seed =
+          Seed.anyLength(hex.decode('000102030405060708090a0b0c0d0e0f'));
+      Wallet wallet = Wallet.fromSeed(
+          null, null, null, 'BIP32TestVector1', btc.createNetwork(), seed);
+      BitcoinAddress addr1, addr2;
+
+      test("m", () {
+        addr1 = wallet.deriveAddressWithPath("m");
+        expect(addr1.publicKey.toJson(),
+            '0339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2');
+        expect(hex.encode(addr1.privateKey.data),
+            'e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35');
+        expect(addr1.chainCode.toJson(),
+            '873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508');
+        expect(addr1.privateKey.toJson(),
+            'L52XzL2cMkHxqxBXRyEpnPQZGUs3uKiL3R11XbAdHigRzDozKZeW');
+        expect(
+            addr1.publicAddress.toJson(), '15mKKb2eos1hWa6tisdPwwDC1a5J1y9nma');
+        expect(addr1.identifier.toJson(),
+            '3442193e1bb70916e914552172cd4e2dbc9df811');
+        expect(addr1.extendedPublicKeyJson(),
+            'xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8');
+        expect(addr1.extendedPrivateKeyJson(),
+            'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi');
+        expect(addr1.parentFingerprint, 0);
+        expect(addr1.verify(), true);
+
+        addr2 = BitcoinAddress.fromPrivateKey(
+            BitcoinPrivateKey.fromJson(addr1.privateKey.toJson()));
+        expect(addr2.publicKey.toJson(), addr1.publicKey.toJson());
+        expect(addr2.privateKey.toJson(), addr1.privateKey.toJson());
+        expect(addr2.verify(), true);
+      });
+
+      test("m/0'", () {
+        addr1 = wallet.deriveAddressWithPath("m/0'");
+        expect(addr1.publicKey.toJson(),
+            '035a784662a4a20a65bf6aab9ae98a6c068a81c52e4b032c0fb5400c706cfccc56');
+        expect(hex.encode(addr1.privateKey.data),
+            'edb2e14f9ee77d26dd93b4ecede8d16ed408ce149b6cd80b0715a2d911a0afea');
+        expect(addr1.chainCode.toJson(),
+            '47fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141');
+        expect(addr1.privateKey.toJson(),
+            'L5BmPijJjrKbiUfG4zbiFKNqkvuJ8usooJmzuD7Z8dkRoTThYnAT');
+        expect(addr1.identifier.toJson(),
+            '5c1bd648ed23aa5fd50ba52b2457c11e9e80a6a7');
+        expect(
+            addr1.publicAddress.toJson(), '19Q2WoS5hSS6T8GjhK8KZLMgmWaq4neXrh');
+        expect(addr1.extendedPrivateKeyJson(),
+            'xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7');
+        expect(addr1.extendedPublicKeyJson(),
+            'xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw');
+
+        /// https://github.com/satoshilabs/slips/blob/master/slip-0010.md
+        expect(addr1.parentFingerprint, 0x3442193e);
+
+        addr2 =
+            BitcoinAddress.fromExtendedKeyJson(addr1.extendedPrivateKeyJson());
+        expect(addr2.publicKey.toJson(), addr1.publicKey.toJson());
+        expect(addr2.privateKey.toJson(), addr1.privateKey.toJson());
+        expect(addr2.extendedPublicKeyJson(), addr1.extendedPublicKeyJson());
+        expect(addr2.extendedPrivateKeyJson(), addr1.extendedPrivateKeyJson());
+        expect(addr2.verify(), true);
+      });
+
+      test("m/0'/1/2'/2/1000000000", () {
+        addr1 = wallet.deriveAddressWithPath("m/0'/1/2'/2/1000000000");
+        expect(addr1.publicKey.toJson(),
+            '022a471424da5e657499d1ff51cb43c47481a03b1e77f951fe64cec9f5a48f7011');
+        expect(hex.encode(addr1.privateKey.data),
+            '471b76e389e528d6de6d816857e012c5455051cad6660850e58372a6c3e6e7c8');
+        expect(addr1.chainCode.toJson(),
+            'c783e67b921d2beb8f6b389cc646d7263b4145701dadd2161548a8b078e65e9e');
+        expect(addr1.privateKey.toJson(),
+            'Kybw8izYevo5xMh1TK7aUr7jHFCxXS1zv8p3oqFz3o2zFbhRXHYs');
+        expect(addr1.identifier.toJson(),
+            'd69aa102255fed74378278c7812701ea641fdf32');
+        expect(
+            addr1.publicAddress.toJson(), '1LZiqrop2HGR4qrH1ULZPyBpU6AUP49Uam');
+        expect(addr1.extendedPrivateKeyJson(),
+            'xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76');
+        expect(addr1.extendedPublicKeyJson(),
+            'xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy');
+        expect(addr1.parentFingerprint, 0xd880d7d8);
+      });
+    });
+  }
+}
+
 /// Runs cruzbit test vectors and unit tests
 class CruzTester extends TestRunner {
   CruzTester(TestCallback group, TestCallback test, ExpectCallback expect)
       : super(group, test, expect);
 
   void run() {
-    group('TestVector1', () {
+    group('CRUZ TestVector1', () {
       /// Create [CruzTransaction] for Test Vector 1.
       /// Reference: https://github.com/cruzbit/cruzbit/blob/master/transaction_test.go#L59
       CruzPublicKey pubKey = CruzPublicKey.fromJson(
@@ -76,10 +215,11 @@ class CruzTester extends TestRunner {
     });
 
     test('Test Genesis', () {
-      CruzBlock genesis = CruzBlock.fromJson(jsonDecode(genesisBlockJson));
-      expect(jsonEncode(genesis), jsonEncode(jsonDecode(genesisBlockJson)));
-      expect(genesis.computeHashListRoot().toJson(),
-          genesis.header.hashListRoot.toJson());
+      CruzBlock genesis = cruz.genesisBlock();
+      expect(jsonEncode(genesis),
+          jsonEncode(jsonDecode(cruzImpl.genesisBlockJson)));
+      expect(
+          genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());
 
       CruzBlockId genesisId = genesis.id();
       expect(genesisId.toJson(),
@@ -89,9 +229,9 @@ class CruzTester extends TestRunner {
   }
 }
 
-/// Runs wallet test vectors and unit tests
-class WalletTester extends TestRunner {
-  WalletTester(TestCallback group, TestCallback test, ExpectCallback expect)
+/// Runs CRUZ wallet test vectors and unit tests
+class CruzWalletTester extends TestRunner {
+  CruzWalletTester(TestCallback group, TestCallback test, ExpectCallback expect)
       : super(group, test, expect);
 
   void run() {
@@ -101,7 +241,7 @@ class WalletTester extends TestRunner {
           null,
           null,
           null,
-          'TestVector2',
+          'SLIP10TestVector2',
           cruz.createNetwork(),
           Seed(hex.decode(
               'fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542')));

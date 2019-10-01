@@ -11,9 +11,11 @@ const int debugLevelError = 0;
 const int debugLevelInfo = 1;
 const int debugLevelDebug = 2;
 
-typedef StringFunction = String Function();
-typedef StringCallback = void Function(String);
 typedef VoidCallback = void Function();
+typedef StringCallback = void Function(String);
+typedef StringFilter = String Function(String);
+typedef StringFunction = String Function();
+typedef StringFutureFunction = Future<String> Function();
 
 Future<void> voidResult() async {}
 

@@ -148,7 +148,7 @@ CruzBlockHeader _$CruzBlockHeaderFromJson(Map<String, dynamic> json) {
     ..previous = json['previous'] == null
         ? null
         : CruzBlockId.fromJson(json['previous'] as String)
-    ..hashListRoot = json['hash_list_root'] == null
+    ..hashRoot = json['hash_list_root'] == null
         ? null
         : CruzTransactionId.fromJson(json['hash_list_root'] as String)
     ..time = json['time'] as int
@@ -173,7 +173,7 @@ Map<String, dynamic> _$CruzBlockHeaderToJson(CruzBlockHeader instance) {
   }
 
   writeNotNull('previous', instance.previous);
-  writeNotNull('hash_list_root', instance.hashListRoot);
+  writeNotNull('hash_list_root', instance.hashRoot);
   writeNotNull('time', instance.time);
   writeNotNull('target', instance.target);
   writeNotNull('chain_work', instance.chainWork);
