@@ -710,22 +710,18 @@ class Wallet extends WalletStorage {
         transactionsChanged && (newTransaction || undoneByReorg);
     bool mature = transaction.maturity <= network.tipHeight;
 
-    if (transaction.inputs != null) {
-      for (TransactionInput input in transaction.inputs) {
-        Address from =
-            input.address == null ? null : addresses[input.address.toJson()];
-        if (from == null) continue;
+    for (TransactionInput input in transaction.inputs) {
+      Address from =
+          input.address == null ? null : addresses[input.address.toJson()];
+      if (from == null) continue;
 
-        /// Track [Address].[state] changes.
-        if (height > 0) from.updateSeenHeight(height);
-        await updateAddressState(from, AddressState.used,
-            store: !balanceChanged);
+      /// Track [Address].[state] changes.
+      if (height > 0) from.updateSeenHeight(height);
+      await updateAddressState(from, AddressState.used, store: !balanceChanged);
 
-        /// Track [Address].[balance] changes.
-        if (balanceChanged) {
-          await _updateBalance(
-              from, undoneByReorg ? input.value : -input.value);
-        }
+      /// Track [Address].[balance] changes.
+      if (balanceChanged) {
+        await _updateBalance(from, undoneByReorg ? input.value : -input.value);
       }
     }
 
@@ -791,5 +787,21 @@ class Wallet extends WalletStorage {
     } else {
       maturing.remove(transaction);
     }
+  }
+
+  /// Returns true if any [TransactionInput.address] in [addresses].
+  bool isFromWallet(Transaction tx) {
+    for (TransactionInput input in tx.inputs) {
+      if (addresses.containsKey(input.fromText)) return true;
+    }
+    return false;
+  }
+
+  /// Returns true if any [TransactionOutput.address] in [addresses].
+  bool isToWallet(Transaction tx) {
+    for (TransactionOutput output in tx.outputs) {
+      if (addresses.containsKey(output.toText)) return true;
+    }
+    return false;
   }
 }

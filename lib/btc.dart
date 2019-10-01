@@ -48,6 +48,14 @@ class BTC extends Currency {
   @override
   String get ticker => 'BTC';
 
+  /// Official name.
+  @override
+  String get name => 'Bitcoin';
+
+  /// Original source code.
+  @override
+  String get url => 'https://github.com/trottier/original-bitcoin';
+
   /// The coin type used for HD wallets.
   /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
   @override
@@ -71,6 +79,7 @@ class BTC extends Currency {
   }
 
   /// Returns number of BTC issued at [height].
+  @override
   int supply(int blocks) {
     int supply = 0, reward = initialCoinbaseReward * satoshisPerBitcoin;
     while (blocks > 0) {
@@ -84,6 +93,15 @@ class BTC extends Currency {
       }
     }
     return supply ~/ satoshisPerBitcoin;
+  }
+
+  /// Computes the expected block reward for the given [height].
+  @override
+  int blockCreationReward(int height) {
+    int halvings = height ~/ blocksUntilRewardHalving;
+    return halvings >= 64
+        ? 0
+        : (initialCoinbaseReward * satoshisPerBitcoin) >> halvings;
   }
 
   /// 0.000011
@@ -413,34 +431,62 @@ class BitcoinScript {
 
 /// Bitcoin transaction input: https://en.bitcoin.it/wiki/Transaction
 class BitcoinTransactionInput extends TransactionInput {
+  // Amount of BTC from this input.
   @override
   int value;
 
+  /// BLOCKCHAIN API transaction index.
   int txIndex;
+
+  /// Address of sender.
   BitcoinAddressHash hash;
+
+  /// Payment script.
   BitcoinScript script;
 
+  /// Unmarshals a JSON-encoded string to [BitcoinTransactionInput].
   BitcoinTransactionInput.fromJson(Map<String, dynamic> json) {
     script = BitcoinScript.fromJson(json['script']);
     Map<String, dynamic> prevOut = json['prev_out'];
     if (prevOut != null) {
       value = int.tryParse(prevOut['value']);
       hash = BitcoinAddressHash.fromJson(prevOut['hash']);
+    } else {
+      value = btc.blockCreationReward(json['height'] ?? 0);
     }
   }
 
+  /// Unmarshals a JSON-encoded string to [BitcoinTransactionInput].
+  Map<String, dynamic> toJson() => {
+        'script': script.toJson(),
+        'prevOut': {
+          'hash': hash.toJson(),
+          'value': value,
+        },
+      };
+
   @override
   PublicAddress get address => hash;
+
+  /// Describes the sender.
+  String get fromText => isCoinbase() ? 'coinbase' : address.toJson();
+
+  /// Returns true if the transaction is a coinbase.
+  @override
+  bool isCoinbase() => hash == null;
 }
 
 /// Bitcoin transaction output.
 @JsonSerializable(includeIfNull: false)
 class BitcoinTransactionOutput extends TransactionOutput {
+  // Amount of BTC to this output.
   @override
   int value;
 
+  /// Address of recipient.
   BitcoinAddressHash hash;
 
+  /// Payment script.
   BitcoinScript script;
 
   /// Null constructor used by JSON deserializer.
@@ -459,12 +505,29 @@ class BitcoinTransactionOutput extends TransactionOutput {
 }
 
 /// A ledger transaction representation. It transfers value from one address to another.
+@JsonSerializable(includeIfNull: false)
 class BitcoinTransaction extends Transaction {
+  /// Identifier for this transaction.
   BitcoinTransactionId hash;
-  int version, size, lockTime, txIndex;
+
+  /// Currently 1.
+  @JsonKey(name: 'ver')
+  int version;
+
+  /// Serialized transaction length.
+  int size;
+
+  /// If non-zero and sequence numbers are < 0xFFFFFFFF: block height or timestamp when transaction is final.
+  @JsonKey(name: 'lock_time')
+  int lockTime;
+
+  /// BLOCKCHAIN API transaction index.
+  @JsonKey(name: 'tx_index')
+  int txIndex;
 
   /// Used by [Wallet].  Not marshaled.
   @override
+  @JsonKey(name: 'block_height')
   int height = 0;
 
   @override
@@ -479,15 +542,16 @@ class BitcoinTransaction extends Transaction {
 
   /// The [PublicAddress] this transaction transfers value to.
   @override
+  @JsonKey(name: 'out')
   List<BitcoinTransactionOutput> outputs;
 
   /// Amount of value this transaction transfers in satoshis.
   @override
-  int get amount => null;
+  int get amount => inputs.fold(0, (v, e) => v + (e.value ?? 0));
 
   /// The handling fee paid to the [PeerNetwork] for this transaction.
   @override
-  int get fee => null;
+  int get fee => amount - outputs.fold(0, (v, e) => v + (e.value ?? 0));
 
   /// Max 100 characters.
   @override
@@ -505,32 +569,12 @@ class BitcoinTransaction extends Transaction {
   BitcoinTransaction();
 
   /// Unmarshals a JSON-encoded string to [BitcoinTransaction].
-  BitcoinTransaction.fromJson(Map<String, dynamic> json) {
-    hash = BitcoinTransactionId.fromJson(json['hash']);
-    version = json['ver'];
-    size = json['size'];
-    lockTime = json['lock_time'];
-    txIndex = json['tx_index'];
-    height = json['block_height'];
-    inputs = json['inputs']
-        .map((t) => BitcoinTransactionInput.fromJson(t))
-        .toList()
-        .cast<BitcoinTransactionInput>();
-    outputs = json['out']
-        .map((t) => BitcoinTransactionOutput.fromJson(t))
-        .toList()
-        .cast<BitcoinTransactionOutput>();
-  }
+  factory BitcoinTransaction.fromJson(Map<String, dynamic> json) =>
+      _$BitcoinTransactionFromJson(json);
 
   /// Marshals [BitcoinTransaction] as a JSON-encoded string.
   @override
-  Map<String, dynamic> toJson() {
-    return null;
-  }
-
-  // The primary sender of this transaction, or 'coinbase' if no sender.
-  @override
-  String get fromText => null;
+  Map<String, dynamic> toJson() => _$BitcoinTransactionToJson(this);
 
   /// Computes an ID for this transaction.
   @override
@@ -538,9 +582,6 @@ class BitcoinTransaction extends Transaction {
 
   /// Signs this transaction.
   void sign(BitcoinPrivateKey key) {}
-
-  /// Returns true if the transaction is a coinbase.
-  bool isCoinbase() => false;
 
   /// Verify only that the transaction is properly signed.
   @override
@@ -788,6 +829,13 @@ class BitcoinBlockHeader extends BlockHeader {
   @JsonKey(name: 'n_tx')
   int transactionCount;
 
+  /// The BLOCKAIN API index of this block.
+  @JsonKey(name: 'block_index')
+  int blockIndex;
+
+  /// The BLOCKAIN API index of the previous block.
+  int prevBlockIndex;
+
   /// Default constructor used by JSON deserializer.
   BitcoinBlockHeader();
 
@@ -814,13 +862,20 @@ class BitcoinBlock extends Block {
   @override
   List<BitcoinTransaction> transactions;
 
+  /// List of indices representing the [BitcoinTransaction] in this block.
+  List<int> txIndexes;
+
   /// Unmarshals a JSON-encoded string to [BitcoinBlock].
   BitcoinBlock.fromJson(Map<String, dynamic> json) {
     header = BitcoinBlockHeader.fromJson(json);
-    transactions = json['tx']
-        .map((t) => BitcoinTransaction.fromJson(t))
-        .toList()
-        .cast<BitcoinTransaction>();
+    if (json['tx'] != null) {
+      transactions = json['tx']
+          .map((t) => BitcoinTransaction.fromJson(t))
+          .toList()
+          .cast<BitcoinTransaction>();
+    } else if (json['txIndexes'] != null) {
+      txIndexes = json['txIndexes'].cast<int>();
+    }
   }
 
   /// Marshals [BitcoinBlock] as a JSON-encoded string.
@@ -870,7 +925,7 @@ class BlockchainAPINetwork extends PeerNetwork {
 
 /// Blockchain.info implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://www.blockchain.com/api/api_websocket
-class BlockchainAPI extends PersistentWebSocketClient {
+class BlockchainAPI extends PersistentWebSocketAndHttpClient {
   /// The [BitcoinAddress] we're monitoring [BlockchainAPINetwork] for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
@@ -891,16 +946,10 @@ class BlockchainAPI extends PersistentWebSocketClient {
   @override
   num minFee;
 
-  /// HTTP client.
-  HttpClient httpClient;
-
-  /// e.g. https://blockchain.info
-  String httpAddress;
-
   /// Forward [Peer] constructor.
-  BlockchainAPI(PeerPreference spec, String webSocketAddress, this.httpClient,
-      this.httpAddress)
-      : super(spec, webSocketAddress);
+  BlockchainAPI(PeerPreference spec, String webSocketAddress,
+      HttpClient httpClient, String httpAddress)
+      : super(spec, webSocketAddress, httpClient, httpAddress);
 
   /// Network lost. Clear [tip] and [tipId].
   @override
@@ -925,17 +974,6 @@ class BlockchainAPI extends PersistentWebSocketClient {
       <String, dynamic>{
         'op': 'ping_block',
       },
-      (Map<String, dynamic> response) {
-        if (response == null) return;
-        checkEquals('block', response['op'], spec.debugPrint);
-        tipId = BitcoinBlockId.fromJson(response['x']['hash']);
-        tipHeight = response['x']['height'];
-        if (spec.debugPrint != null) {
-          spec.debugPrint('initial blockHeight=${tipHeight}');
-        }
-        setState(PeerState.ready);
-        if (tipChanged != null) tipChanged();
-      },
     );
   }
 
@@ -948,7 +986,7 @@ class BlockchainAPI extends PersistentWebSocketClient {
     /// [addressText] can be base58 or xpub.
     /// Multiple Addresses Allowed separated by "|".
     httpClient
-        .request(httpAddress + 'balance?active=$addressText')
+        .request(httpAddress + '/balance?active=$addressText')
         .then((resp) {
       Map<String, dynamic> data = jsonDecode(resp.text);
       Map<String, dynamic> addr = data == null ? null : data[addressText];
@@ -962,7 +1000,7 @@ class BlockchainAPI extends PersistentWebSocketClient {
       PublicAddress address, TransactionIterator iterator,
       {int limit = 50}) {
     return getAddressTransactions(address,
-        offset: iterator != null ? iterator.index : null, limit: limit);
+        offset: iterator != null ? iterator.index : 0, limit: limit);
   }
 
   /// Single Address
@@ -978,8 +1016,8 @@ class BlockchainAPI extends PersistentWebSocketClient {
     /// Optional limit parameter to show n transactions e.g. &limit=50 (Default: 50, Max: 50)
     /// Optional offset parameter to skip the first n transactions e.g. &offset=100 (Page 2 for limit 50)
     httpClient
-        .request(httpAddress +
-            '/rawaddr/$addressText?offset=${offset ?? 0}&limit=$limit')
+        .request(
+            httpAddress + '/rawaddr/$addressText?offset=$offset&limit=$limit')
         .then((resp) {
       Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
       var txs = data == null ? null : data['txs'];
@@ -1051,8 +1089,8 @@ class BlockchainAPI extends PersistentWebSocketClient {
     httpClient
         .request(httpAddress +
             (id != null
-                ? 'rawblock/${id.toJson()}'
-                : 'block-height/$height?format=json'))
+                ? '/rawblock/${id.toJson()}'
+                : '/block-height/$height?format=json'))
         .then(
       (resp) {
         Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
@@ -1075,7 +1113,7 @@ class BlockchainAPI extends PersistentWebSocketClient {
   @override
   Future<TransactionMessage> getTransaction(TransactionId id) {
     Completer<TransactionMessage> completer = Completer<TransactionMessage>();
-    httpClient.request(httpAddress + 'rawtx/${id.toJson()}').then(
+    httpClient.request(httpAddress + '/rawtx/${id.toJson()}').then(
       (resp) {
         Map<String, dynamic> transaction =
             resp == null ? null : jsonDecode(resp.text);
@@ -1106,7 +1144,7 @@ class BlockchainAPI extends PersistentWebSocketClient {
       case 'block':
         handleProtocol(() => handleFilterBlock(
             BitcoinBlockId.fromJson(x['hash']),
-            BitcoinBlock.fromJson(x),
+            BitcoinBlock.fromJson(renameBlockJsonFromWebSocketAPI(x)),
             false));
         break;
       case 'utx':
@@ -1121,6 +1159,17 @@ class BlockchainAPI extends PersistentWebSocketClient {
   /// Handles every new [BitcoinBlock] on the [BlockchainAPINetwork].
   /// [BitcoinBlock.transactions] is empty if no [BitcoinTransaction] match our [filterAdd()].
   void handleFilterBlock(BitcoinBlockId id, BitcoinBlock block, bool undo) {
+    if (tipId == null) {
+      tipId = id;
+      tipHeight = block.header.height;
+      if (spec.debugPrint != null) {
+        spec.debugPrint('initial blockHeight=${tipHeight}');
+      }
+      setState(PeerState.ready);
+      if (tipChanged != null) tipChanged();
+      return;
+    }
+
     if (undo) {
       if (spec.debugPrint != null) {
         spec.debugPrint('got undo!  reorg occurring.');
@@ -1155,6 +1204,14 @@ class BlockchainAPI extends PersistentWebSocketClient {
         : null;
     cb = cb ?? addressFilter[transaction.to.toJson()];
     if (cb != null) cb(transaction);*/
+  }
+
+  Map<String, dynamic> renameBlockJsonFromWebSocketAPI(
+      Map<String, dynamic> data) {
+    data['block_index'] = data['blockIndex'];
+    data['mrkl_root'] = data['mrklRoot'];
+    data['n_tx'] = data['nTx'];
+    return data;
   }
 }
 

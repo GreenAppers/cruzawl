@@ -468,13 +468,13 @@ void expectTransactionEqual(Transaction txn1, Transaction txn2) {
     expect(txn1.inputs.length, txn2.inputs.length);
     for (int i = 0; i < txn1.inputs.length; i++) {
       expect(txn1.inputs[i].value, txn2.inputs[i].value);
-      expect(txn1.inputs[i].address.toJson(), txn2.inputs[i].address.toJson());
+      expect(txn1.inputs[i].fromText, txn2.inputs[i].fromText);
     }
   }
   expect(txn1.outputs.length, txn2.outputs.length);
   for (int i = 0; i < txn1.outputs.length; i++) {
     expect(txn1.outputs[i].value, txn2.outputs[i].value);
-    expect(txn1.outputs[i].address.toJson(), txn2.outputs[i].address.toJson());
+    expect(txn1.outputs[i].toText, txn2.outputs[i].toText);
   }
   expect(txn1.amount, txn2.amount);
   expect(txn1.fee, txn2.fee);

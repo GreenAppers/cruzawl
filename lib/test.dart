@@ -62,6 +62,12 @@ class BitcoinTester extends TestRunner {
           '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b');
       expect(
           genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());
+      expect(genesis.header.transactionCount, 1);
+      expect(genesis.transactions.length, 1);
+      expect(genesis.transactions[0].inputs.length, 1);
+      expect(genesis.transactions[0].outputs.length, 1);
+      expect(genesis.transactions[0].outputs[0].value, btc.parse('50'));
+      expect(genesis.transactions[0].fee, 0);
     });
   }
 }

@@ -4,6 +4,7 @@
 import 'dart:collection';
 import 'dart:convert';
 
+import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/util.dart';
@@ -107,6 +108,24 @@ abstract class PersistentWebSocketClient extends Peer {
       (jsonResponseQueue.removeFirst())(null);
     }
   }
+}
+
+abstract class PersistentWebSocketAndHttpClient
+    extends PersistentWebSocketClient {
+  /// HTTP client.
+  HttpClient httpClient;
+
+  /// e.g. https://blockchain.info
+  String httpAddress;
+
+  PersistentWebSocketAndHttpClient(PeerPreference spec, String webSocketAddress,
+      this.httpClient, this.httpAddress)
+      : super(spec, webSocketAddress);
+
+  /// Number of outstanding requests for throttling.
+  @override
+  int get numOutstanding =>
+      httpClient.numOutstanding + jsonResponseQueue.length;
 }
 
 /// Shim [WebSocket] for testing

@@ -20,7 +20,7 @@ abstract class Currency {
   factory Currency.fromJson(String x) {
     switch (x) {
       case 'BTC':
-        return null;
+        return btc;
       case 'CRUZ':
         return cruz;
       case 'ETH':
@@ -30,8 +30,14 @@ abstract class Currency {
     }
   }
 
-  /// Name of the currency. e.g. CRUZ.
+  /// Ticker for the currency. e.g. CRUZ.
   String get ticker;
+
+  /// Name of the currency. e.g. cruzbit.
+  String get name;
+
+  /// URL for the currency.
+  String get url;
 
   /// Coin ID for HD wallets. e.g. 831.
   /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
@@ -59,7 +65,10 @@ abstract class Currency {
       DateTime.fromMillisecondsSinceEpoch(time * 1000);
 
   /// Returns number of coins issued at [height].
-  int supply(int height) => 0;
+  int supply(int height) => null;
+
+  /// Returns the expected block reward for the given [height].
+  int blockCreationReward(int height) => null;
 
   /// Suggests a fee for [transaction].
   String suggestedFee(Transaction transaction) => null;
@@ -119,6 +128,8 @@ class LoadingCurrency extends Currency {
   const LoadingCurrency();
 
   String get ticker => 'CRUZ';
+  String get name => 'cruzbit';
+  String get url => null;
   int get bip44CoinType => 0;
   int get coinbaseMaturity => 0;
   PublicAddress get nullAddress => null;
@@ -262,14 +273,31 @@ abstract class TransactionId {
   String toJson();
 }
 
+/// Interface representing the sender of currency.
 abstract class TransactionInput {
+  // Amount of currency from this input.
   int get value;
+
+  /// Address of sender.
   PublicAddress get address;
+
+  /// Describes the sender.
+  String get fromText;
+
+  /// Returns true if this [TransactionInput] rewards mining.
+  bool isCoinbase();
 }
 
+/// Interface representing the recipient of currency.
 abstract class TransactionOutput {
+  // Amount of currency to this output.
   int get value;
+
+  /// Address of recipient.
   PublicAddress get address;
+
+  /// Describes the recipient.
+  String get toText => address.toJson();
 }
 
 /// Interface for a transaction transfering value between parties.
@@ -311,9 +339,6 @@ abstract class Transaction {
   /// Computes an ID for this transaction.
   TransactionId id();
 
-  /// Returns true if this transaction rewards mining.
-  bool isCoinbase();
-
   /// Returns true if the transaction cannot be mined at the given height
   bool isExpired(int height) => (expires ?? 0) == 0 ? false : expires < height;
 
@@ -321,7 +346,11 @@ abstract class Transaction {
   bool verify();
 
   /// Block height after which this transaction can be spent.
-  int get maturity => max(matures ?? 0, inputs != null ? 0 : height + 100);
+  int get maturity => max(matures ?? 0, isCoinbase() ? height + 100 : 0);
+
+  /// Returns true if this transaction rewards mining.
+  bool isCoinbase() =>
+      inputs == null || (inputs.length == 1 && inputs[0].isCoinbase());
 
   /// Sorts by [time] and tie-break so only equivalent [Transaction] compare equal.
   static int timeCompare(Transaction a, Transaction b) {

@@ -47,6 +47,14 @@ class CRUZ extends Currency {
   @override
   String get ticker => 'CRUZ';
 
+  /// Official name.
+  @override
+  String get name => 'cruzbit';
+
+  /// Official homepage.
+  @override
+  String get url => 'https://cruzb.it/';
+
   /// The coin type used for HD wallets.
   /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
   @override
@@ -70,6 +78,7 @@ class CRUZ extends Currency {
   }
 
   /// Returns number of CRUZ issued at [height].
+  @override
   int supply(int blocks) {
     int supply = 0, reward = initialCoinbaseReward * cruzbitsPerCruz;
     while (blocks > 0) {
@@ -83,6 +92,15 @@ class CRUZ extends Currency {
       }
     }
     return supply ~/ cruzbitsPerCruz;
+  }
+
+  /// Computes the expected block reward for the given [height].
+  @override
+  int blockCreationReward(int height) {
+    int halvings = height ~/ blocksUntilRewardHalving;
+    return halvings >= 64
+        ? 0
+        : (initialCoinbaseReward * cruzbitsPerCruz) >> halvings;
   }
 
   /// 0.01
@@ -335,6 +353,15 @@ class CruzTransactionInput extends TransactionInput {
   int value;
 
   CruzTransactionInput(this.address, this.value);
+
+  // The base64-encoded sender of this transaction, or 'cruzbase' if no sender.
+  @override
+  String get fromText => isCoinbase() ? 'cruzbase' : address.toJson();
+
+  /// Returns true if the transaction is a coinbase. A coinbase is the first
+  /// transaction in every block used to reward the miner for mining the block.
+  @override
+  bool isCoinbase() => address == null;
 }
 
 /// Shim [TransactionOutput] for CRUZ which has only a single input and output.
@@ -403,7 +430,7 @@ class CruzTransaction extends Transaction {
 
   @override
   List<CruzTransactionInput> get inputs =>
-      from == null ? null : [CruzTransactionInput(from, amount + fee)];
+      [CruzTransactionInput(from, amount + (fee ?? 0))];
 
   @override
   List<CruzTransactionOutput> get outputs =>
@@ -415,7 +442,7 @@ class CruzTransaction extends Transaction {
       : time = DateTime.now().millisecondsSinceEpoch ~/ 1000,
         nonce = Random.secure().nextInt(2147483647) {
     if (series == null) {
-      series = computeTransactionSeries(isCoinbase(), seriesForHeight);
+      series = computeTransactionSeries(from == null, seriesForHeight);
     }
     if (memo != null && memo.isEmpty) memo = null;
   }
@@ -449,10 +476,6 @@ class CruzTransaction extends Transaction {
       ? _$CruzTransactionToJson(this)
       : _$CruzTransactionToJson(CruzTransaction.withoutSignature(this));
 
-  // The base64-encoded sender of this transaction, or 'cruzbase' if no sender.
-  @override
-  String get fromText => isCoinbase() ? 'cruzbase' : from.toJson();
-
   /// Computes an ID for this transaction.
   @override
   CruzTransactionId id() =>
@@ -464,10 +487,6 @@ class CruzTransaction extends Transaction {
           .sign(id().data)
           .buffer
           .asUint8List(0, 64));
-
-  /// Returns true if the transaction is a coinbase. A coinbase is the first
-  /// transaction in every block used to reward the miner for mining the block.
-  bool isCoinbase() => from == null;
 
   /// Verify only that the transaction is properly signed.
   @override

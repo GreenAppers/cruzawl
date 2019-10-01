@@ -64,7 +64,8 @@ void main() {
     expect(currency.ticker, cruz.ticker);
     expect(currency.parse('33'), 33);
     expect(currency.parseTime(43), DateTime.fromMillisecondsSinceEpoch(43000));
-    expect(currency.supply(53), 0);
+    expect(currency.supply(53), null);
+    expect(currency.blockCreationReward(63), null);
     expect(currency.bip44CoinType, 0);
     expect(currency.coinbaseMaturity, 0);
     expect(currency.nullAddress, null);

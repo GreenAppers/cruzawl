@@ -34,6 +34,48 @@ Map<String, dynamic> _$BitcoinTransactionOutputToJson(
   return val;
 }
 
+BitcoinTransaction _$BitcoinTransactionFromJson(Map<String, dynamic> json) {
+  return BitcoinTransaction()
+    ..hash = json['hash'] == null
+        ? null
+        : BitcoinTransactionId.fromJson(json['hash'] as String)
+    ..version = json['ver'] as int
+    ..size = json['size'] as int
+    ..lockTime = json['lock_time'] as int
+    ..txIndex = json['tx_index'] as int
+    ..height = json['block_height'] as int
+    ..inputs = (json['inputs'] as List)
+        ?.map((e) => e == null
+            ? null
+            : BitcoinTransactionInput.fromJson(e as Map<String, dynamic>))
+        ?.toList()
+    ..outputs = (json['out'] as List)
+        ?.map((e) => e == null
+            ? null
+            : BitcoinTransactionOutput.fromJson(e as Map<String, dynamic>))
+        ?.toList();
+}
+
+Map<String, dynamic> _$BitcoinTransactionToJson(BitcoinTransaction instance) {
+  final val = <String, dynamic>{};
+
+  void writeNotNull(String key, dynamic value) {
+    if (value != null) {
+      val[key] = value;
+    }
+  }
+
+  writeNotNull('hash', instance.hash);
+  writeNotNull('ver', instance.version);
+  writeNotNull('size', instance.size);
+  writeNotNull('lock_time', instance.lockTime);
+  writeNotNull('tx_index', instance.txIndex);
+  writeNotNull('block_height', instance.height);
+  writeNotNull('inputs', instance.inputs);
+  writeNotNull('out', instance.outputs);
+  return val;
+}
+
 BitcoinAddress _$BitcoinAddressFromJson(Map<String, dynamic> json) {
   return BitcoinAddress(
     json['publicKey'] == null
@@ -155,7 +197,9 @@ BitcoinBlockHeader _$BitcoinBlockHeaderFromJson(Map<String, dynamic> json) {
     ..bits = json['bits'] as int
     ..nonce = json['nonce'] as int
     ..height = json['height'] as int
-    ..transactionCount = json['n_tx'] as int;
+    ..transactionCount = json['n_tx'] as int
+    ..blockIndex = json['block_index'] as int
+    ..prevBlockIndex = json['prevBlockIndex'] as int;
 }
 
 Map<String, dynamic> _$BitcoinBlockHeaderToJson(BitcoinBlockHeader instance) {
@@ -175,5 +219,7 @@ Map<String, dynamic> _$BitcoinBlockHeaderToJson(BitcoinBlockHeader instance) {
   writeNotNull('nonce', instance.nonce);
   writeNotNull('height', instance.height);
   writeNotNull('n_tx', instance.transactionCount);
+  writeNotNull('block_index', instance.blockIndex);
+  writeNotNull('prevBlockIndex', instance.prevBlockIndex);
   return val;
 }

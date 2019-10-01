@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:json_annotation/json_annotation.dart';
 import "package:pointycastle/digests/sha256.dart";
 
+import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/sembast.dart';
 import 'package:cruzawl/util.dart';
 
@@ -32,6 +33,15 @@ class CruzawlPreferences {
 
   String get theme => storage.getPreference('theme') ?? 'blue';
   Future<void> setTheme(String value) => storage.setPreference('theme', value);
+
+  Map<String, String> get themes => (storage.getPreference('themes') ??
+          {'BTC': 'deepOrange', 'CRUZ': 'blue', 'ETH': 'blueGrey'})
+      .cast<String, String>();
+  Future<void> setThemes(Map<String, String> value) =>
+      storage.setPreference('themes', value);
+
+  String getThemeName(Currency currency) =>
+      currency == null ? theme : themes[currency.ticker];
 
   String get localCurrency =>
       storage.getPreference('localCurrency') ?? defaultLocalCurrency();

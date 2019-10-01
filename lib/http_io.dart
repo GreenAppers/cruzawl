@@ -13,12 +13,15 @@ class HttpClientImpl extends HttpClient {
   static const String type = 'io';
   io.HttpClient client = io.HttpClient();
 
-  HttpClientImpl({StringFilter userAgent}) {
+  HttpClientImpl({StringCallback debugPrint, StringFilter userAgent})
+      : super(debugPrint) {
     if (userAgent != null) client.userAgent = userAgent(client.userAgent);
   }
 
   @override
   Future<HttpResponse> request(String url, {String method, String data}) async {
+    numOutstanding++;
+
     Uri uri = Uri.parse(url);
     var request;
     switch (method) {
@@ -31,6 +34,7 @@ class HttpClientImpl extends HttpClient {
         break;
     }
 
+    if (debugPrint != null) debugPrint('HTTP Request: ${request.uri}');
     var response = await request.close();
     HttpResponse ret = HttpResponse(response.statusCode);
     await for (var contents in response.transform(Utf8Decoder())) {
@@ -41,6 +45,9 @@ class HttpClientImpl extends HttpClient {
       }
     }
 
+    if (debugPrint != null)
+      debugPrint('HTTP Response=${ret.status}: ${ret.text}');
+    numOutstanding--;
     return ret;
   }
 }

@@ -9,12 +9,17 @@ import 'package:cruzawl/http.dart';
 /// dart:html [HttpClient] implementation.
 class HttpClientImpl extends HttpClient {
   static const String type = 'html';
+  HttpClientImpl({StringCallback debugPrint, StringFilter userAgent})
+      : super(debugPrint) {}
 
   @override
   Future<HttpResponse> request(String url, {String method, String data}) {
+    numOutstanding++;
     Completer<HttpResponse> completer = Completer<HttpResponse>();
-    html.HttpRequest.request(url, method: method).then(
-        (r) => completer.complete(HttpResponse(r.status, r.responseText)));
+    html.HttpRequest.request(url, method: method).then((r) {
+      numOutstanding--;
+      completer.complete(HttpResponse(r.status, r.responseText));
+    });
     return completer.future;
   }
 }

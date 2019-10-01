@@ -4,7 +4,9 @@
 import 'dart:async';
 import 'dart:collection';
 
-export 'http_html.dart' if (dart.library.io) 'http_io.dart';
+export 'package:cruzawl/http_html.dart'
+    if (dart.library.io) 'package:cruzawl/http_io.dart';
+import 'package:cruzawl/util.dart';
 
 /// HTTP response itegrating [io.HttpClient] and [html.HttpRequest].
 class HttpResponse {
@@ -15,6 +17,10 @@ class HttpResponse {
 
 /// HTTP client itegrating [io.HttpClient] and [html.HttpRequest].
 abstract class HttpClient {
+  int numOutstanding = 0;
+  StringCallback debugPrint;
+  HttpClient([this.debugPrint]);
+
   Future<HttpResponse> request(String url, {String method, String data});
 }
 
