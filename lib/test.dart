@@ -4,12 +4,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:bs58check/bs58check.dart' as bs58check;
 import 'package:convert/convert.dart';
 
 import 'package:cruzawl/btc.dart' hide genesisBlockJson;
 import 'package:cruzawl/currency.dart';
-import 'package:cruzawl/cruz.dart' as cruzImpl show genesisBlockJson;
+import 'package:cruzawl/cruz.dart' as cruz_impl show genesisBlockJson;
 import 'package:cruzawl/cruz.dart' hide genesisBlockJson;
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/wallet.dart';
@@ -66,6 +65,10 @@ class BitcoinTester extends TestRunner {
       expect(genesis.transactions.length, 1);
       expect(genesis.transactions[0].inputs.length, 1);
       expect(genesis.transactions[0].outputs.length, 1);
+      expect(genesis.transactions[0].inputs[0].isCoinbase, true);
+      expect(genesis.transactions[0].inputs[0].fromText, 'coinbase');
+      expect(genesis.transactions[0].outputs[0].toText,
+          '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa');
       expect(genesis.transactions[0].outputs[0].value, btc.parse('50'));
       expect(genesis.transactions[0].fee, 0);
     });
@@ -223,7 +226,7 @@ class CruzTester extends TestRunner {
     test('Test Genesis', () {
       CruzBlock genesis = cruz.genesisBlock();
       expect(jsonEncode(genesis),
-          jsonEncode(jsonDecode(cruzImpl.genesisBlockJson)));
+          jsonEncode(jsonDecode(cruz_impl.genesisBlockJson)));
       expect(
           genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());
 

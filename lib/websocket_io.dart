@@ -48,7 +48,7 @@ class WebSocketImpl extends WebSocket {
       ws = io.WebSocket.fromUpgradedSocket(await response.detachSocket(),
           serverSide: false);
       onConnected(ws);
-    } on Exception catch (error) {
+    } catch (error) {
       onError(error);
     }
   }

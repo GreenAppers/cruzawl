@@ -5,12 +5,13 @@ import 'dart:async';
 import 'dart:html' as html;
 
 import 'package:cruzawl/http.dart';
+import 'package:cruzawl/util.dart';
 
 /// dart:html [HttpClient] implementation.
 class HttpClientImpl extends HttpClient {
   static const String type = 'html';
   HttpClientImpl({StringCallback debugPrint, StringFilter userAgent})
-      : super(debugPrint) {}
+      : super(debugPrint);
 
   @override
   Future<HttpResponse> request(String url, {String method, String data}) {

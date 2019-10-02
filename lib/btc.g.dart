@@ -10,9 +10,9 @@ BitcoinTransactionOutput _$BitcoinTransactionOutputFromJson(
     Map<String, dynamic> json) {
   return BitcoinTransactionOutput()
     ..value = json['value'] as int
-    ..hash = json['hash'] == null
+    ..address = json['addr'] == null
         ? null
-        : BitcoinAddressHash.fromJson(json['hash'] as String)
+        : BitcoinAddressHash.fromJson(json['addr'] as String)
     ..script = json['script'] == null
         ? null
         : BitcoinScript.fromJson(json['script'] as String);
@@ -29,7 +29,7 @@ Map<String, dynamic> _$BitcoinTransactionOutputToJson(
   }
 
   writeNotNull('value', instance.value);
-  writeNotNull('hash', instance.hash);
+  writeNotNull('addr', instance.address);
   writeNotNull('script', instance.script);
   return val;
 }
@@ -41,6 +41,7 @@ BitcoinTransaction _$BitcoinTransactionFromJson(Map<String, dynamic> json) {
         : BitcoinTransactionId.fromJson(json['hash'] as String)
     ..version = json['ver'] as int
     ..size = json['size'] as int
+    ..time = json['time'] as int
     ..lockTime = json['lock_time'] as int
     ..txIndex = json['tx_index'] as int
     ..height = json['block_height'] as int
@@ -68,6 +69,7 @@ Map<String, dynamic> _$BitcoinTransactionToJson(BitcoinTransaction instance) {
   writeNotNull('hash', instance.hash);
   writeNotNull('ver', instance.version);
   writeNotNull('size', instance.size);
+  writeNotNull('time', instance.time);
   writeNotNull('lock_time', instance.lockTime);
   writeNotNull('tx_index', instance.txIndex);
   writeNotNull('block_height', instance.height);

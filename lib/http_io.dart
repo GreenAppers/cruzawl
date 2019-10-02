@@ -45,8 +45,9 @@ class HttpClientImpl extends HttpClient {
       }
     }
 
-    if (debugPrint != null)
+    if (debugPrint != null) {
       debugPrint('HTTP Response=${ret.status}: ${ret.text}');
+    }
     numOutstanding--;
     return ret;
   }

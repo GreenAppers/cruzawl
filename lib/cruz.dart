@@ -170,7 +170,7 @@ class CRUZ extends Currency {
       Uint8List data = base64.decode(text);
       if (data.length != CruzPublicKey.size) return null;
       return CruzPublicKey(data);
-    } on Exception {
+    } catch (_) {
       return null;
     }
   }
@@ -180,7 +180,7 @@ class CRUZ extends Currency {
   CruzPrivateKey fromPrivateKeyJson(String text) {
     try {
       return CruzPrivateKey.fromJson(text);
-    } on Exception {
+    } catch (_) {
       return null;
     }
   }
@@ -194,7 +194,7 @@ class CRUZ extends Currency {
       } else {
         return CruzBlockId.fromJson(text);
       }
-    } on Exception {
+    } catch (_) {
       return null;
     }
   }
@@ -208,7 +208,7 @@ class CRUZ extends Currency {
       } else {
         return CruzTransactionId.fromJson(text);
       }
-    } on Exception {
+    } catch (_) {
       return null;
     }
   }
@@ -356,12 +356,12 @@ class CruzTransactionInput extends TransactionInput {
 
   // The base64-encoded sender of this transaction, or 'cruzbase' if no sender.
   @override
-  String get fromText => isCoinbase() ? 'cruzbase' : address.toJson();
+  String get fromText => isCoinbase ? 'cruzbase' : address.toJson();
 
   /// Returns true if the transaction is a coinbase. A coinbase is the first
   /// transaction in every block used to reward the miner for mining the block.
   @override
-  bool isCoinbase() => address == null;
+  bool get isCoinbase => address == null;
 }
 
 /// Shim [TransactionOutput] for CRUZ which has only a single input and output.
@@ -391,11 +391,9 @@ class CruzTransaction extends Transaction {
   int nonce;
 
   /// Public key this transaction transfers value from.
-  @override
   CruzPublicKey from;
 
   /// Public key this transaction transfers value to.
-  @override
   CruzPublicKey to;
 
   /// Amount of value this transaction transfers in cruzbits.
@@ -427,6 +425,13 @@ class CruzTransaction extends Transaction {
   /// Used by [Wallet].  Not marshaled.
   @JsonKey(ignore: true)
   int height = 0;
+
+  @override
+  bool get isCoinbase => from == null;
+
+  @override
+  @JsonKey(ignore: true)
+  CruzTransactionId hash;
 
   @override
   List<CruzTransactionInput> get inputs =>

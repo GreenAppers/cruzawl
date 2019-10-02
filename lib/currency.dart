@@ -285,7 +285,7 @@ abstract class TransactionInput {
   String get fromText;
 
   /// Returns true if this [TransactionInput] rewards mining.
-  bool isCoinbase();
+  bool get isCoinbase;
 }
 
 /// Interface representing the recipient of currency.
@@ -297,7 +297,7 @@ abstract class TransactionOutput {
   PublicAddress get address;
 
   /// Describes the recipient.
-  String get toText => address.toJson();
+  String get toText => address == null ? null : address.toJson();
 }
 
 /// Interface for a transaction transfering value between parties.
@@ -333,6 +333,15 @@ abstract class Transaction {
   /// Optional height expiry for including this transaction.
   int get expires;
 
+  /// Cached [TransactionId] matching [Transaction.id()].
+  TransactionId get hash;
+
+  /// Block height after which this transaction can be spent.
+  int get maturity => max(matures ?? 0, isCoinbase ? height + 100 : 0);
+
+  /// Returns true if this transaction rewards mining.
+  bool get isCoinbase;
+
   /// Marshals this transaction as a JSON-encoded string.
   Map<String, dynamic> toJson();
 
@@ -345,12 +354,13 @@ abstract class Transaction {
   /// Verifies this transaction's signature.
   bool verify();
 
-  /// Block height after which this transaction can be spent.
-  int get maturity => max(matures ?? 0, isCoinbase() ? height + 100 : 0);
+  /// Returns true if [x] is in [inputs].
+  bool containsInputText(String x) =>
+      inputs.where((e) => e.fromText == x).isNotEmpty;
 
-  /// Returns true if this transaction rewards mining.
-  bool isCoinbase() =>
-      inputs == null || (inputs.length == 1 && inputs[0].isCoinbase());
+  /// Returns true if [x] is in [outputs].
+  bool containsOutputText(String x) =>
+      outputs.where((e) => e.toText == x).isNotEmpty;
 
   /// Sorts by [time] and tie-break so only equivalent [Transaction] compare equal.
   static int timeCompare(Transaction a, Transaction b) {
@@ -413,8 +423,10 @@ abstract class BlockHeader {
 
   /// Expected number of random hashes before mining this block.
   BigInt blockWork() {
+    BlockId blockTarget = target;
+    if (blockTarget == null) return null;
     BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0] = 1);
-    return twoTo256 ~/ (target.toBigInt() + BigInt.from(1));
+    return twoTo256 ~/ (blockTarget.toBigInt() + BigInt.from(1));
   }
 
   /// Difference in work between [x] and this block.

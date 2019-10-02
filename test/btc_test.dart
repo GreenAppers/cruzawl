@@ -1,8 +1,6 @@
 // Copyright 2019 cruzawl developers
 // Use of this source code is governed by a MIT-style license that can be found in the LICENSE file.
 
-import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:convert/convert.dart';
@@ -10,8 +8,6 @@ import 'package:test/test.dart';
 
 import 'package:cruzawl/btc.dart';
 import 'package:cruzawl/currency.dart';
-import 'package:cruzawl/preferences.dart';
-import 'package:cruzawl/network.dart';
 import 'package:cruzawl/test.dart';
 
 void main() {

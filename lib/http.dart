@@ -3,6 +3,9 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
+
+import 'package:http/http.dart';
 
 export 'package:cruzawl/http_html.dart'
     if (dart.library.io) 'package:cruzawl/http_io.dart';
@@ -22,6 +25,19 @@ abstract class HttpClient {
   HttpClient([this.debugPrint]);
 
   Future<HttpResponse> request(String url, {String method, String data});
+
+  void requestWithIncrementalHandler(String url,
+      {String method, String data}) async {
+    var request = Request(method ?? 'GET', Uri.parse(url));
+    var response = await request.send();
+    var lineStream =
+        response.stream.transform(Utf8Decoder()).transform(LineSplitter());
+
+    /// https://github.com/llamadonica/dart-json-stream-parser/tree/master/test
+    await for (String line in lineStream) {
+      print(line);
+    }
+  }
 }
 
 /// Asynchronous HTTP request

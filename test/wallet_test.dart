@@ -12,7 +12,6 @@ import 'package:cruzawl/cruz.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sembast.dart';
-import 'package:cruzawl/test.dart';
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/websocket.dart';
 import 'package:cruzawl/wallet.dart';

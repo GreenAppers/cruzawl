@@ -27,7 +27,7 @@ class WebSocketImpl extends WebSocket {
       ws = html.WebSocket(address);
       ws.onOpen.listen(this.onConnected);
       connectErrorSubscription = ws.onError.listen(onError);
-    } on Exception catch (error) {
+    } catch (error) {
       onError(error, null);
     }
   }

@@ -3,7 +3,6 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:bip32/bip32.dart' as bip32;
@@ -170,7 +169,7 @@ class BTC extends Currency {
   PublicAddress fromPublicAddressJson(String text) {
     try {
       return BitcoinAddressHash.fromJson(text);
-    } on Exception {
+    } catch (_) {
       return null;
     }
   }
@@ -180,7 +179,7 @@ class BTC extends Currency {
   BitcoinPublicKey fromPublicKeyJson(String text) {
     try {
       return BitcoinPublicKey.fromJson(text);
-    } on Exception {
+    } catch (_) {
       return null;
     }
   }
@@ -190,7 +189,7 @@ class BTC extends Currency {
   BitcoinPrivateKey fromPrivateKeyJson(String text) {
     try {
       return BitcoinPrivateKey.fromJson(text);
-    } on Exception {
+    } catch (_) {
       return null;
     }
   }
@@ -199,11 +198,12 @@ class BTC extends Currency {
   @override
   BitcoinBlockId fromBlockIdJson(String text, [bool pad = false]) {
     try {
-      if (pad)
+      if (pad) {
         return BitcoinBlockId.fromString(text);
-      else
+      } else {
         return BitcoinBlockId.fromJson(text);
-    } on Exception {
+      }
+    } catch (_) {
       return null;
     }
   }
@@ -212,11 +212,12 @@ class BTC extends Currency {
   @override
   BitcoinTransactionId fromTransactionIdJson(String text, [bool pad = false]) {
     try {
-      if (pad)
+      if (pad) {
         return BitcoinTransactionId.fromString(text);
-      else
+      } else {
         return BitcoinTransactionId.fromJson(text);
-    } on Exception {
+      }
+    } catch (_) {
       return null;
     }
   }
@@ -233,8 +234,8 @@ class BTC extends Currency {
       {int matures, int expires}) {
     if (!(fromInput is BitcoinAddress)) throw FormatException();
     if (!(toInput is BitcoinPublicKey)) throw FormatException();
-    BitcoinAddress from = fromInput;
-    BitcoinPublicKey to = toInput;
+    //BitcoinAddress from = fromInput;
+    //BitcoinPublicKey to = toInput;
     return null;
   }
 
@@ -288,7 +289,14 @@ class BitcoinAddressHash extends PublicAddress {
       : this.fromExtendedIdentifier(Uint8List.fromList([version] + input.data));
 
   /// Unmarshals a base58-encoded string to [BitcoinPublicKey].
-  BitcoinAddressHash.fromJson(String x) : this(bs58check.base58.decode(x));
+  factory BitcoinAddressHash.fromJson(String x) {
+    try {
+      Uint8List ret = bs58check.base58.decode(x);
+      return BitcoinAddressHash(ret);
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Marshals [BitcoinPublicKey] as a base58-encoded string.
   @override
@@ -425,12 +433,15 @@ class BitcoinScript {
   BitcoinScript.fromJson(String x) : this(hex.decode(x));
 
   /// Marshals [BitcoinScript] as a hex-encoded string.
-  @override
   String toJson() => hex.encode(data);
 }
 
 /// Bitcoin transaction input: https://en.bitcoin.it/wiki/Transaction
 class BitcoinTransactionInput extends TransactionInput {
+  /// True if the transaction is a coinbase.
+  @override
+  bool isCoinbase = false;
+
   // Amount of BTC from this input.
   @override
   int value;
@@ -439,7 +450,13 @@ class BitcoinTransactionInput extends TransactionInput {
   int txIndex;
 
   /// Address of sender.
-  BitcoinAddressHash hash;
+  @override
+  BitcoinAddressHash address;
+
+  /// Describes the sender.
+  @override
+  String get fromText =>
+      isCoinbase ? 'coinbase' : (address == null ? null : address.toJson());
 
   /// Payment script.
   BitcoinScript script;
@@ -449,10 +466,17 @@ class BitcoinTransactionInput extends TransactionInput {
     script = BitcoinScript.fromJson(json['script']);
     Map<String, dynamic> prevOut = json['prev_out'];
     if (prevOut != null) {
-      value = int.tryParse(prevOut['value']);
-      hash = BitcoinAddressHash.fromJson(prevOut['hash']);
+      value = prevOut['value'];
+      String addrText = prevOut['addr'], hashText = prevOut['hash'];
+      if (addrText != null) {
+        address = BitcoinAddressHash.fromJson(addrText);
+      } else if (hashText != null) {
+        address = BitcoinAddressHash(hex.decode(hashText));
+      }
     } else {
-      value = btc.blockCreationReward(json['height'] ?? 0);
+      isCoinbase = true;
+      int height = json['height'];
+      value = height == null ? 0 : btc.blockCreationReward(height);
     }
   }
 
@@ -460,20 +484,10 @@ class BitcoinTransactionInput extends TransactionInput {
   Map<String, dynamic> toJson() => {
         'script': script.toJson(),
         'prevOut': {
-          'hash': hash.toJson(),
+          'hash': hex.encode(address.data),
           'value': value,
         },
       };
-
-  @override
-  PublicAddress get address => hash;
-
-  /// Describes the sender.
-  String get fromText => isCoinbase() ? 'coinbase' : address.toJson();
-
-  /// Returns true if the transaction is a coinbase.
-  @override
-  bool isCoinbase() => hash == null;
 }
 
 /// Bitcoin transaction output.
@@ -484,7 +498,9 @@ class BitcoinTransactionOutput extends TransactionOutput {
   int value;
 
   /// Address of recipient.
-  BitcoinAddressHash hash;
+  @override
+  @JsonKey(name: 'addr')
+  BitcoinAddressHash address;
 
   /// Payment script.
   BitcoinScript script;
@@ -497,17 +513,14 @@ class BitcoinTransactionOutput extends TransactionOutput {
       _$BitcoinTransactionOutputFromJson(json);
 
   /// Marshals [BitcoinTransactionOutput] as a JSON-encoded string.
-  @override
   Map<String, dynamic> toJson() => _$BitcoinTransactionOutputToJson(this);
-
-  @override
-  PublicAddress get address => hash;
 }
 
 /// A ledger transaction representation. It transfers value from one address to another.
 @JsonSerializable(includeIfNull: false)
 class BitcoinTransaction extends Transaction {
   /// Identifier for this transaction.
+  @override
   BitcoinTransactionId hash;
 
   /// Currently 1.
@@ -517,6 +530,9 @@ class BitcoinTransaction extends Transaction {
   /// Serialized transaction length.
   int size;
 
+  /// Unix time.
+  int time;
+
   /// If non-zero and sequence numbers are < 0xFFFFFFFF: block height or timestamp when transaction is final.
   @JsonKey(name: 'lock_time')
   int lockTime;
@@ -525,16 +541,20 @@ class BitcoinTransaction extends Transaction {
   @JsonKey(name: 'tx_index')
   int txIndex;
 
-  /// Used by [Wallet].  Not marshaled.
+  /// Used by [Wallet].
   @override
   @JsonKey(name: 'block_height')
   int height = 0;
 
   @override
-  DateTime get dateTime => null;
+  DateTime get dateTime =>
+      DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toLocal();
 
   @override
   int get nonce => null;
+
+  @override
+  bool get isCoinbase => inputs.length == 1 && inputs[0].isCoinbase;
 
   /// The [PublicAddress] this transaction transfers value from.
   @override
@@ -547,11 +567,12 @@ class BitcoinTransaction extends Transaction {
 
   /// Amount of value this transaction transfers in satoshis.
   @override
-  int get amount => inputs.fold(0, (v, e) => v + (e.value ?? 0));
+  int get amount => outputs.fold(0, (v, e) => v + (e.value ?? 0));
 
   /// The handling fee paid to the [PeerNetwork] for this transaction.
   @override
-  int get fee => amount - outputs.fold(0, (v, e) => v + (e.value ?? 0));
+  int get fee =>
+      isCoinbase ? 0 : inputs.fold(0, (v, e) => v + (e.value ?? 0)) - amount;
 
   /// Max 100 characters.
   @override
@@ -578,7 +599,7 @@ class BitcoinTransaction extends Transaction {
 
   /// Computes an ID for this transaction.
   @override
-  BitcoinTransactionId id() => null;
+  BitcoinTransactionId id() => hash;
 
   /// Signs this transaction.
   void sign(BitcoinPrivateKey key) {}
@@ -796,12 +817,15 @@ class BitcoinBlockHeader extends BlockHeader {
 
   @override
   @JsonKey(ignore: true)
-  DateTime get dateTime => DateTime.fromMillisecondsSinceEpoch(time * 1000);
+  DateTime get dateTime =>
+      DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toLocal();
 
   /// Threshold new [BitcoinBlock] must hash under for Proof of Work.
   @override
   @JsonKey(ignore: true)
   BlockId get target {
+    if (bits == null) return null;
+
     /// https://github.com/bitcoin/bitcoin/blob/master/src/arith_uint256.cpp#L205
     int nSize = bits >> 24, nWord = bits & 0x007fffff;
     if (nSize <= 3) {
@@ -814,7 +838,7 @@ class BitcoinBlockHeader extends BlockHeader {
 
   /// Total cumulative chain work.
   @JsonKey(ignore: true)
-  BitcoinBlockId chainWork;
+  BitcoinBlockId get chainWork => null;
 
   /// Parameter varied by miners for Proof of Work.
   @override
@@ -949,7 +973,9 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
   /// Forward [Peer] constructor.
   BlockchainAPI(PeerPreference spec, String webSocketAddress,
       HttpClient httpClient, String httpAddress)
-      : super(spec, webSocketAddress, httpClient, httpAddress);
+      : super(spec, webSocketAddress, httpClient, httpAddress) {
+    maxOutstanding = 10;
+  }
 
   /// Network lost. Clear [tip] and [tipId].
   @override
@@ -1029,7 +1055,9 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
 
       TransactionIteratorResults ret =
           TransactionIteratorResults(0, offset + limit, List<Transaction>());
-      for (var t in txs) ret.transactions.add(BitcoinTransaction.fromJson(t));
+      for (var t in txs) {
+        ret.transactions.add(BitcoinTransaction.fromJson(t));
+      }
 
       completer.complete(ret);
     });
@@ -1081,6 +1109,30 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
     return null;
   }
 
+  /// Blocks for one day: https://blockchain.info/blocks/$time_in_milliseconds?format=json
+  Future<List<BitcoinBlockHeader>> getBlockHeaders(DateTime time) {
+    Completer<List<BitcoinBlockHeader>> completer =
+        Completer<List<BitcoinBlockHeader>>();
+    httpClient
+        .request(httpAddress +
+            '/blocks/${time.toUtc().millisecondsSinceEpoch}?format=json')
+        .then(
+      (resp) {
+        Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
+        var blocks = data == null ? null : data['blocks'];
+        if (blocks == null) {
+          completer.complete(null);
+          return;
+        }
+        completer.complete(blocks
+            .map((h) => BitcoinBlockHeader.fromJson(h))
+            .toList()
+            .cast<BitcoinBlockHeader>());
+      },
+    );
+    return completer.future;
+  }
+
   /// Single Block
   /// You can also request the block to return in binary form (Hex encoded) using ?format=hex
   @override
@@ -1096,7 +1148,6 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
         Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
         var blocks = data == null ? null : data['blocks'];
         var block = blocks == null ? null : blocks.first;
-
         if (block == null) {
           completer.complete(null);
           return;
@@ -1105,6 +1156,18 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
             block != null ? BitcoinBlock.fromJson(block) : null));
       },
     );
+    return completer.future;
+  }
+
+  /// Estimated network hash rate.
+  Future<int> getHashRate({BlockId id, int height}) {
+    Completer<int> completer = Completer<int>();
+    httpClient.request(httpAddress + '/q/hashrate?format=json').then((resp) {
+      int rate = jsonDecode(resp.text);
+      completer.complete(rate == null
+          ? null
+          : (BigInt.from(rate) * BigInt.from(1000000000)).toInt());
+    });
     return completer.future;
   }
 
@@ -1126,7 +1189,6 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
             transaction != null
                 ? BitcoinTransaction.fromJson(transaction)
                 : null);
-        //if (ret.transaction != null) ret.transaction.height = body['height'];
         completer.complete(ret);
       },
     );
