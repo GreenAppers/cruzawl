@@ -383,7 +383,6 @@ class CruzTransaction extends Transaction {
   int time;
 
   @override
-  @JsonKey(ignore: true)
   DateTime get dateTime => DateTime.fromMillisecondsSinceEpoch(time * 1000);
 
   /// Collision prevention. Pseudorandom. Not used for crypto.
@@ -657,7 +656,6 @@ class CruzBlockHeader extends BlockHeader {
   int time;
 
   @override
-  @JsonKey(ignore: true)
   DateTime get dateTime => DateTime.fromMillisecondsSinceEpoch(time * 1000);
 
   /// Threshold new [CruzBlock] must hash under for Proof of Work.

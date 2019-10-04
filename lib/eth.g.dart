@@ -11,18 +11,18 @@ EthereumTransaction _$EthereumTransactionFromJson(Map<String, dynamic> json) {
     ..hash = json['hash'] == null
         ? null
         : EthereumTransactionId.fromJson(json['hash'] as String)
-    ..index = int.parse(json['transactionIndex'] as String)
-    ..height = int.parse(json['blockNumber'] as String)
-    ..nonce = int.parse(json['nonce'] as String)
+    ..index = ETH.hexDecodeInt(json['transactionIndex'] as String)
+    ..height = ETH.hexDecodeInt(json['blockNumber'] as String)
+    ..nonce = ETH.hexDecodeInt(json['nonce'] as String)
     ..from = json['from'] == null
         ? null
         : EthereumAddressHash.fromJson(json['from'] as String)
     ..to = json['to'] == null
         ? null
         : EthereumAddressHash.fromJson(json['to'] as String)
-    ..amount = int.parse(json['value'] as String)
-    ..gas = int.parse(json['gas'] as String)
-    ..gasPrice = int.parse(json['gasPrice'] as String)
+    ..amount = ETH.hexDecodeInt(json['value'] as String)
+    ..gas = ETH.hexDecodeInt(json['gas'] as String)
+    ..gasPrice = ETH.hexDecodeInt(json['gasPrice'] as String)
     ..input = ETH.hexDecode(json['input'] as String);
 }
 
@@ -158,10 +158,10 @@ EthereumBlockHeader _$EthereumBlockHeaderFromJson(Map<String, dynamic> json) {
     ..previous = json['parentHash'] == null
         ? null
         : EthereumBlockId.fromJson(json['parentHash'] as String)
-    ..hashRoot = json['transactionRoot'] == null
+    ..hashRoot = json['transactionsRoot'] == null
         ? null
-        : EthereumTransactionId.fromJson(json['transactionRoot'] as String)
-    ..time = int.parse(json['timestamp'] as String)
+        : EthereumTransactionId.fromJson(json['transactionsRoot'] as String)
+    ..time = ETH.hexDecodeInt(json['timestamp'] as String)
     ..difficulty = json['difficulty'] == null
         ? null
         : BigInt.parse(json['difficulty'] as String)
@@ -170,11 +170,11 @@ EthereumBlockHeader _$EthereumBlockHeaderFromJson(Map<String, dynamic> json) {
         : BigInt.parse(json['totalDifficulty'] as String)
     ..nonceValue =
         json['nonce'] == null ? null : BigInt.parse(json['nonce'] as String)
-    ..height = int.parse(json['number'] as String)
+    ..height = ETH.hexDecodeInt(json['number'] as String)
     ..miner = json['miner'] == null
         ? null
         : EthereumAddressHash.fromJson(json['miner'] as String)
-    ..size = json['size'] as int;
+    ..size = ETH.hexDecodeInt(json['size'] as String);
 }
 
 Map<String, dynamic> _$EthereumBlockHeaderToJson(EthereumBlockHeader instance) {
@@ -188,7 +188,7 @@ Map<String, dynamic> _$EthereumBlockHeaderToJson(EthereumBlockHeader instance) {
 
   writeNotNull('hash', instance.hash);
   writeNotNull('parentHash', instance.previous);
-  writeNotNull('transactionRoot', instance.hashRoot);
+  writeNotNull('transactionsRoot', instance.hashRoot);
   writeNotNull('timestamp', instance.time);
   writeNotNull('difficulty', instance.difficulty?.toString());
   writeNotNull('totalDifficulty', instance.totalDifficulty?.toString());

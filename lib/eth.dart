@@ -122,7 +122,7 @@ class ETH extends Currency {
     bip32.BIP32 node = bip32.BIP32.fromSeed(seed);
     bip32.BIP32 child = path == 'm' ? node : node.derivePath(path);
     return EthereumAddress(
-        EthereumPublicKey(child.publicKey),
+        EthereumPublicKey(ecc.pointFromScalar(child.privateKey, false).sublist(1)),
         EthereumPrivateKey(child.privateKey),
         EthereumChainCode(child.chainCode),
         child.index,
@@ -243,6 +243,8 @@ class ETH extends Currency {
 
   static String hexEncodeInt(int x, [bool prefix = true]) =>
       (prefix ? '0x' : '') + x.toRadixString(16);
+
+  static int hexDecodeInt(String x) => x == null ? null : int.tryParse(x);
 }
 
 /// Right 20 bytes of Keccack-256.
@@ -426,17 +428,17 @@ class EthereumTransaction extends Transaction {
   EthereumTransactionId hash;
 
   /// Integer of the transactions index position in the block. null when its pending.
-  @JsonKey(name: 'transactionIndex', fromJson: int.parse)
+  @JsonKey(name: 'transactionIndex', fromJson: ETH.hexDecodeInt)
   int index;
 
   /// Used by [Wallet].
   @override
-  @JsonKey(name: 'blockNumber', fromJson: int.parse)
+  @JsonKey(name: 'blockNumber', fromJson: ETH.hexDecodeInt)
   int height = 0;
 
   /// The number of transactions made by the sender prior to this one.
   @override
-  @JsonKey(fromJson: int.parse)
+  @JsonKey(fromJson: ETH.hexDecodeInt)
   int nonce;
 
   /// Address of the sender.
@@ -447,15 +449,15 @@ class EthereumTransaction extends Transaction {
 
   /// Value transferred in Wei.
   @override
-  @JsonKey(name: 'value', fromJson: int.parse)
+  @JsonKey(name: 'value', fromJson: ETH.hexDecodeInt)
   int amount;
 
   /// Gas provided by the sender
-  @JsonKey(fromJson: int.parse)
+  @JsonKey(fromJson: ETH.hexDecodeInt)
   int gas;
 
   /// Gas price provided by the sender in Wei.
-  @JsonKey(fromJson: int.parse)
+  @JsonKey(fromJson: ETH.hexDecodeInt)
   int gasPrice;
 
   /// The data send along with the transaction.
@@ -678,15 +680,14 @@ class EthereumBlockHeader extends BlockHeader {
   EthereumBlockId previous;
 
   /// The root of the transaction trie of the block.
-  @JsonKey(name: 'transactionRoot')
+  @JsonKey(name: 'transactionsRoot')
   EthereumTransactionId hashRoot;
 
   /// The unix timestamp for when the block was collated.
-  @JsonKey(name: 'timestamp', fromJson: int.parse)
+  @JsonKey(name: 'timestamp', fromJson: ETH.hexDecodeInt)
   int time;
 
   @override
-  @JsonKey(ignore: true)
   DateTime get dateTime =>
       DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toLocal();
 
@@ -698,12 +699,14 @@ class EthereumBlockHeader extends BlockHeader {
 
   /// Threshold new [EthereumBlock] must hash under for Proof of Work.
   @override
-  @JsonKey(ignore: true)
-  BlockId get target => null;
+  BlockId get target {
+    BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0] = 1);
+    return EthereumBlockId.fromBigInt(twoTo256 ~/ difficulty);
+  }
 
   /// Total cumulative chain work.
-  @JsonKey(ignore: true)
-  EthereumBlockId get chainWork => null;
+  @override
+  EthereumBlockId get chainWork => EthereumBlockId.fromBigInt(totalDifficulty);
 
   /// Parameter varied by miners for Proof of Work.
   @override
@@ -712,7 +715,7 @@ class EthereumBlockHeader extends BlockHeader {
 
   /// Height is eventually unique.
   @override
-  @JsonKey(name: 'number', fromJson: int.parse)
+  @JsonKey(name: 'number', fromJson: ETH.hexDecodeInt)
   int height;
 
   /// The number of transactions in this block.
@@ -723,6 +726,7 @@ class EthereumBlockHeader extends BlockHeader {
   EthereumAddressHash miner;
 
   /// Integer the size of this block in bytes.
+  @JsonKey(fromJson: ETH.hexDecodeInt)
   int size;
 
   /// Default constructor used by JSON deserializer.
@@ -735,6 +739,10 @@ class EthereumBlockHeader extends BlockHeader {
   /// Marshals [EthereumBlockHeader] as a JSON-encoded string.
   @override
   Map<String, dynamic> toJson() => _$EthereumBlockHeaderToJson(this);
+
+  /// Expected number of random hashes before mining this block.
+  @override
+  BigInt blockWork() => difficulty;
 
   /// Computes an ID for this block.
   @override
@@ -773,7 +781,7 @@ class EthereumBlock extends Block {
   @override
   EthereumBlockId id() => header.id();
 
-  /// Compute a hash list root of all transaction hashes.
+  /// Compute a Merkle tree root of all transaction hashes.
   @override
   EthereumTransactionId computeHashRoot() => null;
 }
@@ -831,7 +839,9 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
 
   /// Forward [Peer] constructor.
   InfuraAPI(PeerPreference spec, String webSocketAddress)
-      : super(spec, webSocketAddress);
+      : super(spec, webSocketAddress) {
+    queryNumberField = 'id';
+  }
 
   /// Network lost. Clear [tip] and [tipId].
   @override
@@ -848,10 +858,10 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
     addJsonMessage(<String, dynamic>{
       'jsonrpc': '2.0',
       'method': 'eth_subscribe',
-      'params': ['newHeads'],
+      'params': <String>['newHeads'],
     }, (Map<String, dynamic> response) {
       if (response == null) return;
-      headsSubscription = response['subscription'];
+      headsSubscription = response['result'];
     });
 
     /// Returns the current "latest" block number.
@@ -861,7 +871,7 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
       'params': [],
     }, (Map<String, dynamic> response) {
       if (response == null) return;
-      tipHeight = int.parse(response['result']);
+      tipHeight = ETH.hexDecodeInt(response['result']);
       if (spec.debugPrint != null) {
         spec.debugPrint('ETH initial blockHeight=${tipHeight}');
       }
@@ -881,7 +891,7 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
       'params': [addressText, 'latest'],
     }, (Map<String, dynamic> response) {
       completer
-          .complete(response == null ? null : int.parse(response['result']));
+          .complete(response == null ? null : ETH.hexDecodeInt(response['result']));
     });
     return completer.future;
   }
@@ -890,37 +900,61 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
   Future<TransactionIteratorResults> getTransactions(
       PublicAddress address, TransactionIterator iterator,
       {int limit = 50}) {
-    return getAddressTransactions(address,
+    return getAddressLogs(address,
         offset: iterator != null ? iterator.index : 0, limit: limit);
   }
 
-  Future<TransactionIteratorResults> getAddressTransactions(
+  Future<TransactionIteratorResults> getAddressLogs(
       PublicAddress address,
       {int offset = 0,
       int limit = 50}) {
     Completer<TransactionIteratorResults> completer =
         Completer<TransactionIteratorResults>();
+    /// Returns an array of all logs matching a given filter object.
+    addJsonMessage(<String, dynamic>{
+      'jsonrpc': '2.0',
+      'method': 'eth_getLogs',
+      'params': [{'address': address.toJson()}],
+    }, (Map<String, dynamic> response) {
+      spec.debugPrint("got ${jsonEncode(response)}");
+      completer.complete(null);
+    });
     return completer.future;
   }
 
   @override
   Future<TransactionId> putTransaction(Transaction transaction) {
     Completer<TransactionId> completer = Completer<TransactionId>();
+    /// TODO: eth_sendRawTransaction
+    return completer.future;
+  }
+
+  /// Returns logs that are included in new imported blocks and match the given filter criteria.
+  /// In case of a chain reorganization previous sent logs that are on the old chain will be resend
+  /// with the removed property set to true. Logs from transactions that ended up in the new chain are emitted.
+  /// Therefore a subscription can emit logs for the same transaction multiple times.
+  @override
+  Future<bool> filterAdd(
+      PublicAddress address, TransactionCallback transactionCb) {
+    Completer<bool> completer = Completer<bool>();
+    addressFilter[address.toJson()] = transactionCb;
+    addJsonMessage(<String, dynamic>{
+      'jsonrpc': '2.0',
+      'method': 'eth_subscribe',
+      'params': ['logs', {'address': address.toJson()} ],
+    }, (Map<String, dynamic> response) {
+      completer.complete(response != null);
+    });
     return completer.future;
   }
 
   @override
-  Future<bool> filterAdd(
-      PublicAddress address, TransactionCallback transactionCb) {
-    addressFilter[address.toJson()] = transactionCb;
-    return Future.value(true);
-  }
-
-  @override
   Future<bool> filterTransactionQueue() {
+    /// No way to use eth_subscribe newPendingTransactions?
     return Future.value(true);
   }
 
+  /// Returns information about a block.
   @override
   Future<BlockHeaderMessage> getBlockHeader({BlockId id, int height}) {
     Completer<BlockHeaderMessage> completer = Completer<BlockHeaderMessage>();
@@ -1024,26 +1058,36 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
     return completer.future;
   }
 
-  /// Handle the INFURA WebSocket API message frame consisting of [id] and [result].
+  /// Handle the INFURA WebSocket API message frame.
   void handleMessage(String message) {
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
       debugPrintLong('got infura API message ' + message, spec.debugPrint);
     }
     Map<String, dynamic> json = jsonDecode(message);
-    Map<String, dynamic> result = json['result'];
+    Map<String, dynamic> params = json == null ? null : json['params'];
+    Map<String, dynamic> result = params == null ? null : params['result'];
     if (json['method'] == 'eth_subscription') {
-      if (json['subscription'] == headsSubscription) {
+      if (params['subscription'] == headsSubscription) {
         handleProtocol(() => handleFilterBlock(
             result['hash'] == null
                 ? null
                 : EthereumBlockId.fromJson(result['hash']),
             EthereumBlock.fromJson(result),
             false));
-      }
-      /*
+      } else {
+        assert(result['blockNumber'] != null);
+        assert(result['transactionIndex'] != null);
+
+        /// Fetch the transaction associated with this log.
+        addJsonMessage(<String, dynamic>{
+          'jsonrpc': '2.0',
+          'method': 'eth_getTransactionByBlockNumberAndIndex',
+          'params': [ result['blockNumber'] , result['transactionIndex'] ],
+        }, (Map<String, dynamic> x) =>
         handleProtocol(
-            () => handleNewTransaction(EthereumTransaction.fromJson(x)));
-      */
+            () => handleNewTransaction(EthereumTransaction.fromJson(x)))
+        );
+      }
     } else {
       handleProtocol(() {
         dispatchFromOutstanding(json);
@@ -1095,11 +1139,11 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
 
   /// Handles every new [EthereumTransaction] matching our [filterAdd()]
   void handleNewTransaction(EthereumTransaction transaction) {
-    /*TransactionCallback cb = transaction.from != null
+    TransactionCallback cb = transaction.from != null
         ? addressFilter[transaction.from.toJson()]
         : null;
     cb = cb ?? addressFilter[transaction.to.toJson()];
-    if (cb != null) cb(transaction);*/
+    if (cb != null) cb(transaction);
   }
 }
 

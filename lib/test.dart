@@ -331,29 +331,23 @@ class EthereumTester extends TestRunner {
     });
 
     test('Ethereum genesis test', () {
-/*
       EthereumBlock genesis = eth.genesisBlock();
       EthereumBlockId genesisId = genesis.id();
       expect(genesisId.toJson(),
-          '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f');
-      expect(genesis.header.bits, 0x1d00ffff);
+          '0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3');
+      expect(genesis.header.miner.toJson(),
+          '0x0000000000000000000000000000000000000000');
+      expect(genesis.header.size, 0x21c);
+      expect(genesis.header.difficulty.toInt(), 0x400000000);
       expect(genesis.header.target.toJson(),
-          '00000000ffff0000000000000000000000000000000000000000000000000000');
-      expect(genesisId.toBigInt() <= genesis.header.target.toBigInt(), true);
+          '0x0000000040000000000000000000000000000000000000000000000000000000');
+      //expect(genesisId.toBigInt() <= genesis.header.target.toBigInt(), true);
       expect(genesis.header.hashRoot.toJson(),
-          '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b');
-      expect(
-          genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());
-      expect(genesis.header.transactionCount, 1);
-      expect(genesis.transactions.length, 1);
-      expect(genesis.transactions[0].inputs.length, 1);
-      expect(genesis.transactions[0].outputs.length, 1);
-      expect(genesis.transactions[0].inputs[0].isCoinbase, true);
-      expect(genesis.transactions[0].inputs[0].fromText, 'coinbase');
-      expect(genesis.transactions[0].outputs[0].toText,
-          '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa');
-      expect(genesis.transactions[0].outputs[0].value, btc.parse('50'));
-      expect(genesis.transactions[0].fee, 0);*/
+          '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421');
+      /*expect(
+          genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());*/
+      expect(genesis.header.transactionCount, null);
+      expect(genesis.transactions.length, 0);
     });
   }
 }

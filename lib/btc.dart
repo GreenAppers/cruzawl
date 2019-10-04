@@ -819,13 +819,11 @@ class BitcoinBlockHeader extends BlockHeader {
   int bits;
 
   @override
-  @JsonKey(ignore: true)
   DateTime get dateTime =>
       DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toLocal();
 
   /// Threshold new [BitcoinBlock] must hash under for Proof of Work.
   @override
-  @JsonKey(ignore: true)
   BlockId get target {
     if (bits == null) return null;
 
@@ -840,7 +838,6 @@ class BitcoinBlockHeader extends BlockHeader {
   }
 
   /// Total cumulative chain work.
-  @JsonKey(ignore: true)
   BitcoinBlockId get chainWork => null;
 
   /// Parameter varied by miners for Proof of Work.
@@ -1275,11 +1272,22 @@ class BlockchainAPI extends PersistentWebSocketClient with HttpClientMixin {
 
   /// Handles every new [BitcoinTransaction] matching our [filterAdd()]
   void handleNewTransaction(BitcoinTransaction transaction) {
-    /*TransactionCallback cb = transaction.from != null
-        ? addressFilter[transaction.from.toJson()]
-        : null;
-    cb = cb ?? addressFilter[transaction.to.toJson()];
-    if (cb != null) cb(transaction);*/
+    for (BitcoinTransactionInput input in transaction.inputs) {
+      if (input.fromText == null) continue;
+      TransactionCallback cb = addressFilter[input.fromText];
+      if (cb != null) {
+        cb(transaction);
+        return;
+      }
+    } 
+    for (BitcoinTransactionOutput output in transaction.outputs) {
+      if (output.toText == null) continue;
+      TransactionCallback cb = addressFilter[output.toText];
+      if (cb != null) {
+        cb(transaction);
+        return;
+      }
+    } 
   }
 
   Map<String, dynamic> renameBlockJsonFromWebSocketAPI(
