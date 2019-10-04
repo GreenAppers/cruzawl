@@ -10,6 +10,7 @@ import 'package:cruzawl/btc.dart' hide genesisBlockJson;
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/cruz.dart' as cruz_impl show genesisBlockJson;
 import 'package:cruzawl/cruz.dart' hide genesisBlockJson;
+import 'package:cruzawl/eth.dart' hide genesisBlockJson;
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/wallet.dart';
 
@@ -48,7 +49,7 @@ class BitcoinTester extends TestRunner {
       expect(addr.publicAddress.toJson(), '1PMycacnJaSqwwJqjawXBErnLsZ7RkXUAs');
     });
 
-    test('Test Genesis', () {
+    test('Bitcoin genesis test', () {
       BitcoinBlock genesis = btc.genesisBlock();
       BitcoinBlockId genesisId = genesis.id();
       expect(genesisId.toJson(),
@@ -89,6 +90,10 @@ class BitcoinWalletTester extends TestRunner {
       Wallet wallet = Wallet.fromSeed(
           null, null, null, 'BIP32TestVector1', btc.createNetwork(), seed);
       BitcoinAddress addr1, addr2;
+
+      test("BTC wallet", () {
+        expect(wallet.bip44Path(13, 0), "m/44'/0'/0'/0/13'");
+      });
 
       test("m", () {
         addr1 = wallet.deriveAddressWithPath("m");
@@ -223,7 +228,7 @@ class CruzTester extends TestRunner {
       });
     });
 
-    test('Test Genesis', () {
+    test('CRUZ genesis test', () {
       CruzBlock genesis = cruz.genesisBlock();
       expect(jsonEncode(genesis),
           jsonEncode(jsonDecode(cruz_impl.genesisBlockJson)));
@@ -256,6 +261,10 @@ class CruzWalletTester extends TestRunner {
               'fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542')));
       CruzAddress addr1, addr2;
 
+      test("CRUZ wallet", () {
+        expect(wallet.bip44Path(13, 831), "m/44'/831'/0'/0'/13'");
+      });
+
       test("m/0'", () {
         addr1 = wallet.deriveAddressWithPath("m/0'");
         expect(hex.encode(addr1.privateKey.data.buffer.asUint8List(0, 32)),
@@ -286,6 +295,65 @@ class CruzWalletTester extends TestRunner {
         tx.sign(addr2.privateKey);
         expect(tx.verify(), false);
       });
+    });
+  }
+}
+
+/// Runs ethereum test vectors and unit tests
+class EthereumTester extends TestRunner {
+  EthereumTester(TestCallback group, TestCallback test, ExpectCallback expect)
+      : super(group, test, expect);
+
+  void run() {
+    test('Ethereum address test', () {
+      /// https://medium.com/@codetractio/inside-an-ethereum-transaction-fa94ffca912f
+      EthereumAddress addr = EthereumAddress.fromPrivateKey(
+          EthereumPrivateKey.fromJson(
+              'c0dec0dec0dec0dec0dec0dec0dec0dec0dec0dec0dec0dec0dec0dec0dec0de'));
+      expect(addr.publicKey.toJson(),
+          '0x4643bb6b393ac20a6175c713175734a72517c63d6f73a3ca90a15356f2e967da03d16431441c61ac69aeabb7937d333829d9da50431ff6af38536aa262497b27');
+      expect(addr.publicAddress.toJson(),
+          '0x53ae893e4b22d707943299a8d0c844df0e3d5557');
+
+      /// https://bitcoin.stackexchange.com/a/42097
+      addr = EthereumAddress.fromPrivateKey(EthereumPrivateKey.fromJson(
+          'b205a1e03ddf50247d8483435cd91f9c732bad281ad420061ab4310c33166276'));
+      expect(addr.publicKey.toJson(),
+          '0x6cb84859e85b1d9a27e060fdede38bb818c93850fb6e42d9c7e4bd879f8b9153fd94ed48e1f63312dce58f4d778ff45a2e5abb08a39c1bc0241139f5e54de7df');
+      expect(addr.publicAddress.toJson(),
+          '0xafdefc1937ae294c3bd55386a8b9775539d81653');
+
+      /// https://ethereum.stackexchange.com/q/6520
+      addr = EthereumAddress.fromPrivateKey(EthereumPrivateKey.fromJson(
+          '0xe9873d79c6d87dc0fb6a5778633389f4453213303da61f20bd67fc233aa33262'));
+      expect(addr.publicAddress.toJson(),
+          '0x60751ab56d58781069b1c73064ad580dade1f469');
+    });
+
+    test('Ethereum genesis test', () {
+/*
+      EthereumBlock genesis = eth.genesisBlock();
+      EthereumBlockId genesisId = genesis.id();
+      expect(genesisId.toJson(),
+          '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f');
+      expect(genesis.header.bits, 0x1d00ffff);
+      expect(genesis.header.target.toJson(),
+          '00000000ffff0000000000000000000000000000000000000000000000000000');
+      expect(genesisId.toBigInt() <= genesis.header.target.toBigInt(), true);
+      expect(genesis.header.hashRoot.toJson(),
+          '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b');
+      expect(
+          genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());
+      expect(genesis.header.transactionCount, 1);
+      expect(genesis.transactions.length, 1);
+      expect(genesis.transactions[0].inputs.length, 1);
+      expect(genesis.transactions[0].outputs.length, 1);
+      expect(genesis.transactions[0].inputs[0].isCoinbase, true);
+      expect(genesis.transactions[0].inputs[0].fromText, 'coinbase');
+      expect(genesis.transactions[0].outputs[0].toText,
+          '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa');
+      expect(genesis.transactions[0].outputs[0].value, btc.parse('50'));
+      expect(genesis.transactions[0].fee, 0);*/
     });
   }
 }

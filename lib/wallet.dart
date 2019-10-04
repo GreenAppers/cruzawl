@@ -412,7 +412,8 @@ class Wallet extends WalletStorage {
   /// Apostrophe in the path indicates that BIP32 hardened derivation is used.
   String bip44Path(int index, int coinType,
       {int bip43Purpose = 44, int accountId = 0, int change = 0}) {
-    return "m/$bip43Purpose'/$coinType'/$accountId'/$change'/$index'";
+    String hardenedChange = currency.hardenedChange ? "'" : '';
+    return "m/$bip43Purpose'/$coinType'/$accountId'/$change$hardenedChange/$index'";
   }
 
   /// Run [Currency] specific [deriveAddress] on [path] with [seed].

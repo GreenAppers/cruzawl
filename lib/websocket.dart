@@ -10,8 +10,6 @@ import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/util.dart';
 import 'websocket_html.dart' if (dart.library.io) 'websocket_io.dart';
 
-typedef JsonCallback = void Function(Map<String, dynamic>);
-
 /// Interface for RFC6455 WebSocket protocol
 abstract class WebSocket {
   void close();
@@ -21,6 +19,68 @@ abstract class WebSocket {
   void handleDone(Function doneHandler);
   void listen(Function messageHandler);
   void send(String text);
+}
+
+/// [Peer] mixin handling JSON responses in order.
+class JsonResponseQueueMixin {
+  /// [Queue] holding [JsonCallback] for expected in-order responses.
+  Queue<JsonCallback> jsonResponseQueue = Queue<JsonCallback>();
+
+  /// Number of in-flight queries.
+  int get numOutstanding => jsonResponseQueue.length;
+
+  void dispatchFromOutstanding(Map<String, dynamic> response) {
+    assert(jsonResponseQueue.isNotEmpty);
+    (jsonResponseQueue.removeFirst())(response);
+  }
+
+  void failOutstanding() {
+    while (jsonResponseQueue.isNotEmpty) {
+      (jsonResponseQueue.removeFirst())(null);
+    }
+  }
+
+  void addOutstandingJson(Map<String, dynamic> x,
+      [JsonCallback responseCallback]) {
+    if (responseCallback != null) jsonResponseQueue.add(responseCallback);
+  }
+}
+
+/// [Peer] mixin handling JSON responses indexed by query number.
+class JsonResponseMapMixin {
+  /// [Map] associating [JsonCallback] and response-id.
+  Map<int, JsonCallback> jsonResponseMap = Map<int, JsonCallback>();
+
+  String queryNumberField;
+
+  int nextQueryNumber = 1;
+
+  /// Number of in-flight queries.
+  int get numOutstanding => jsonResponseMap.length;
+
+  void dispatchFromOutstanding(Map<String, dynamic> response) {
+    assert(jsonResponseMap.isNotEmpty);
+    int queryId = response[queryNumberField];
+    assert(queryId != null);
+    JsonCallback cb = jsonResponseMap[queryId];
+    assert(cb != null);
+    cb(response);
+  }
+
+  void failOutstanding() {
+    while (jsonResponseMap.isNotEmpty) {
+      (jsonResponseMap.remove(jsonResponseMap.keys.first))(null);
+    }
+  }
+
+  void addOutstandingJson(Map<String, dynamic> x,
+      [JsonCallback responseCallback]) {
+    if (responseCallback != null) {
+      int queryNumber = nextQueryNumber++;
+      jsonResponseMap[queryNumber] = responseCallback;
+      x[queryNumberField] = queryNumber;
+    }
+  }
 }
 
 /// [Peer] integrating [html.Websocket] and [io.WebSocket]
@@ -33,9 +93,6 @@ abstract class PersistentWebSocketClient extends Peer {
 
   /// The wrapped dart:html or dart:io [WebSocket].
   WebSocket ws = WebSocketImpl();
-
-  /// [Queue] holding [JsonCallback] for expected in-order responses.
-  Queue<JsonCallback> jsonResponseQueue = Queue<JsonCallback>();
 
   /// [address] is derived from [spec] with optional context, e.g. genesis [BlockId].
   PersistentWebSocketClient(PeerPreference spec, this.address,
@@ -51,9 +108,12 @@ abstract class PersistentWebSocketClient extends Peer {
   /// Interface for messages received from transport.
   void handleMessage(String message);
 
-  /// Number of in-flight queries.
-  @override
-  int get numOutstanding => jsonResponseQueue.length;
+  /// Interface for managing response [JsonCallback].
+  void addOutstandingJson(Map<String, dynamic> x,
+      [JsonCallback responseCallback]);
+
+  /// Inteface for reseting in-flight queries.
+  void failOutstanding();
 
   @override
   void disconnect(String reason) {
@@ -61,7 +121,7 @@ abstract class PersistentWebSocketClient extends Peer {
     if (spec.debugPrint != null) spec.debugPrint('disconnected: ' + reason);
     setState(PeerState.disconnected);
     handleDisconnected();
-    failJsonResponseQueue();
+    failOutstanding();
     failThrottleQueue();
     if (autoReconnectSeconds != null) connectAfter(autoReconnectSeconds);
   }
@@ -89,43 +149,13 @@ abstract class PersistentWebSocketClient extends Peer {
 
   /// [WebSocket.send] message [x] expecting an in-order response for [responseCallback]
   void addJsonMessage(Map<String, dynamic> x, [JsonCallback responseCallback]) {
+    addOutstandingJson(x, responseCallback);
     String message = jsonEncode(x);
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
       spec.debugPrint('sending message: $message');
     }
-    if (responseCallback != null) jsonResponseQueue.add(responseCallback);
     ws.send(message);
   }
-
-  void dispatchFromJsonResponseQueue(Map<String, dynamic> response) {
-    assert(jsonResponseQueue.isNotEmpty);
-    (jsonResponseQueue.removeFirst())(response);
-    dispatchFromThrottleQueue();
-  }
-
-  void failJsonResponseQueue() {
-    while (jsonResponseQueue.isNotEmpty) {
-      (jsonResponseQueue.removeFirst())(null);
-    }
-  }
-}
-
-abstract class PersistentWebSocketAndHttpClient
-    extends PersistentWebSocketClient {
-  /// HTTP client.
-  HttpClient httpClient;
-
-  /// e.g. https://blockchain.info
-  String httpAddress;
-
-  PersistentWebSocketAndHttpClient(PeerPreference spec, String webSocketAddress,
-      this.httpClient, this.httpAddress)
-      : super(spec, webSocketAddress);
-
-  /// Number of outstanding requests for throttling.
-  @override
-  int get numOutstanding =>
-      httpClient.numOutstanding + jsonResponseQueue.length;
 }
 
 /// Shim [WebSocket] for testing

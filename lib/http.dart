@@ -11,14 +11,16 @@ export 'package:cruzawl/http_html.dart'
     if (dart.library.io) 'package:cruzawl/http_io.dart';
 import 'package:cruzawl/util.dart';
 
-/// HTTP response itegrating [io.HttpClient] and [html.HttpRequest].
+typedef JsonCallback = void Function(Map<String, dynamic>);
+
+/// HTTP response integrating [io.HttpClient] and [html.HttpRequest].
 class HttpResponse {
   int status;
   String text;
   HttpResponse(this.status, [this.text]);
 }
 
-/// HTTP client itegrating [io.HttpClient] and [html.HttpRequest].
+/// HTTP client integrating [io.HttpClient] and [html.HttpRequest].
 abstract class HttpClient {
   int numOutstanding = 0;
   StringCallback debugPrint;
@@ -26,6 +28,7 @@ abstract class HttpClient {
 
   Future<HttpResponse> request(String url, {String method, String data});
 
+  // Seems to work in web and browser, http_io and http_html may be unnecessary.
   void requestWithIncrementalHandler(String url,
       {String method, String data}) async {
     var request = Request(method ?? 'GET', Uri.parse(url));
@@ -56,5 +59,29 @@ class TestHttpClient extends HttpClient {
     HttpRequest httpRequest = HttpRequest(url, method, data);
     requests.add(httpRequest);
     return httpRequest.completer.future;
+  }
+}
+
+/// [Peer] mixin handling HTTP responses.
+class HttpClientMixin {
+  /// HTTP client.
+  HttpClient httpClient;
+
+  /// e.g. https://blockchain.info
+  String httpAddress;
+
+  /// Number of outstanding requests for throttling.
+  int get numOutstanding => httpClient.numOutstanding;
+
+  VoidCallback responseComplete;
+
+  void addOutstandingJson(Map<String, dynamic> x,
+      [JsonCallback responseCallback]) {}
+
+  void failOutstanding() {}
+
+  void completeResponse<X>(Completer<X> completer, X result) {
+    completer.complete(result);
+    if (responseComplete != null) responseComplete();
   }
 }

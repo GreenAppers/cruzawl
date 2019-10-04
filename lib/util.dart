@@ -50,6 +50,10 @@ bool equalUint8List(Uint8List x, Uint8List y) {
 
 String zeroPadOddLengthString(String x) => x.length % 2 == 0 ? x : '0' + x;
 
+String zeroPadOddLengthHexString(String x) => x.length % 2 == 0
+    ? x
+    : (x.startsWith('0x') ? ('0x0' + x.substring(2)) : ('0' + x));
+
 /// Prepends [input] with zeros so [input.length] becomes [size].
 Uint8List zeroPadUint8List(Uint8List input, int size) {
   if (input.length < size) {

@@ -670,8 +670,10 @@ class CruzBlockHeader extends BlockHeader {
   CruzBlockId chainWork;
 
   /// Parameter varied by miners for Proof of Work.
-  @override
   int nonce;
+
+  @override
+  BigInt get nonceValue => BigInt.from(nonce);
 
   /// Height is eventually unique.
   @override
@@ -779,7 +781,7 @@ class CruzPeerNetwork extends PeerNetwork {
 
 /// CRUZ implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://github.com/cruzbit/cruzbit/blob/master/protocol.go
-class CruzPeer extends PersistentWebSocketClient {
+class CruzPeer extends PersistentWebSocketClient with JsonResponseQueueMixin {
   /// The [CruzAddress] we're monitoring [CruzPeerNetwork] for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
@@ -1189,7 +1191,10 @@ class CruzPeer extends PersistentWebSocketClient {
       case 'tip_header':
       case 'transaction':
       case 'transaction_relay_policy':
-        handleProtocol(() => dispatchFromJsonResponseQueue(json));
+        handleProtocol(() {
+          dispatchFromOutstanding(json);
+          dispatchFromThrottleQueue();
+        });
         break;
       case 'filter_block':
       case 'filter_block_undo':

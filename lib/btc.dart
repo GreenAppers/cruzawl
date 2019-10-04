@@ -60,6 +60,9 @@ class BTC extends Currency {
   @override
   int get bip44CoinType => 0;
 
+  /// Hardened change in BIP32 path;
+  bool get hardenedChange => false;
+
   /// Coinbase transactions mature after 100 blocks.
   /// Reference: https://github.com/trottier/original-bitcoin/blob/master/src/main.h#L20
   @override
@@ -245,33 +248,6 @@ class BTC extends Currency {
       bip32: bip32.Bip32Type(public: 0x0488b21e, private: 0x0488ade4));
 }
 
-/// Hash160, 20 bytes.
-@immutable
-class BitcoinAddressIdentifier extends PublicAddress {
-  final Uint8List data;
-  static const int size = 20;
-
-  /// Fully specified constructor used by JSON deserializer.
-  BitcoinAddressIdentifier(this.data) {
-    if (data.length != size) throw FormatException();
-  }
-
-  /// https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses
-  BitcoinAddressIdentifier.compute(BitcoinPublicKey input)
-      : data = hash(input.data);
-
-  /// Unmarshals a hex-encoded string to [BitcoinPublicKey].
-  BitcoinAddressIdentifier.fromJson(String x) : this(hex.decode(x));
-
-  /// Marshals [BitcoinPublicKey] as a hex-encoded string.
-  @override
-  String toJson() => hex.encode(data);
-
-  /// SHA-256 then RIPEMD-160 hash.
-  static Uint8List hash(Uint8List input) =>
-      RIPEMD160Digest().process(SHA256Digest().process(input));
-}
-
 /// Checksummed Hash160.
 @immutable
 class BitcoinAddressHash extends PublicAddress {
@@ -288,7 +264,7 @@ class BitcoinAddressHash extends PublicAddress {
   BitcoinAddressHash.compute(BitcoinAddressIdentifier input, [int version = 0])
       : this.fromExtendedIdentifier(Uint8List.fromList([version] + input.data));
 
-  /// Unmarshals a base58-encoded string to [BitcoinPublicKey].
+  /// Unmarshals a base58-encoded string to [BitcoinAddressHash].
   factory BitcoinAddressHash.fromJson(String x) {
     try {
       Uint8List ret = bs58check.base58.decode(x);
@@ -298,7 +274,7 @@ class BitcoinAddressHash extends PublicAddress {
     }
   }
 
-  /// Marshals [BitcoinPublicKey] as a base58-encoded string.
+  /// Marshals [BitcoinAddressHash] as a base58-encoded string.
   @override
   String toJson() => bs58check.base58.encode(data);
 
@@ -307,7 +283,34 @@ class BitcoinAddressHash extends PublicAddress {
       SHA256Digest().process(SHA256Digest().process(input));
 }
 
-/// ECDSA public key, 33 bytes.
+/// Hash160, 20 bytes.
+@immutable
+class BitcoinAddressIdentifier extends PublicAddress {
+  final Uint8List data;
+  static const int size = 20;
+
+  /// Fully specified constructor used by JSON deserializer.
+  BitcoinAddressIdentifier(this.data) {
+    if (data.length != size) throw FormatException();
+  }
+
+  /// https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses
+  BitcoinAddressIdentifier.compute(BitcoinPublicKey input)
+      : data = hash(input.data);
+
+  /// Unmarshals a hex-encoded string to [BitcoinAddressIdentifier].
+  BitcoinAddressIdentifier.fromJson(String x) : this(hex.decode(x));
+
+  /// Marshals [BitcoinAddressIdentifier] as a hex-encoded string.
+  @override
+  String toJson() => hex.encode(data);
+
+  /// SHA-256 then RIPEMD-160 hash.
+  static Uint8List hash(Uint8List input) =>
+      RIPEMD160Digest().process(SHA256Digest().process(input));
+}
+
+/// ECDSA public key, compressed with prefix byte: 33 bytes.
 @immutable
 class BitcoinPublicKey extends PublicAddress {
   final Uint8List data;
@@ -841,8 +844,10 @@ class BitcoinBlockHeader extends BlockHeader {
   BitcoinBlockId get chainWork => null;
 
   /// Parameter varied by miners for Proof of Work.
-  @override
   int nonce;
+
+  @override
+  BigInt get nonceValue => BigInt.from(nonce);
 
   /// Height is eventually unique.
   @override
@@ -913,7 +918,7 @@ class BitcoinBlock extends Block {
   @override
   BitcoinBlockId id() => header.id();
 
-  /// Compute a hash list root of all transaction hashes.
+  /// Compute a Merkle tree root of all transaction hashes.
   @override
   BitcoinTransactionId computeHashRoot() => BitcoinTransactionId(MerkleTree(
           leaves: transactions.map((t) => t.hash.data).toList(),
@@ -949,7 +954,7 @@ class BlockchainAPINetwork extends PeerNetwork {
 
 /// Blockchain.info implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://www.blockchain.com/api/api_websocket
-class BlockchainAPI extends PersistentWebSocketAndHttpClient {
+class BlockchainAPI extends PersistentWebSocketClient with HttpClientMixin {
   /// The [BitcoinAddress] we're monitoring [BlockchainAPINetwork] for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
@@ -973,7 +978,10 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
   /// Forward [Peer] constructor.
   BlockchainAPI(PeerPreference spec, String webSocketAddress,
       HttpClient httpClient, String httpAddress)
-      : super(spec, webSocketAddress, httpClient, httpAddress) {
+      : super(spec, webSocketAddress) {
+    this.httpClient = httpClient;
+    this.httpAddress = httpAddress;
+    responseComplete = dispatchFromThrottleQueue;
     maxOutstanding = 10;
   }
 
@@ -1016,7 +1024,7 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
         .then((resp) {
       Map<String, dynamic> data = jsonDecode(resp.text);
       Map<String, dynamic> addr = data == null ? null : data[addressText];
-      completer.complete(addr == null ? null : addr['final_balance']);
+      completeResponse(completer, addr == null ? null : addr['final_balance']);
     });
     return completer.future;
   }
@@ -1048,7 +1056,7 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
       Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
       var txs = data == null ? null : data['txs'];
       if (txs == null) {
-        completer.complete(null);
+        completeResponse(completer, null);
         return;
       }
       checkEquals(addressText, data['address'], spec.debugPrint);
@@ -1059,7 +1067,7 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
         ret.transactions.add(BitcoinTransaction.fromJson(t));
       }
 
-      completer.complete(ret);
+      completeResponse(completer, ret);
     });
     return completer.future;
   }
@@ -1076,7 +1084,7 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
       /*headers: {'Content-Type', 'application/x-www-form-urlencoded'}*/
     )
         .then((resp) {
-      completer.complete(null);
+      completeResponse(completer, null);
     });
     return completer.future;
   }
@@ -1121,13 +1129,15 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
         Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
         var blocks = data == null ? null : data['blocks'];
         if (blocks == null) {
-          completer.complete(null);
+          completeResponse(completer, null);
           return;
         }
-        completer.complete(blocks
-            .map((h) => BitcoinBlockHeader.fromJson(h))
-            .toList()
-            .cast<BitcoinBlockHeader>());
+        completeResponse(
+            completer,
+            blocks
+                .map((h) => BitcoinBlockHeader.fromJson(h))
+                .toList()
+                .cast<BitcoinBlockHeader>());
       },
     );
     return completer.future;
@@ -1149,11 +1159,13 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
         var blocks = data == null ? null : data['blocks'];
         var block = blocks == null ? null : blocks.first;
         if (block == null) {
-          completer.complete(null);
+          completeResponse(completer, null);
           return;
         }
-        completer.complete(BlockMessage(BitcoinBlockId.fromJson(block['hash']),
-            block != null ? BitcoinBlock.fromJson(block) : null));
+        completeResponse(
+            completer,
+            BlockMessage(BitcoinBlockId.fromJson(block['hash']),
+                block != null ? BitcoinBlock.fromJson(block) : null));
       },
     );
     return completer.future;
@@ -1164,9 +1176,11 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
     Completer<int> completer = Completer<int>();
     httpClient.request(httpAddress + '/q/hashrate?format=json').then((resp) {
       int rate = jsonDecode(resp.text);
-      completer.complete(rate == null
-          ? null
-          : (BigInt.from(rate) * BigInt.from(1000000000)).toInt());
+      completeResponse(
+          completer,
+          rate == null
+              ? null
+              : (BigInt.from(rate) * BigInt.from(1000000000)).toInt());
     });
     return completer.future;
   }
@@ -1181,7 +1195,7 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
         Map<String, dynamic> transaction =
             resp == null ? null : jsonDecode(resp.text);
         if (transaction == null) {
-          completer.complete(null);
+          completeResponse(completer, null);
           return;
         }
         TransactionMessage ret = TransactionMessage(
@@ -1189,7 +1203,7 @@ class BlockchainAPI extends PersistentWebSocketAndHttpClient {
             transaction != null
                 ? BitcoinTransaction.fromJson(transaction)
                 : null);
-        completer.complete(ret);
+        completeResponse(completer, ret);
       },
     );
     return completer.future;

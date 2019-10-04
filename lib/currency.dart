@@ -8,6 +8,7 @@ import "package:pointycastle/src/utils.dart";
 
 import 'package:cruzawl/btc.dart';
 import 'package:cruzawl/cruz.dart';
+import 'package:cruzawl/eth.dart';
 import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/util.dart';
@@ -24,7 +25,7 @@ abstract class Currency {
       case 'CRUZ':
         return cruz;
       case 'ETH':
-        return null;
+        return eth;
       default:
         return null;
     }
@@ -42,6 +43,9 @@ abstract class Currency {
   /// Coin ID for HD wallets. e.g. 831.
   /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
   int get bip44CoinType;
+
+  /// Hardened change in BIP32 path;
+  bool get hardenedChange => true;
 
   /// Number of blocks until mining rewards are spendable.
   int get coinbaseMaturity;
@@ -406,7 +410,7 @@ abstract class BlockHeader {
   BlockId get chainWork;
 
   /// Parameter varied by miners for Proof of Work.
-  int get nonce;
+  BigInt get nonceValue;
 
   /// The [BlockHeader.height] of [previous] plus one.
   int get height;
@@ -463,8 +467,10 @@ abstract class Block {
 
 const LoadingCurrency loadingCurrency = LoadingCurrency();
 
-const CRUZ cruz = CRUZ();
-
 const BTC btc = BTC();
 
-const List<Currency> currencies = <Currency>[cruz, btc];
+const CRUZ cruz = CRUZ();
+
+const ETH eth = ETH();
+
+const List<Currency> currencies = <Currency>[cruz, btc, eth];
