@@ -22,7 +22,7 @@ abstract class WebSocket {
 }
 
 /// [Peer] mixin handling JSON responses in order.
-class JsonResponseQueueMixin {
+mixin JsonResponseQueueMixin {
   /// [Queue] holding [JsonCallback] for expected in-order responses.
   Queue<JsonCallback> jsonResponseQueue = Queue<JsonCallback>();
 
@@ -47,7 +47,7 @@ class JsonResponseQueueMixin {
 }
 
 /// [Peer] mixin handling JSON responses indexed by query number.
-class JsonResponseMapMixin {
+mixin JsonResponseMapMixin {
   /// [Map] associating [JsonCallback] and response-id.
   Map<int, JsonCallback> jsonResponseMap = Map<int, JsonCallback>();
 
@@ -62,7 +62,7 @@ class JsonResponseMapMixin {
     assert(jsonResponseMap.isNotEmpty);
     int queryId = response[queryNumberField];
     assert(queryId != null);
-    JsonCallback cb = jsonResponseMap[queryId];
+    JsonCallback cb = jsonResponseMap.remove(queryId);
     assert(cb != null);
     cb(response);
   }
@@ -81,6 +81,13 @@ class JsonResponseMapMixin {
       x[queryNumberField] = queryNumber;
     }
   }
+}
+
+class NullJsonResponseMixin {
+  void addOutstandingJson(Map<String, dynamic> x,
+      [JsonCallback responseCallback]) {}
+
+  void failOutstanding() {}
 }
 
 /// [Peer] integrating [html.Websocket] and [io.WebSocket]

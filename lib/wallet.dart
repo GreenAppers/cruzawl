@@ -666,7 +666,7 @@ class Wallet extends WalletStorage {
     do {
       if (await getNextTransactions(peer, x) == null) return voidResult();
     } while (x.loadIterator.height >
-        max(0, peer.tipHeight - currency.coinbaseMaturity));
+        max(0, peer.tipHeight - (currency.coinbaseMaturity ?? 100)));
 
     /// [newBalance] and [newMatureBalance] account for possibly receiving new
     /// transactions for [x] as we're loading.

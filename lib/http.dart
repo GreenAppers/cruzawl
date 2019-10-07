@@ -63,7 +63,7 @@ class TestHttpClient extends HttpClient {
 }
 
 /// [Peer] mixin handling HTTP responses.
-class HttpClientMixin {
+mixin HttpClientMixin {
   /// HTTP client.
   HttpClient httpClient;
 
@@ -74,11 +74,6 @@ class HttpClientMixin {
   int get numOutstanding => httpClient.numOutstanding;
 
   VoidCallback responseComplete;
-
-  void addOutstandingJson(Map<String, dynamic> x,
-      [JsonCallback responseCallback]) {}
-
-  void failOutstanding() {}
 
   void completeResponse<X>(Completer<X> completer, X result) {
     completer.complete(result);

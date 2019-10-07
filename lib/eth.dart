@@ -57,7 +57,7 @@ class ETH extends Currency {
 
   /// Ethereum has no period of custory for block rewards.
   @override
-  int get coinbaseMaturity => 0;
+  int get coinbaseMaturity => null;
 
   /// Format discrete wei value [v] in fractional ETH representation.
   @override
@@ -102,13 +102,13 @@ class ETH extends Currency {
   @override
   PublicAddress get nullAddress => EthereumPublicKey(Uint8List(64));
 
-  /// Create a [InfuraAPINetwork] instance.
+  /// Create a [EtherscanInfuraAPINetwork] instance.
   @override
-  InfuraAPINetwork createNetwork(
+  EtherscanInfuraAPINetwork createNetwork(
           {VoidCallback peerChanged,
           VoidCallback tipChanged,
           HttpClient httpClient}) =>
-      InfuraAPINetwork(peerChanged, tipChanged);
+      EtherscanInfuraAPINetwork(httpClient, peerChanged, tipChanged);
 
   /// The first [Block] in the chain. e.g. https://www.etherchain.org/block/0
   @override
@@ -122,7 +122,8 @@ class ETH extends Currency {
     bip32.BIP32 node = bip32.BIP32.fromSeed(seed);
     bip32.BIP32 child = path == 'm' ? node : node.derivePath(path);
     return EthereumAddress(
-        EthereumPublicKey(ecc.pointFromScalar(child.privateKey, false).sublist(1)),
+        EthereumPublicKey(
+            ecc.pointFromScalar(child.privateKey, false).sublist(1)),
         EthereumPrivateKey(child.privateKey),
         EthereumChainCode(child.chainCode),
         child.index,
@@ -447,10 +448,13 @@ class EthereumTransaction extends Transaction {
   /// Address of the receiver. null when its a contract creation transaction.
   EthereumAddressHash to;
 
-  /// Value transferred in Wei.
+  /// Value transferred in Wei or zero.
   @override
-  @JsonKey(name: 'value', fromJson: ETH.hexDecodeInt)
-  int amount;
+  int get amount => value ?? 0;
+
+  /// Value transferred in Wei.
+  @JsonKey(fromJson: ETH.hexDecodeInt)
+  int value;
 
   /// Gas provided by the sender
   @JsonKey(fromJson: ETH.hexDecodeInt)
@@ -786,9 +790,12 @@ class EthereumBlock extends Block {
   EthereumTransactionId computeHashRoot() => null;
 }
 
-/// https://infura.io/docs/ethereum/wss/introduction.md
-class InfuraAPINetwork extends PeerNetwork {
-  InfuraAPINetwork(VoidCallback peerChanged, VoidCallback tipChanged)
+/// INFURA API with optional combination of Etherscan API.
+class EtherscanInfuraAPINetwork extends PeerNetwork {
+  HttpClient httpClient;
+
+  EtherscanInfuraAPINetwork(
+      this.httpClient, VoidCallback peerChanged, VoidCallback tipChanged)
       : super(peerChanged, tipChanged);
 
   @override
@@ -797,7 +804,7 @@ class InfuraAPINetwork extends PeerNetwork {
   /// Creates [Peer] ready to [Peer.connect()].
   @override
   Peer createPeerWithSpec(PeerPreference spec) =>
-      InfuraAPI(spec, parseUri(spec.url));
+      EtherscanInfuraAPI(spec, parseUri(spec.url), httpClient, spec.root);
 
   /// Valid INFURA URI: 'mainnet.infura.io', 'wss://mainnet.infura.io/ws/v3/YOUR-PROJECT-ID'.
   String parseUri(String uriText) {
@@ -811,10 +818,81 @@ class InfuraAPINetwork extends PeerNetwork {
   }
 }
 
-/// INFURA implementation of the [PeerNetwork] entry [Peer] abstraction.
-/// Reference: https://infura.io/docs/ethereum/wss/introduction.md
-class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
-  /// The [EthereumAddress] we're monitoring [InfuraAPINetwork] for.
+/// Etherscan+INFURA implementation of the [PeerNetwork] entry [Peer] abstraction.
+/// Use INFURA WebSocket API for eth_subscribe and eth_getBalance.
+/// Refrence: https://infura.io/docs/ethereum/wss/introduction.md
+/// Use Etherscan for everything else.
+/// Reference: https://etherscan.io/apis
+class EtherscanInfuraAPI extends InfuraAPI with EtherscanAPI {
+  EtherscanInfuraAPI(PeerPreference spec, String webSocketAddress,
+      HttpClient httpClient, String httpAddress)
+      : super(spec, webSocketAddress) {
+    this.httpClient = httpClient;
+    this.httpAddress = httpAddress;
+    responseComplete = dispatchFromThrottleQueue;
+  }
+
+  /// Throttles sum of outstanding InfurAPI and EtherscanAPI calls.
+  int get numOutstanding => jsonResponseMap.length + httpClient.numOutstanding;
+}
+
+/// https://etherscan.io/apis
+mixin EtherscanAPI on HttpClientMixin {
+  String apiKey = 'GPJZQMQ7KTRFI5KQNY3DR3W7AC1Y6DES2I';
+
+  /// Returns information about a block by number.
+  Future<BlockHeaderMessage> getBlockByHeight(int height) {
+    Completer<BlockHeaderMessage> completer = Completer<BlockHeaderMessage>();
+    httpClient
+        .request(httpAddress +
+            '/api?module=proxy&action=eth_getBlockByNumber&tag=${ETH.hexEncodeInt(height)}&boolean=true&apikey=$apiKey')
+        .then((resp) {
+      Map<String, dynamic> response = jsonDecode(resp.text);
+      Map<String, dynamic> block = response == null ? null : response['result'];
+      if (block == null) {
+        completeResponse(completer, null);
+        return;
+      }
+      completeResponse(
+          completer,
+          BlockHeaderMessage(EthereumBlockId.fromJson(block['hash']),
+              EthereumBlockHeader.fromJson(block)));
+    });
+    return completer.future;
+  }
+
+  /// Get a list of 'Normal' Transactions By Address.
+  Future<TransactionIteratorResults> getTransactions(
+      PublicAddress address, TransactionIterator iterator,
+      {int limit = 50}) {
+    Completer<TransactionIteratorResults> completer =
+        Completer<TransactionIteratorResults>();
+    int page = iterator != null ? iterator.index : 0;
+    httpClient
+        .request(httpAddress +
+            '/api?module=account&action=txlist&address=${address.toJson()}&sort=dsc&offset=$limit&page=$page&apikey=$apiKey')
+        .then((resp) {
+      Map<String, dynamic> response = jsonDecode(resp.text);
+      List<dynamic> transactions = response == null ? null : response['result'];
+      if (transactions == null) {
+        completeResponse(completer, null);
+        return;
+      }
+      TransactionIteratorResults ret =
+          TransactionIteratorResults(0, page + 1, List<Transaction>());
+      for (Map<String, dynamic> transaction in transactions) {
+        ret.transactions.add(EthereumTransaction.fromJson(transaction));
+      }
+      completeResponse(completer, ret);
+    });
+    return completer.future;
+  }
+}
+
+/// https://infura.io/docs/ethereum/wss/introduction.md
+class InfuraAPI extends PersistentWebSocketClient
+    with JsonResponseMapMixin, HttpClientMixin {
+  /// The [EthereumAddress] we're monitoring for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
 
@@ -826,11 +904,11 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
   @override
   EthereumBlockId tipId;
 
-  /// The minimum [EthereumTransaction.amount] for the [InfuraAPINetwork].
+  /// The minimum [EthereumTransaction.amount].
   @override
   num minAmount;
 
-  /// The minimum [EthereumTransaction.fee] for the [InfuraAPINetwork].
+  /// The minimum [EthereumTransaction.fee].
   @override
   num minFee;
 
@@ -890,8 +968,8 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
       'method': 'eth_getBalance',
       'params': [addressText, 'latest'],
     }, (Map<String, dynamic> response) {
-      completer
-          .complete(response == null ? null : ETH.hexDecodeInt(response['result']));
+      completer.complete(
+          response == null ? null : ETH.hexDecodeInt(response['result']));
     });
     return completer.future;
   }
@@ -904,20 +982,25 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
         offset: iterator != null ? iterator.index : 0, limit: limit);
   }
 
-  Future<TransactionIteratorResults> getAddressLogs(
-      PublicAddress address,
-      {int offset = 0,
-      int limit = 50}) {
+  Future<TransactionIteratorResults> getAddressLogs(PublicAddress address,
+      {int offset = 0, int limit = 50}) {
     Completer<TransactionIteratorResults> completer =
         Completer<TransactionIteratorResults>();
+
     /// Returns an array of all logs matching a given filter object.
     addJsonMessage(<String, dynamic>{
       'jsonrpc': '2.0',
       'method': 'eth_getLogs',
-      'params': [{'address': address.toJson()}],
+      'params': [
+        {
+          'address': address.toJson(),
+          'fromBlock': ETH.hexEncodeInt(tipHeight - 1000),
+          'toBlock': 'latest'
+        }
+      ],
     }, (Map<String, dynamic> response) {
-      spec.debugPrint("got ${jsonEncode(response)}");
-      completer.complete(null);
+      spec.debugPrint("got-logs ${jsonEncode(response)}");
+      completer.complete(TransactionIteratorResults(0, 0, <Transaction>[]));
     });
     return completer.future;
   }
@@ -925,6 +1008,7 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
   @override
   Future<TransactionId> putTransaction(Transaction transaction) {
     Completer<TransactionId> completer = Completer<TransactionId>();
+
     /// TODO: eth_sendRawTransaction
     return completer.future;
   }
@@ -941,7 +1025,10 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
     addJsonMessage(<String, dynamic>{
       'jsonrpc': '2.0',
       'method': 'eth_subscribe',
-      'params': ['logs', {'address': address.toJson()} ],
+      'params': [
+        'logs',
+        {'address': address.toJson()}
+      ],
     }, (Map<String, dynamic> response) {
       completer.complete(response != null);
     });
@@ -993,7 +1080,7 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
             EthereumBlockHeader.fromJson(block)));
       });
     }
-    return null;
+    return completer.future;
   }
 
   /// Returns information about a block.
@@ -1043,7 +1130,7 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
     addJsonMessage(<String, dynamic>{
       'jsonrpc': '2.0',
       'method': 'eth_getTransactionByHash',
-      'params': [id.toJson(), true],
+      'params': [id.toJson()],
     }, (Map<String, dynamic> response) {
       Map<String, dynamic> transaction =
           response == null ? null : response['result'];
@@ -1079,14 +1166,14 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
         assert(result['transactionIndex'] != null);
 
         /// Fetch the transaction associated with this log.
-        addJsonMessage(<String, dynamic>{
-          'jsonrpc': '2.0',
-          'method': 'eth_getTransactionByBlockNumberAndIndex',
-          'params': [ result['blockNumber'] , result['transactionIndex'] ],
-        }, (Map<String, dynamic> x) =>
-        handleProtocol(
-            () => handleNewTransaction(EthereumTransaction.fromJson(x)))
-        );
+        addJsonMessage(
+            <String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'eth_getTransactionByBlockNumberAndIndex',
+              'params': [result['blockNumber'], result['transactionIndex']],
+            },
+            (Map<String, dynamic> x) => handleProtocol(
+                () => handleNewTransaction(EthereumTransaction.fromJson(x))));
       }
     } else {
       handleProtocol(() {
@@ -1096,7 +1183,7 @@ class InfuraAPI extends PersistentWebSocketClient with JsonResponseMapMixin {
     }
   }
 
-  /// Handles every new [EthereumBlock] on the [InfuraAPINetwork].
+  /// Handles every new [EthereumBlock].
   /// [EthereumBlock.transactions] is empty if no [EthereumTransaction] match our [filterAdd()].
   void handleFilterBlock(EthereumBlockId id, EthereumBlock block, bool undo) {
     if (tipId == null) {

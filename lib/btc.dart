@@ -951,7 +951,8 @@ class BlockchainAPINetwork extends PeerNetwork {
 
 /// Blockchain.info implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://www.blockchain.com/api/api_websocket
-class BlockchainAPI extends PersistentWebSocketClient with HttpClientMixin {
+class BlockchainAPI extends PersistentWebSocketClient
+    with HttpClientMixin, NullJsonResponseMixin {
   /// The [BitcoinAddress] we're monitoring [BlockchainAPINetwork] for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
@@ -1279,7 +1280,7 @@ class BlockchainAPI extends PersistentWebSocketClient with HttpClientMixin {
         cb(transaction);
         return;
       }
-    } 
+    }
     for (BitcoinTransactionOutput output in transaction.outputs) {
       if (output.toText == null) continue;
       TransactionCallback cb = addressFilter[output.toText];
@@ -1287,7 +1288,7 @@ class BlockchainAPI extends PersistentWebSocketClient with HttpClientMixin {
         cb(transaction);
         return;
       }
-    } 
+    }
   }
 
   Map<String, dynamic> renameBlockJsonFromWebSocketAPI(

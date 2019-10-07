@@ -20,7 +20,7 @@ EthereumTransaction _$EthereumTransactionFromJson(Map<String, dynamic> json) {
     ..to = json['to'] == null
         ? null
         : EthereumAddressHash.fromJson(json['to'] as String)
-    ..amount = ETH.hexDecodeInt(json['value'] as String)
+    ..value = ETH.hexDecodeInt(json['value'] as String)
     ..gas = ETH.hexDecodeInt(json['gas'] as String)
     ..gasPrice = ETH.hexDecodeInt(json['gasPrice'] as String)
     ..input = ETH.hexDecode(json['input'] as String);
@@ -41,7 +41,7 @@ Map<String, dynamic> _$EthereumTransactionToJson(EthereumTransaction instance) {
   writeNotNull('nonce', instance.nonce);
   writeNotNull('from', instance.from);
   writeNotNull('to', instance.to);
-  writeNotNull('value', instance.amount);
+  writeNotNull('value', instance.value);
   writeNotNull('gas', instance.gas);
   writeNotNull('gasPrice', instance.gasPrice);
   writeNotNull('input', instance.input);
