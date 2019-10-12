@@ -13,7 +13,9 @@ dependencies:
   bs58check: ^1.0.1
   convert: ^2.1.1
   collection: ^1.14.11
-  ed25519_hd_key: ^1.0.1
+  ed25519_hd_key:
+    git:
+      url: https://github.com/GreenAppers/dart-ed25519-hd-key
   fixnum: ^0.10.9
   http: ^0.12.0+2
   json_annotation: ^3.0.0
@@ -22,7 +24,12 @@ dependencies:
   pedantic: ^1.8.0
   pointycastle: ^1.0.1
   sembast: ^2.0.1
-  tweetnacl: ^0.3.2
+  tweetnacl:
+    git:
+      url: https://github.com/GreenAppers/tweetnacl-dart
+  tweetnacl_musig:
+    git:
+      url: https://github.com/GreenAppers/tweetnacl-musig
 
 dev_dependencies:
   build_runner: ^1.4.0

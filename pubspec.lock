@@ -172,9 +172,11 @@ packages:
   ed25519_hd_key:
     dependency: "direct main"
     description:
-      name: ed25519_hd_key
-      url: "https://pub.dartlang.org"
-    source: hosted
+      path: "."
+      ref: HEAD
+      resolved-ref: "850d0a0061d43cb7e1729901a2edd3c45b02b2c2"
+      url: "https://github.com/GreenAppers/dart-ed25519-hd-key"
+    source: git
     version: "1.0.1"
   fixnum:
     dependency: "direct main"
@@ -522,10 +524,21 @@ packages:
   tweetnacl:
     dependency: "direct main"
     description:
-      name: tweetnacl
-      url: "https://pub.dartlang.org"
-    source: hosted
+      path: "."
+      ref: HEAD
+      resolved-ref: "14c6386326ad46f7e6d3c62f4796c07403f918a9"
+      url: "https://github.com/GreenAppers/tweetnacl-dart"
+    source: git
     version: "0.3.2"
+  tweetnacl_musig:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: HEAD
+      resolved-ref: "58c5390a58a37c1efe3e73d8e8d02f6226edd99c"
+      url: "https://github.com/GreenAppers/tweetnacl-musig"
+    source: git
+    version: "1.0.0+0"
   typed_data:
     dependency: transitive
     description:
