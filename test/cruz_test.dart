@@ -194,7 +194,7 @@ void main() {
         aliceSendsBobCruz1,
         cruz1fee,
         null,
-        seriesForHeight: cruz1height,
+        seriesForHeight: cruz1height + oneDayInBlocks,
         matures: cruz1height + oneDayInBlocks);
 
     /// Alice sends Bob [bobClaimTransaction1] ------------------------------->.
@@ -222,17 +222,17 @@ void main() {
         null,
         seriesForHeight: cruz2height);
 
-    /// <------------ Bob sends Alice [bobRefundTransaction2] and [bobRefundR2].
+    /// <------------ Bob sends Alice [bobRefundTransaction2].
     final CruzTransaction bobRefundTransaction2 = CruzTransaction(
         CruzPublicKey(bobJointKey2.jointPublicKey.data),
         CruzPublicKey(bobPub2.data),
         bobSendsAliceCruz2,
         cruz2fee,
         null,
-        seriesForHeight: cruz2height,
+        seriesForHeight: cruz2height + oneDayInBlocks * 2,
         matures: cruz2height + oneDayInBlocks * 2);
 
-    /// <--------- Bob sends Alice [aliceClaimTransaction2] and [bobAliceClaimR2].
+    /// <--------- Bob sends Alice [aliceClaimTransaction2].
     final CruzTransaction aliceClaimTransaction2 = CruzTransaction(
         CruzPublicKey(bobJointKey2.jointPublicKey.data),
         CruzPublicKey(alicePub2.data),
@@ -284,7 +284,7 @@ void main() {
         CruzSignature(aliceRefundTransactionSignature.data);
     expect(aliceRefundTransaction1.verify(), true);
 
-    /// Bob verifies [aliceRefundBobR2] and [bobRefundTransaction2].
+    /// Bob verifies [bobRefundTransaction2].
     expect(bobRefundTransaction2signedByAlice.R, aliceRefundBobR2.pack());
     final SchnorrSignature bobRefundTransaction2signedByBob = jointSign(
         bobPriv2,
@@ -394,5 +394,288 @@ void main() {
         SchnorrSignature(bobAdaptor.point.pack(), secret));
     aliceClaimTransaction2.signature = CruzSignature(aliceClaimSignature.data);
     expect(aliceClaimTransaction2.verify(), true);
+  });
+
+  /// For a Schnorr-Spilman[1] payment channel on CRUZ there's one hiccup:
+  /// We need the atomicity of a single transaction conferring a balance to two
+  /// parties on a ledger without multiple outputs per transaction.
+  ///
+  /// In general, those parties can form an ephemeral joint key, and jointly
+  /// pre-sign transactions from it to each party forming it:
+  ///   Transaction 1 from JointKey(A,B,C) -> A sending them 5 CRUZ,
+  ///   Transaction 2 from JointKey(A,B,C) -> B sending them 9 CRUZ, and so on.
+  /// Then a single transaction to JointKey(A,B,C) acts like a transaction with
+  /// 3 outputs, albeit through an intermediate address and with an extra fee.
+  ///
+  /// The payment channel scheme described in [1] is updated as follows:
+  ///   For each payment Alice and Bob form an ephemeral joint key as described.
+  /// Now Alice must retain a return-balance transaction for each payment she
+  /// makes until the channel is closed.
+  ///
+  /// References:
+  /// [1] https://gist.github.com/markblundeberg/a3aba3c9d610e59c3c49199f697bc38b#schnorr-spilman-payment-channels-protocol
+  test('cruz payment channel', () {
+    /// One-way payment channel: Alice → Bob funded with [aliceFundsChannelWithCruz].
+    num aliceFundsChannelWithCruz = cruz.parse('10');
+    int cruzFee = cruz.parse(cruz.suggestedFee(null));
+    int cruzTipHeight = 328328;
+    int oneDayInBlocks = 6 * 24;
+
+    /// Alice generates [alicePriv] to open the channel.
+    final PrivateKey alicePriv = PrivateKey.fromSeed(randBytes(32));
+    final PublicKey alicePub = alicePriv.publicKey;
+
+    /// Alice sends Bob [alicePub], and H([aliceRefundR]) -------------------->.
+    final Uint8List aliceRefundr = generateNonce(alicePriv, randBytes(32));
+    final CurvePoint aliceRefundR = CurvePoint.fromScalar(aliceRefundr);
+
+    /// Bob generates [bobPriv] to accept Alice's open channel request.
+    final PrivateKey bobPriv = PrivateKey.fromSeed(randBytes(32));
+    final PublicKey bobPub = bobPriv.publicKey;
+
+    /// <------------------- Bob sends Alice [bobPub], and H([bobRefundAliceR]).
+    final bobRefundAlicer = generateNonce(bobPriv, randBytes(32));
+    final CurvePoint bobRefundAliceR = CurvePoint.fromScalar(bobRefundAlicer);
+
+    /// Bob creates [bobJointKey].
+    final JointKey bobJointKey =
+        JointKey.generate(<PublicKey>[alicePub, bobPub], bobPriv, 1);
+
+    /// Alice creates [aliceJointKey].
+    final JointKey aliceJointKey =
+        JointKey.generate(<PublicKey>[alicePub, bobPub], alicePriv, 0);
+    expect(aliceJointKey.jointPublicKey.data, bobJointKey.jointPublicKey.data);
+
+    /// Alice sends Bob [aliceFundingTransaction] ---------------------------->.
+    final CruzTransaction aliceFundingTransaction = CruzTransaction(
+        CruzPublicKey(alicePub.data),
+        CruzPublicKey(aliceJointKey.jointPublicKey.data),
+        aliceFundsChannelWithCruz + 3 * cruzFee,
+        cruzFee,
+        null,
+        seriesForHeight: cruzTipHeight);
+
+    /// Alice sends Bob [aliceRefundTransaction] and [aliceRefundR] ---------->.
+    final CruzTransaction aliceRefundTransaction = CruzTransaction(
+        CruzPublicKey(aliceJointKey.jointPublicKey.data),
+        CruzPublicKey(alicePub.data),
+        aliceFundsChannelWithCruz + 2 * cruzFee,
+        cruzFee,
+        null,
+        seriesForHeight: cruzTipHeight + 3 * oneDayInBlocks,
+        matures: cruzTipHeight + 3 * oneDayInBlocks);
+
+    /// Bob verifies [aliceRefundR] and notes [aliceRefundTransaction.matures].
+
+    /// <---------------- Bob signs [aliceRefundTransaction] and sends to Alice.
+    final SchnorrSignature aliceRefundTransactionSignedByBob = jointSign(
+        bobPriv,
+        bobJointKey,
+        <CurvePoint>[aliceRefundR, bobRefundAliceR],
+        bobRefundAlicer,
+        aliceRefundTransaction.id().data);
+
+    /// Alice verifies [aliceRefundTransaction].
+    expect(aliceRefundTransactionSignedByBob.R, bobRefundAliceR.pack());
+    final SchnorrSignature aliceRefundTransactionSignedByAlice = jointSign(
+        alicePriv,
+        aliceJointKey,
+        <CurvePoint>[aliceRefundR, bobRefundAliceR],
+        aliceRefundr,
+        aliceRefundTransaction.id().data);
+    final SchnorrSignature aliceRefundTransactionSignature = addSignatures(
+        aliceRefundTransactionSignedByAlice, aliceRefundTransactionSignedByBob);
+    aliceRefundTransaction.signature =
+        CruzSignature(aliceRefundTransactionSignature.data);
+    expect(aliceRefundTransaction.verify(), true);
+
+    /// Alice brodcasts [aliceFundingTransaction] to the cruz [PeerNetwork].
+
+    /// Bob waits for confirmations then tells Alice that the channel is open.
+    final int numChannelPayments = 5;
+    final List<int> alicePaysBobCruzbits = <int>[444, 9099, 1233, 8778, 92201];
+    final List<CruzTransaction> aliceReturnBalanceTransactions =
+        <CruzTransaction>[];
+    CruzTransaction lastBobReturnBalanceTransaction,
+        lastBobCloseChannelTransaction;
+    int aliceChannelBalance = aliceFundsChannelWithCruz, bobChannelBalance = 0;
+    for (int i = 0; i < numChannelPayments; i++) {
+      /// Alice generates ephemeral [alicePaymentPriv] to make her next payment.
+      final PrivateKey alicePaymentPriv = PrivateKey.fromSeed(randBytes(32));
+      final PublicKey alicePaymentPub = alicePaymentPriv.publicKey;
+
+      /// Alice sends Bob [alicePaymentPub], H([aliceReturnBalanceR]),
+      /// H([aliceBobReturnBalanceR]), and H([aliceBobCloseChannelR]) -------->.
+      final Uint8List aliceReturnBalancer =
+          generateNonce(alicePaymentPriv, randBytes(32));
+      final CurvePoint aliceReturnBalanceR =
+          CurvePoint.fromScalar(aliceReturnBalancer);
+      final Uint8List aliceBobReturnBalancer =
+          generateNonce(alicePaymentPriv, randBytes(32));
+      final CurvePoint aliceBobReturnBalanceR =
+          CurvePoint.fromScalar(aliceBobReturnBalancer);
+      final Uint8List aliceBobCloseChannelr =
+          generateNonce(alicePaymentPriv, randBytes(32));
+      final CurvePoint aliceBobCloseChannelR =
+          CurvePoint.fromScalar(aliceBobCloseChannelr);
+
+      /// Bob generates [bobPaymentPriv] to accept Alice's next payment.
+      final PrivateKey bobPaymentPriv = PrivateKey.fromSeed(randBytes(32));
+      final PublicKey bobPaymentPub = bobPaymentPriv.publicKey;
+
+      /// <------------ Bob sends Alice [bobPaymentPub], H([bobReturnBalanceR]),
+      /// H([bobAliceReturnBalanceR]), and H([bobCloseChannelR]).
+      final Uint8List bobReturnBalancer =
+          generateNonce(bobPaymentPriv, randBytes(32));
+      final CurvePoint bobReturnBalanceR =
+          CurvePoint.fromScalar(bobReturnBalancer);
+      final Uint8List bobAliceReturnBalancer =
+          generateNonce(bobPaymentPriv, randBytes(32));
+      final CurvePoint bobAliceReturnBalanceR =
+          CurvePoint.fromScalar(bobAliceReturnBalancer);
+      final Uint8List bobCloseChannelr =
+          generateNonce(bobPaymentPriv, randBytes(32));
+      final CurvePoint bobCloseChannelR =
+          CurvePoint.fromScalar(bobCloseChannelr);
+
+      /// Bob creates [bobPaymentJointKey].
+      final JointKey bobPaymentJointKey = JointKey.generate(
+          <PublicKey>[alicePaymentPub, bobPaymentPub], bobPaymentPriv, 1);
+
+      /// Alice creates [alicePaymentJointKey].
+      final JointKey alicePaymentJointKey = JointKey.generate(
+          <PublicKey>[alicePaymentPub, bobPaymentPub], alicePaymentPriv, 0);
+      expect(alicePaymentJointKey.jointPublicKey.data,
+          bobPaymentJointKey.jointPublicKey.data);
+
+      /// Alice sends Bob [aliceReturnBalanceR], [aliceBobReturnBalanceR],
+      /// and [aliceBobCloseChannelR] ---------------------------------------->.
+
+      /// Bob verifies [aliceReturnBalanceR], [aliceBobReturnBalanceR], and
+      /// [aliceBobCloseChannelR].
+
+      /// <-------------------------------- Bob sends Alice [bobReturnBalanceR],
+      /// [bobAliceReturnBalanceR], and [bobCloseChannelR].
+
+      /// Alice sends Bob signed [bobReturnBalanceTransaction] --------------->.
+      final CruzTransaction bobReturnBalanceTransaction = CruzTransaction(
+          CruzPublicKey(alicePaymentJointKey.jointPublicKey.data),
+          CruzPublicKey(bobPub.data),
+          bobChannelBalance + alicePaysBobCruzbits[i],
+          cruzFee,
+          null,
+          seriesForHeight: cruzTipHeight);
+      final SchnorrSignature bobReturnBalanceTransactionSignedByAlice =
+          jointSign(
+              alicePaymentPriv,
+              alicePaymentJointKey,
+              <CurvePoint>[aliceBobReturnBalanceR, bobReturnBalanceR],
+              aliceBobReturnBalancer,
+              bobReturnBalanceTransaction.id().data);
+
+      /// Bob verifies [bobReturnBalanceTransaction].
+      expect(bobReturnBalanceTransactionSignedByAlice.R,
+          aliceBobReturnBalanceR.pack());
+      final SchnorrSignature bobReturnBalanceTransactionSignedByByBob =
+          jointSign(
+              bobPaymentPriv,
+              bobPaymentJointKey,
+              <CurvePoint>[aliceBobReturnBalanceR, bobReturnBalanceR],
+              bobReturnBalancer,
+              bobReturnBalanceTransaction.id().data);
+      final SchnorrSignature bobReturnBalanceTransactionSignature =
+          addSignatures(bobReturnBalanceTransactionSignedByAlice,
+              bobReturnBalanceTransactionSignedByByBob);
+      bobReturnBalanceTransaction.signature =
+          CruzSignature(bobReturnBalanceTransactionSignature.data);
+      expect(bobReturnBalanceTransaction.verify(), true);
+
+      /// <------------- Bob sends Alice signed [aliceReturnBalanceTransaction].
+      final CruzTransaction aliceReturnBalanceTransaction = CruzTransaction(
+          CruzPublicKey(bobPaymentJointKey.jointPublicKey.data),
+          CruzPublicKey(alicePub.data),
+          aliceChannelBalance - alicePaysBobCruzbits[i],
+          cruzFee,
+          null,
+          seriesForHeight: cruzTipHeight);
+      final SchnorrSignature aliceReturnBalanceTransactionSignedByBob =
+          jointSign(
+              bobPaymentPriv,
+              bobPaymentJointKey,
+              <CurvePoint>[aliceReturnBalanceR, bobAliceReturnBalanceR],
+              bobAliceReturnBalancer,
+              aliceReturnBalanceTransaction.id().data);
+
+      /// Alice verifies [aliceReturnBalanceTransaction].
+      expect(aliceReturnBalanceTransactionSignedByBob.R,
+          bobAliceReturnBalanceR.pack());
+      final SchnorrSignature aliceReturnBalanceTransactionSignedByByAlice =
+          jointSign(
+              alicePaymentPriv,
+              alicePaymentJointKey,
+              <CurvePoint>[aliceReturnBalanceR, bobAliceReturnBalanceR],
+              aliceReturnBalancer,
+              aliceReturnBalanceTransaction.id().data);
+      final SchnorrSignature aliceReturnBalanceTransactionSignature =
+          addSignatures(aliceReturnBalanceTransactionSignedByBob,
+              aliceReturnBalanceTransactionSignedByByAlice);
+      aliceReturnBalanceTransaction.signature =
+          CruzSignature(aliceReturnBalanceTransactionSignature.data);
+      expect(aliceReturnBalanceTransaction.verify(), true);
+
+      /// Alice sends Bob signed [bobCloseChannelTransaction] ---------------->.
+      final CruzTransaction bobCloseChannelTransaction = CruzTransaction(
+          CruzPublicKey(aliceJointKey.jointPublicKey.data),
+          CruzPublicKey(alicePaymentJointKey.jointPublicKey.data),
+          aliceFundingTransaction.amount,
+          cruzFee,
+          null,
+          seriesForHeight: cruzTipHeight);
+      final SchnorrSignature bobCloseChannelTransactionSignedByAlice =
+          jointSign(
+              alicePriv,
+              aliceJointKey,
+              <CurvePoint>[aliceBobCloseChannelR, bobCloseChannelR],
+              aliceBobCloseChannelr,
+              bobCloseChannelTransaction.id().data);
+
+      /// Bob verifies [bobCloseChannelTransaction].
+      expect(bobCloseChannelTransactionSignedByAlice.R,
+          aliceBobCloseChannelR.pack());
+      final SchnorrSignature bobCloseChannelTransactionSignedByBob = jointSign(
+          bobPriv,
+          bobJointKey,
+          <CurvePoint>[aliceBobCloseChannelR, bobCloseChannelR],
+          bobCloseChannelr,
+          bobCloseChannelTransaction.id().data);
+      final SchnorrSignature bobCloseChannelTransactionSignature =
+          addSignatures(bobCloseChannelTransactionSignedByAlice,
+              bobCloseChannelTransactionSignedByBob);
+      bobCloseChannelTransaction.signature =
+          CruzSignature(bobCloseChannelTransactionSignature.data);
+      expect(bobCloseChannelTransaction.verify(), true);
+
+      /// Bob updates [bobChannelBalance], [lastBobCloseChannelTransaction],
+      /// and [lastBobReturnBalanceTransaction].
+      lastBobCloseChannelTransaction = bobCloseChannelTransaction;
+      lastBobReturnBalanceTransaction = bobReturnBalanceTransaction;
+      bobChannelBalance = bobReturnBalanceTransaction.amount;
+
+      /// Alice updates [aliceChannelBalance], and stores [aliceReturnBalanceTransaction].
+      aliceReturnBalanceTransactions.add(aliceReturnBalanceTransaction);
+      aliceChannelBalance = aliceReturnBalanceTransaction.amount;
+    }
+
+    /// Bob broadcasts [lastBobCloseChannelTransaction] before [aliceRefundTransaction.matures].
+
+    /// Bob waits for confirmation and then broadcasts [lastBobReturnBalanceTransaction].
+
+    /// Alice broadcasts the matching transaction from [aliceReturnBalanceTransactions].
+
+    /// The channel is closed.
+    int sumAlicePaysBobCruzbits = alicePaysBobCruzbits.reduce((a, b) => a + b);
+    expect(lastBobReturnBalanceTransaction.amount, sumAlicePaysBobCruzbits);
+    expect(aliceReturnBalanceTransactions.last.amount,
+        aliceFundsChannelWithCruz - sumAlicePaysBobCruzbits);
   });
 }
