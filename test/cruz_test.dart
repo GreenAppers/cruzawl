@@ -133,20 +133,39 @@ void main() {
     int cruz1fee = cruz.parse(cruz.suggestedFee(null)), cruz2fee = cruz1fee;
     int oneDayInBlocks = 6 * 24;
 
-    /// Alice generates Keypair1 for cruz1 and Keypair2 for cruz2.
+    /// Alice generates [alicePriv1] for cruz1 and [alicePriv2] for cruz2.
     final PrivateKey alicePriv1 = PrivateKey.fromSeed(randBytes(32));
     final PrivateKey alicePriv2 = PrivateKey.fromSeed(randBytes(32));
-    final PublicKey alicePub1 = alicePriv1.publicKey,
-        alicePub2 = alicePriv2.publicKey;
+    final PublicKey alicePub1 = alicePriv1.publicKey;
+    final PublicKey alicePub2 = alicePriv2.publicKey;
 
-    /// Alice sends Bob [alicePub2] ------------------------------------------>.
+    /// Alice sends Bob [alicePub2], H([aliceRefundR1]), H([aliceClaimR2]),
+    /// H([aliceRefundBobR2]), and H([aliceBobClaimR1]) ---------------------->.
+    final Uint8List aliceRefundr1 = generateNonce(alicePriv1, randBytes(32));
+    final CurvePoint aliceRefundR1 = CurvePoint.fromScalar(aliceRefundr1);
+    final aliceClaimr2 = generateNonce(alicePriv2, randBytes(32));
+    final CurvePoint aliceClaimR2 = CurvePoint.fromScalar(aliceClaimr2);
+    final aliceRefundBobr2 = generateNonce(alicePriv2, randBytes(32));
+    final CurvePoint aliceRefundBobR2 = CurvePoint.fromScalar(aliceRefundBobr2);
+    final Uint8List aliceBobClaimr1 = generateNonce(alicePriv1, randBytes(32));
+    final CurvePoint aliceBobClaimR1 = CurvePoint.fromScalar(aliceBobClaimr1);
 
-    /// Bob generates Keypair1 for cruz1 and Keypair2 for cruz2.
+    /// Bob generates [bobPriv1] for cruz1, [bobPriv2] for cruz2, and [bobAdaptor].
     final PrivateKey bobPriv1 = PrivateKey.fromSeed(randBytes(32));
     final PrivateKey bobPriv2 = PrivateKey.fromSeed(randBytes(32));
     final PublicKey bobPub1 = bobPriv1.publicKey, bobPub2 = bobPriv2.publicKey;
+    final Adaptor bobAdaptor = Adaptor.generate(randBytes(32));
 
-    /// <-------------------------------------------- Bob sends Alice [bobPub1].
+    /// <--------- Bob sends Alice [bobPub1], H([bobRefundr2]), H([bobClaimR1]),
+    /// H([bobRefundAliceR1]), H([bobAliceClaimR2]), and [bobAdaptor.point].
+    final Uint8List bobRefundr2 = generateNonce(bobPriv2, randBytes(32));
+    final CurvePoint bobRefundR2 = CurvePoint.fromScalar(bobRefundr2);
+    final bobClaimr1 = generateNonce(bobPriv1, randBytes(32));
+    final CurvePoint bobClaimR1 = CurvePoint.fromScalar(bobClaimr1);
+    final bobRefundAlicer1 = generateNonce(bobPriv1, randBytes(32));
+    final CurvePoint bobRefundAliceR1 = CurvePoint.fromScalar(bobRefundAlicer1);
+    final Uint8List bobAliceClaimr2 = generateNonce(bobPriv2, randBytes(32));
+    final CurvePoint bobAliceClaimR2 = CurvePoint.fromScalar(bobAliceClaimr2);
 
     /// Bob creates [bobJointKey2].
     final JointKey bobJointKey2 =
@@ -155,6 +174,9 @@ void main() {
     /// Alice creates [aliceJointKey1].
     final JointKey aliceJointKey1 =
         JointKey.generate(<PublicKey>[alicePub1, bobPub1], alicePriv1, 0);
+
+    /// Alice sends Bob [aliceRefundR1], [aliceClaimR2], [aliceRefundBobR2], and
+    /// [aliceBobClaimR1] ---------------------------------------------------->.
 
     /// Alice sends Bob [aliceFundingTransaction1] --------------------------->.
     final CruzTransaction aliceFundingTransaction1 = CruzTransaction(
@@ -165,7 +187,7 @@ void main() {
         null,
         seriesForHeight: cruz1height);
 
-    /// Alice sends Bob [aliceRefundTransaction1] and [aliceRefundR1] -------->.
+    /// Alice sends Bob [aliceRefundTransaction1] ---------------------------->.
     final CruzTransaction aliceRefundTransaction1 = CruzTransaction(
         CruzPublicKey(aliceJointKey1.jointPublicKey.data),
         CruzPublicKey(alicePub1.data),
@@ -174,11 +196,8 @@ void main() {
         null,
         seriesForHeight: cruz1height,
         matures: cruz1height + oneDayInBlocks);
-    final Uint8List aliceRefundr1 =
-        generateNonce(alicePriv1, aliceRefundTransaction1.id().data);
-    final CurvePoint aliceRefundR1 = CurvePoint.fromScalar(aliceRefundr1);
 
-    /// Alice sends Bob [bobClaimTransaction1] and [aliceBobClaimR1] --------->.
+    /// Alice sends Bob [bobClaimTransaction1] ------------------------------->.
     final CruzTransaction bobClaimTransaction1 = CruzTransaction(
         CruzPublicKey(aliceJointKey1.jointPublicKey.data),
         CruzPublicKey(bobPub1.data),
@@ -187,9 +206,12 @@ void main() {
         null,
         seriesForHeight: cruz1height,
         expires: cruz1height + oneDayInBlocks);
-    final Uint8List aliceBobClaimr1 =
-        generateNonce(alicePriv1, bobClaimTransaction1.id().data);
-    final CurvePoint aliceBobClaimR1 = CurvePoint.fromScalar(aliceBobClaimr1);
+
+    /// Bob verifies [aliceRefundR1], [aliceClaimR2], [aliceRefundBobR2], and
+    /// [aliceBobClaimR1].
+
+    /// <-------------------------- Bob sends Alice [bobRefundR2], [bobClaimR1],
+    /// [bobRefundAliceR1], and [bobAliceClaimR2].
 
     /// <--------------------------- Bob sends Alice [bobFundingTransaction2].
     final CruzTransaction bobFundingTransaction2 = CruzTransaction(
@@ -209,9 +231,6 @@ void main() {
         null,
         seriesForHeight: cruz2height,
         matures: cruz2height + oneDayInBlocks * 2);
-    final Uint8List bobRefundr2 =
-        generateNonce(bobPriv2, bobRefundTransaction2.id().data);
-    final CurvePoint bobRefundR2 = CurvePoint.fromScalar(bobRefundr2);
 
     /// <--------- Bob sends Alice [aliceClaimTransaction2] and [bobAliceClaimR2].
     final CruzTransaction aliceClaimTransaction2 = CruzTransaction(
@@ -222,24 +241,9 @@ void main() {
         null,
         seriesForHeight: cruz2height,
         expires: cruz2height + oneDayInBlocks * 2);
-    final Uint8List bobAliceClaimr2 =
-        generateNonce(bobPriv2, aliceClaimTransaction2.id().data);
-    final CurvePoint bobAliceClaimR2 = CurvePoint.fromScalar(bobAliceClaimr2);
 
-    /// <------------------ Bob generates [bobRefundAliceR1] and sends to Alice.
-    final bobRefundAlicer1 =
-        generateNonce(bobPriv1, aliceRefundTransaction1.id().data);
-    final CurvePoint bobRefundAliceR1 = CurvePoint.fromScalar(bobRefundAlicer1);
-
-    /// Alice generates [aliceClaimR2] and sends to Bob ---------------------->.
-    final aliceClaimr2 =
-        generateNonce(alicePriv2, aliceClaimTransaction2.id().data);
-    final CurvePoint aliceClaimR2 = CurvePoint.fromScalar(aliceClaimr2);
-
-    /// Alice generates [aliceRefundBobR2] and sends to Bob ------------------>.
-    final aliceRefundBobr2 =
-        generateNonce(alicePriv2, bobRefundTransaction2.id().data);
-    final CurvePoint aliceRefundBobR2 = CurvePoint.fromScalar(aliceRefundBobr2);
+    /// Alice verifies [bobRefundR2], [bobClaimR1], [bobRefundAliceR1], and
+    /// [bobAliceClaimR2].
 
     /// Alice signs [bobRefundTransaction2] and sends to Bob ----------------->.
     final JointKey aliceJointKey2 = JointKey.generate(
@@ -250,6 +254,7 @@ void main() {
         alicePriv2,
         aliceJointKey2,
         <CurvePoint>[aliceRefundBobR2, bobRefundR2],
+        aliceRefundBobr2,
         bobRefundTransaction2.id().data);
 
     /// <--------------- Bob signs [aliceRefundTransaction1] and sends to Alice.
@@ -261,13 +266,16 @@ void main() {
         bobPriv1,
         bobJointKey1,
         <CurvePoint>[aliceRefundR1, bobRefundAliceR1],
+        bobRefundAlicer1,
         aliceRefundTransaction1.id().data);
 
-    /// Alice verifies [aliceRefundTransaction1]
+    /// Alice verifies [aliceRefundTransaction1].
+    expect(aliceRefundTransaction1signedByBob.R, bobRefundAliceR1.pack());
     final SchnorrSignature aliceRefundTransaction1signedByAlice = jointSign(
         alicePriv1,
         aliceJointKey1,
         <CurvePoint>[aliceRefundR1, bobRefundAliceR1],
+        aliceRefundr1,
         aliceRefundTransaction1.id().data);
     final SchnorrSignature aliceRefundTransactionSignature = addSignatures(
         aliceRefundTransaction1signedByAlice,
@@ -276,11 +284,13 @@ void main() {
         CruzSignature(aliceRefundTransactionSignature.data);
     expect(aliceRefundTransaction1.verify(), true);
 
-    /// Bob verifies [bobRefundTransaction2]
+    /// Bob verifies [aliceRefundBobR2] and [bobRefundTransaction2].
+    expect(bobRefundTransaction2signedByAlice.R, aliceRefundBobR2.pack());
     final SchnorrSignature bobRefundTransaction2signedByBob = jointSign(
         bobPriv2,
         bobJointKey2,
         <CurvePoint>[aliceRefundBobR2, bobRefundR2],
+        bobRefundr2,
         bobRefundTransaction2.id().data);
     final SchnorrSignature bobRefundTransactionSignature = addSignatures(
         bobRefundTransaction2signedByAlice, bobRefundTransaction2signedByBob);
@@ -292,17 +302,16 @@ void main() {
 
     /// Bob brodcasts [bobFundingTransaction2] to the cruz2 [PeerNetwork].
 
-    /// <----------------------------------- Bob sends Alice [bobAdaptor.point].
-    final Adaptor bobAdaptor = Adaptor.generate(randBytes(32));
-
     /// <-------------------- Bob sends Alice [bobAdaptorSignatureForBobsClaim].
-    final bobClaimr1 = generateNonce(bobPriv1, bobClaimTransaction1.id().data);
-    final CurvePoint bobClaimR1 = CurvePoint.fromScalar(bobClaimr1);
     final SchnorrSignature bobAdaptorSignatureForBobsClaim =
-        jointSignWithAdaptor(bobPriv1, bobJointKey1, aliceBobClaimR1,
-            bobClaimR1, bobAdaptor.point, bobClaimTransaction1.id().data);
-    expect(equalUint8List(bobAdaptorSignatureForBobsClaim.R, bobClaimR1.pack()),
-        true);
+        jointSignWithAdaptor(
+            bobPriv1,
+            bobJointKey1,
+            aliceBobClaimR1,
+            bobClaimR1,
+            bobAdaptor.point,
+            bobClaimr1,
+            bobClaimTransaction1.id().data);
 
     /// <------------------ Bob sends Alice [bobAdaptorSignatureForAlicesClaim].
     final SchnorrSignature bobAdaptorSignatureForAlicesClaim =
@@ -312,13 +321,11 @@ void main() {
             aliceClaimR2,
             bobAliceClaimR2,
             bobAdaptor.point,
+            bobAliceClaimr2,
             aliceClaimTransaction2.id().data);
-    expect(
-        equalUint8List(
-            bobAdaptorSignatureForAlicesClaim.R, bobAliceClaimR2.pack()),
-        true);
 
     /// Alice verifies [bobAdaptorSignatureForBobsClaim].
+    expect(bobAdaptorSignatureForBobsClaim.R, bobClaimR1.pack());
     expect(
         verifyAdaptorSignature(
             aliceJointKey1.primePublicKeys[1],
@@ -331,6 +338,7 @@ void main() {
         true);
 
     /// Alice verifies [bobAdaptorSignatureForAlicesClaim].
+    expect(bobAdaptorSignatureForAlicesClaim.R, bobAliceClaimR2.pack());
     expect(
         verifyAdaptorSignature(
             aliceJointKey2.primePublicKeys[1],
@@ -350,13 +358,11 @@ void main() {
             aliceBobClaimR1,
             CurvePoint.unpack(bobAdaptorSignatureForBobsClaim.R),
             bobAdaptor.point,
+            aliceBobClaimr1,
             bobClaimTransaction1.id().data);
-    expect(
-        equalUint8List(
-            aliceAdaptorSignatureForBobsClaim.R, aliceBobClaimR1.pack()),
-        true);
 
     /// Bob signs and broadcasts [bobClaimTransaction1] to the cruz1 [PeerNetwork].
+    expect(aliceAdaptorSignatureForBobsClaim.R, aliceBobClaimR1.pack());
     final SchnorrSignature bobClaimSignature = addSignatures(
         addSignatures(
             aliceAdaptorSignatureForBobsClaim, bobAdaptorSignatureForBobsClaim),
@@ -364,12 +370,12 @@ void main() {
     bobClaimTransaction1.signature = CruzSignature(bobClaimSignature.data);
     expect(bobClaimTransaction1.verify(), true);
 
-    /// Alice deduces [bobAdaptor.secret].
+    /// Alice deduces [bobAdaptor.secret] from [bobClaimTransaction1].
     final Uint8List secret = CurvePoint.subtractScalars(
         bobClaimTransaction1.signature.data.sublist(32),
         CurvePoint.addScalars(aliceAdaptorSignatureForBobsClaim.s,
             bobAdaptorSignatureForBobsClaim.s));
-    expect(equalUint8List(secret, bobAdaptor.secret), true);
+    expect(secret, bobAdaptor.secret);
 
     /// Alice signs and broadcasts [aliceClaimTransaction2] to the cruz2 [PeerNetwork].
     final SchnorrSignature aliceAdaptorSignatureForAlicesClaim =
@@ -379,11 +385,9 @@ void main() {
             aliceClaimR2,
             bobAliceClaimR2,
             bobAdaptor.point,
+            aliceClaimr2,
             aliceClaimTransaction2.id().data);
-    expect(
-        equalUint8List(
-            aliceAdaptorSignatureForAlicesClaim.R, aliceClaimR2.pack()),
-        true);
+    expect(aliceAdaptorSignatureForAlicesClaim.R, aliceClaimR2.pack());
     final SchnorrSignature aliceClaimSignature = addSignatures(
         addSignatures(aliceAdaptorSignatureForAlicesClaim,
             bobAdaptorSignatureForAlicesClaim),

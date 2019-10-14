@@ -115,13 +115,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "3.0.0"
-  logging:
-    dependency: transitive
-    description:
-      name: logging
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "0.11.3+2"
   merkletree:
     dependency: transitive
     description:
@@ -163,7 +156,7 @@ packages:
       name: sembast
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.0.1+2"
+    version: "2.1.0"
   source_span:
     dependency: transitive
     description:
@@ -206,7 +199,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "58c5390a58a37c1efe3e73d8e8d02f6226edd99c"
+      resolved-ref: "523ac35ae76629933e4b2bfeed9cd4629e98801b"
       url: "https://github.com/GreenAppers/tweetnacl-musig"
     source: git
     version: "1.0.0+0"
@@ -218,4 +211,4 @@ packages:
     source: hosted
     version: "1.1.6"
 sdks:
-  dart: ">=2.3.0 <3.0.0"
+  dart: ">=2.4.0-dev <3.0.0"
