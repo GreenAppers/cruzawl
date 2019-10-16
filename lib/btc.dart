@@ -55,6 +55,9 @@ class BTC extends Currency {
   @override
   String get url => 'https://github.com/trottier/original-bitcoin';
 
+  @override
+  String get supplementalApiUrl => 'https://blockchain.info';
+
   /// The coin type used for HD wallets.
   /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
   @override

@@ -40,6 +40,9 @@ abstract class Currency {
   /// URL for the currency.
   String get url;
 
+  /// E.g. Etherscan for historical transactions on ETH.
+  String get supplementalApiUrl => null;
+
   /// Coin ID for HD wallets. e.g. 831.
   /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
   int get bip44CoinType;

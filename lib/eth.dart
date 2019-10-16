@@ -47,6 +47,9 @@ class ETH extends Currency {
   @override
   String get url => 'https://www.ethereum.org/';
 
+  @override
+  String get supplementalApiUrl => 'https://api.etherscan.io/';
+
   /// The coin type used for HD wallets.
   /// Reference: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
   @override
@@ -102,13 +105,13 @@ class ETH extends Currency {
   @override
   PublicAddress get nullAddress => EthereumPublicKey(Uint8List(64));
 
-  /// Create a [EtherscanInfuraAPINetwork] instance.
+  /// Create a [SupplementedEthereumRPCNetwork] instance.
   @override
-  EtherscanInfuraAPINetwork createNetwork(
+  SupplementedEthereumRPCNetwork createNetwork(
           {VoidCallback peerChanged,
           VoidCallback tipChanged,
           HttpClient httpClient}) =>
-      EtherscanInfuraAPINetwork(httpClient, peerChanged, tipChanged);
+      SupplementedEthereumRPCNetwork(httpClient, peerChanged, tipChanged);
 
   /// The first [Block] in the chain. e.g. https://www.etherchain.org/block/0
   @override
@@ -790,11 +793,11 @@ class EthereumBlock extends Block {
   EthereumTransactionId computeHashRoot() => null;
 }
 
-/// INFURA API with optional combination of Etherscan API.
-class EtherscanInfuraAPINetwork extends PeerNetwork {
+/// Ethereum RPC optionally supplemented with Etherscan.
+class SupplementedEthereumRPCNetwork extends PeerNetwork {
   HttpClient httpClient;
 
-  EtherscanInfuraAPINetwork(
+  SupplementedEthereumRPCNetwork(
       this.httpClient, VoidCallback peerChanged, VoidCallback tipChanged)
       : super(peerChanged, tipChanged);
 
@@ -804,27 +807,30 @@ class EtherscanInfuraAPINetwork extends PeerNetwork {
   /// Creates [Peer] ready to [Peer.connect()].
   @override
   Peer createPeerWithSpec(PeerPreference spec) =>
-      EtherscanInfuraAPI(spec, parseUri(spec.url), httpClient, spec.root);
+      SupplementedEthereumRPC(spec, parseUri(spec.url), httpClient, spec.root);
 
-  /// Valid INFURA URI: 'mainnet.infura.io', 'wss://mainnet.infura.io/ws/v3/YOUR-PROJECT-ID'.
+  /// Valid URI: '10.0.0.1', 'ws://10.0.01', 'mainnet.infura.io',
+  /// 'wss://mainnet.infura.io/ws/v3/YOUR-PROJECT-ID'.
   String parseUri(String uriText) {
-    if (!Uri.parse(uriText).hasScheme) uriText = 'wss://' + uriText;
     Uri uri = Uri.parse(uriText);
+    bool infura = uri.host.toLowerCase().endsWith('infura.io');
+    if (!uri.hasScheme) {
+      uri = Uri.parse(infura ? 'wss://' : 'ws://' + uriText);
+    }
     Uri url = uri.replace(
-        path: uri.path.isEmpty
+        port: (uri.hasPort || infura) ? uri.port : 8546,
+        path: (uri.path.isEmpty && infura)
             ? '/ws/v3/3b9c62d39b5f4dc5b0d78f2c717fb2f1'
             : uri.path);
     return url.toString();
   }
 }
 
-/// Etherscan+INFURA implementation of the [PeerNetwork] entry [Peer] abstraction.
-/// Use INFURA WebSocket API for eth_subscribe and eth_getBalance.
-/// Refrence: https://infura.io/docs/ethereum/wss/introduction.md
-/// Use Etherscan for everything else.
-/// Reference: https://etherscan.io/apis
-class EtherscanInfuraAPI extends InfuraAPI with EtherscanAPI {
-  EtherscanInfuraAPI(PeerPreference spec, String webSocketAddress,
+/// Uses Etherscan (https://etherscan.io/apis) for historical transaction information.
+/// Uses Ethereum RPC (https://infura.io/docs/ethereum/wss/introduction.md) for the rest.
+/// Tested with geth and INFURA.
+class SupplementedEthereumRPC extends EthereumRPC with EtherscanAPI {
+  SupplementedEthereumRPC(PeerPreference spec, String webSocketAddress,
       HttpClient httpClient, String httpAddress)
       : super(spec, webSocketAddress) {
     this.httpClient = httpClient;
@@ -832,7 +838,7 @@ class EtherscanInfuraAPI extends InfuraAPI with EtherscanAPI {
     responseComplete = dispatchFromThrottleQueue;
   }
 
-  /// Throttles sum of outstanding InfurAPI and EtherscanAPI calls.
+  /// Throttles sum of outstanding EthereumRPC and EtherscanAPI calls.
   int get numOutstanding => jsonResponseMap.length + httpClient.numOutstanding;
 }
 
@@ -865,6 +871,8 @@ mixin EtherscanAPI on HttpClientMixin {
   Future<TransactionIteratorResults> getTransactions(
       PublicAddress address, TransactionIterator iterator,
       {int limit = 50}) {
+    if (httpAddress == null)
+      return Future.value(TransactionIteratorResults(0, 0, <Transaction>[]));
     Completer<TransactionIteratorResults> completer =
         Completer<TransactionIteratorResults>();
     int page = iterator != null ? iterator.index : 0;
@@ -889,8 +897,8 @@ mixin EtherscanAPI on HttpClientMixin {
   }
 }
 
-/// https://infura.io/docs/ethereum/wss/introduction.md
-class InfuraAPI extends PersistentWebSocketClient
+/// https://github.com/ethereum/wiki/wiki/JSON-RPC
+class EthereumRPC extends PersistentWebSocketClient
     with JsonResponseMapMixin, HttpClientMixin {
   /// The [EthereumAddress] we're monitoring for.
   Map<String, TransactionCallback> addressFilter =
@@ -912,11 +920,11 @@ class InfuraAPI extends PersistentWebSocketClient
   @override
   num minFee;
 
-  /// INFURA heads subscription id.
+  /// Heads subscription id.
   String headsSubscription;
 
   /// Forward [Peer] constructor.
-  InfuraAPI(PeerPreference spec, String webSocketAddress)
+  EthereumRPC(PeerPreference spec, String webSocketAddress)
       : super(spec, webSocketAddress) {
     queryNumberField = 'id';
   }
@@ -1145,10 +1153,11 @@ class InfuraAPI extends PersistentWebSocketClient
     return completer.future;
   }
 
-  /// Handle the INFURA WebSocket API message frame.
+  /// Handle the Ethereum WebSocket message frame.
   void handleMessage(String message) {
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
-      debugPrintLong('got infura API message ' + message, spec.debugPrint);
+      debugPrintLong(
+          'got Ethereum WebSocket message ' + message, spec.debugPrint);
     }
     Map<String, dynamic> json = jsonDecode(message);
     Map<String, dynamic> params = json == null ? null : json['params'];

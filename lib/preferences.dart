@@ -113,9 +113,9 @@ class CruzawlPreferences {
       return <PeerPreference>[
         PeerPreference('Satoshi Locomoco', 'wallet.cruzbit.xyz', 'CRUZ', ''),
         PeerPreference('BLOCKCHAIN', 'ws.blockchain.info', 'BTC', '',
-            root: 'https://blockchain.info'),
-        PeerPreference('Etherscan+INFURA', 'mainnet.infura.io', 'ETH', '',
-            root: 'https://api.etherscan.io/'),
+            root: btc.supplementalApiUrl),
+        PeerPreference('INFURA', 'mainnet.infura.io', 'ETH', '',
+            root: eth.supplementalApiUrl),
       ];
     }
     return peers.map<PeerPreference>((v) => PeerPreference.fromJson(v)).toList()
