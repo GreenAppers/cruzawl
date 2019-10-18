@@ -7,23 +7,27 @@ part of 'eth.dart';
 // **************************************************************************
 
 EthereumTransaction _$EthereumTransactionFromJson(Map<String, dynamic> json) {
-  return EthereumTransaction()
+  return EthereumTransaction(
+    json['from'] == null
+        ? null
+        : EthereumAddressHash.fromJson(json['from'] as String),
+    json['to'] == null
+        ? null
+        : EthereumAddressHash.fromJson(json['to'] as String),
+    ETH.hexDecodeInt(json['value'] as String),
+    ETH.hexDecodeInt(json['gas'] as String),
+    ETH.hexDecodeInt(json['gasPrice'] as String),
+    ETH.hexDecodeInt(json['nonce'] as String),
+    input: ETH.hexDecode(json['input'] as String),
+    sigR: ETH.hexDecode(json['r'] as String),
+    sigS: ETH.hexDecode(json['s'] as String),
+    sigV: ETH.hexDecodeInt(json['v'] as String),
+  )
     ..hash = json['hash'] == null
         ? null
         : EthereumTransactionId.fromJson(json['hash'] as String)
     ..index = ETH.hexDecodeInt(json['transactionIndex'] as String)
-    ..height = ETH.hexDecodeInt(json['blockNumber'] as String)
-    ..nonce = ETH.hexDecodeInt(json['nonce'] as String)
-    ..from = json['from'] == null
-        ? null
-        : EthereumAddressHash.fromJson(json['from'] as String)
-    ..to = json['to'] == null
-        ? null
-        : EthereumAddressHash.fromJson(json['to'] as String)
-    ..value = ETH.hexDecodeInt(json['value'] as String)
-    ..gas = ETH.hexDecodeInt(json['gas'] as String)
-    ..gasPrice = ETH.hexDecodeInt(json['gasPrice'] as String)
-    ..input = ETH.hexDecode(json['input'] as String);
+    ..height = ETH.hexDecodeInt(json['blockNumber'] as String);
 }
 
 Map<String, dynamic> _$EthereumTransactionToJson(EthereumTransaction instance) {
@@ -45,6 +49,9 @@ Map<String, dynamic> _$EthereumTransactionToJson(EthereumTransaction instance) {
   writeNotNull('gas', instance.gas);
   writeNotNull('gasPrice', instance.gasPrice);
   writeNotNull('input', instance.input);
+  writeNotNull('v', instance.sigV);
+  writeNotNull('r', instance.sigR);
+  writeNotNull('s', instance.sigS);
   return val;
 }
 

@@ -8,6 +8,7 @@ import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/test.dart';
 
 void main() {
+  /// See [EthereumTester] in lib/test.dart for the on-device unit tests.
   EthereumTester(group, test, expect).run();
   //EthereumWalletTester(group, test, expect).run();
 

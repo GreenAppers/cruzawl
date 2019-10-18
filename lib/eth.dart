@@ -9,6 +9,8 @@ import 'dart:typed_data';
 import 'package:bip32/bip32.dart' as bip32;
 import 'package:bip32/src/utils/ecurve.dart' as ecc;
 import "package:convert/convert.dart";
+import 'package:ethereum_util/src/rlp.dart' as Rlp;
+import 'package:ethereum_util/src/signature.dart' as Signature;
 import "package:fixnum/fixnum.dart";
 import 'package:json_annotation/json_annotation.dart';
 import 'package:meta/meta.dart';
@@ -328,25 +330,6 @@ class EthereumPrivateKey extends PrivateKey {
       EthereumPublicKey(ecc.pointFromScalar(data, false).sublist(1));
 }
 
-/// ECDSA signature, 64 bytes.
-@immutable
-class EthereumSignature extends Signature {
-  final Uint8List data;
-  static const int size = 64;
-
-  /// Fully specified constructor used by JSON deserializer.
-  EthereumSignature(this.data) {
-    if (data.length != size) throw FormatException();
-  }
-
-  /// Unmarshals hex string to [EthereumSignature].
-  EthereumSignature.fromJson(String x) : this(ETH.hexDecode(x));
-
-  /// Marshals [EthereumSignature] as a hex string.
-  @override
-  String toJson() => ETH.hexEncode(data);
-}
-
 /// SLIP-0010 chain code.
 @immutable
 class EthereumChainCode extends ChainCode {
@@ -378,7 +361,8 @@ class EthereumTransactionId extends TransactionId {
   }
 
   /// Computes the hash of [transaction] - not implemented.
-  EthereumTransactionId.compute(EthereumTransaction transaction) : data = null;
+  EthereumTransactionId.compute(Uint8List rlpEncodedTransaction)
+      : data = SHA3Digest(256, true).process(rlpEncodedTransaction);
 
   /// Unmarshals a hex string to [EthereumTransactionId].
   EthereumTransactionId.fromJson(String x) : this(ETH.hexDecode(x));
@@ -471,11 +455,27 @@ class EthereumTransaction extends Transaction {
   @JsonKey(fromJson: ETH.hexDecode)
   Uint8List input;
 
+  /// The v component of the signature of this transaction.
+  @JsonKey(name: 'v', fromJson: ETH.hexDecodeInt)
+  int sigV;
+
+  /// The r component of the signature of this transaction.
+  @JsonKey(name: 'r', fromJson: ETH.hexDecode)
+  Uint8List sigR;
+
+  /// The s component of the signature of this transaction.
+  @JsonKey(name: 's', fromJson: ETH.hexDecode)
+  Uint8List sigS;
+
+  /// e.g. 1 for mainnet and 4 for Rinkeby Testnet.
+  @JsonKey(ignore: true)
+  int chainId;
+
   @override
   DateTime get dateTime => null;
 
   @override
-  bool get isCoinbase => from == null;
+  bool get isCoinbase => false;
 
   @override
   List<EthereumTransactionInput> get inputs =>
@@ -502,7 +502,33 @@ class EthereumTransaction extends Transaction {
   int get expires => null;
 
   /// Creates an arbitrary unsigned [EthereumTransaction].
-  EthereumTransaction();
+  EthereumTransaction(
+      this.from, this.to, this.value, this.gas, this.gasPrice, this.nonce,
+      {this.input, this.sigR, this.sigS, this.sigV, this.chainId = 1}) {
+    if (from == null && sigR != null && sigS != null && sigV != null) {
+      from = EthereumAddressHash.compute(recoverSenderPublicKey());
+    }
+  }
+
+  /// Unmarshals a RLP-encoded Uint8List to [EthereumTransaction].
+  factory EthereumTransaction.fromRlp(Uint8List rlp, {int chainId}) {
+    List<dynamic> t = Rlp.decode(rlp);
+    if (t.length != 9) throw FormatException('Invalid length ${t.length}');
+    int sigV = decodeBigInt(t[6]).toInt(), derivedChainId = (sigV - 35) ~/ 2;
+    if (derivedChainId >= 0) chainId ??= derivedChainId;
+    return EthereumTransaction(
+        null,
+        EthereumAddressHash(t[3]),
+        decodeBigInt(t[4]).toInt(),
+        decodeBigInt(t[2]).toInt(),
+        decodeBigInt(t[1]).toInt(),
+        decodeBigInt(t[0]).toInt(),
+        input: t[5],
+        sigV: decodeBigInt(t[6]).toInt(),
+        sigR: t[7],
+        sigS: t[8],
+        chainId: chainId);
+  }
 
   /// Unmarshals a JSON-encoded string to [EthereumTransaction].
   factory EthereumTransaction.fromJson(Map<String, dynamic> json) =>
@@ -512,16 +538,70 @@ class EthereumTransaction extends Transaction {
   @override
   Map<String, dynamic> toJson() => _$EthereumTransactionToJson(this);
 
-  /// Computes an ID for this transaction.
+  /// Marshals [EthereumTransaction] as a RLP-encoded Uint8List.
+  Uint8List toRlp({bool withSignature = true}) {
+    /// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md
+    return ((sigV != chainId * 2 + 35) &&
+            (sigV != chainId * 2 + 36) &&
+            withSignature == false)
+        ? Rlp.encode(<dynamic>[nonce, gasPrice, gas, to.data, value, input])
+        : Rlp.encode(<dynamic>[
+            nonce,
+            gasPrice,
+            gas,
+            to.data,
+            value,
+            input,
+            withSignature ? sigV : chainId,
+            withSignature ? sigR : Uint8List(0),
+            withSignature ? sigS : Uint8List(0)
+          ]);
+  }
+
+  /// Computes the signed hash for this transaction.
   @override
-  EthereumTransactionId id() => hash;
+  EthereumTransactionId id() => EthereumTransactionId.compute(toRlp());
+
+  // Computes the unsigned hash for this transaction.
+  EthereumTransactionId unsignedHash() =>
+      EthereumTransactionId.compute(toRlp(withSignature: false));
+
+  Uint8List signature() => Uint8List.fromList(sigR + sigS + [sigV]);
 
   /// Signs this transaction.
-  void sign(EthereumPrivateKey key) {}
+  void sign(EthereumPrivateKey key) {
+    Signature.ECDSASignature sig =
+        Signature.sign(unsignedHash().data, key.data, chainId: chainId);
+    sigR = encodeBigInt(sig.r);
+    sigS = encodeBigInt(sig.s);
+    sigV = sig.v;
+  }
 
   /// Verify only that the transaction is properly signed.
   @override
-  bool verify() => false;
+  bool verify() {
+    try {
+      if (from == null) {
+        recoverSenderPublicKey();
+        return true;
+      } else {
+        /// Tautology if [from] was from recovered from [sigR], [sigS].
+        return ecc.verify(
+            unsignedHash().data,
+            Uint8List.fromList([4] + recoverSenderPublicKey().data),
+            Uint8List.fromList(sigR + sigS));
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  EthereumPublicKey recoverSenderPublicKey() =>
+      EthereumPublicKey(Signature.recoverPublicKeyFromSignature(
+          Signature.ECDSASignature(
+              decodeBigInt(sigR), decodeBigInt(sigS), sigV),
+          unsignedHash().data,
+          chainId: chainId));
 }
 
 /// Ethereum implementation of the [Wallet] entry [Address] abstraction.
@@ -809,7 +889,7 @@ class SupplementedEthereumRPCNetwork extends PeerNetwork {
   Peer createPeerWithSpec(PeerPreference spec) =>
       SupplementedEthereumRPC(spec, parseUri(spec.url), httpClient, spec.root);
 
-  /// Valid URI: '10.0.0.1', 'ws://10.0.01', 'mainnet.infura.io',
+  /// Valid URI: '10.0.0.1/ws', 'ws://10.0.01/ws', 'mainnet.infura.io',
   /// 'wss://mainnet.infura.io/ws/v3/YOUR-PROJECT-ID'.
   String parseUri(String uriText) {
     Uri uri = Uri.parse(uriText);
@@ -826,8 +906,8 @@ class SupplementedEthereumRPCNetwork extends PeerNetwork {
   }
 }
 
-/// Uses Etherscan (https://etherscan.io/apis) for historical transaction information.
-/// Uses Ethereum RPC (https://infura.io/docs/ethereum/wss/introduction.md) for the rest.
+/// Supplements with Etherscan (https://etherscan.io/apis) for historical transaction information.
+/// Ethereum RPC is used (https://infura.io/docs/ethereum/wss/introduction.md) for the rest.
 /// Tested with geth and INFURA.
 class SupplementedEthereumRPC extends EthereumRPC with EtherscanAPI {
   SupplementedEthereumRPC(PeerPreference spec, String webSocketAddress,
@@ -1034,11 +1114,22 @@ class EthereumRPC extends PersistentWebSocketClient
       'jsonrpc': '2.0',
       'method': 'eth_subscribe',
       'params': [
-        'logs',
+        'newPendingTransactions',
+
+        /// Added in https://github.com/GreenAppers/go-ethereum
         {'address': address.toJson()}
       ],
     }, (Map<String, dynamic> response) {
-      completer.complete(response != null);
+      addJsonMessage(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'method': 'eth_subscribe',
+        'params': [
+          'logs',
+          {'address': address.toJson()}
+        ],
+      }, (Map<String, dynamic> response) {
+        completer.complete(response != null && response['error'] == null);
+      });
     });
     return completer.future;
   }
@@ -1161,16 +1252,26 @@ class EthereumRPC extends PersistentWebSocketClient
     }
     Map<String, dynamic> json = jsonDecode(message);
     Map<String, dynamic> params = json == null ? null : json['params'];
-    Map<String, dynamic> result = params == null ? null : params['result'];
     if (json['method'] == 'eth_subscription') {
       if (params['subscription'] == headsSubscription) {
+        Map<String, dynamic> result = params == null ? null : params['result'];
         handleProtocol(() => handleFilterBlock(
             result['hash'] == null
                 ? null
                 : EthereumBlockId.fromJson(result['hash']),
             EthereumBlock.fromJson(result),
             false));
+      } else if (params['result'] is String) {
+        addJsonMessage(
+            <String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'eth_getTransactionByHash',
+              'params': [params['result']],
+            },
+            (Map<String, dynamic> x) => handleProtocol(
+                () => handleNewTransaction(EthereumTransaction.fromJson(x))));
       } else {
+        Map<String, dynamic> result = params == null ? null : params['result'];
         assert(result['blockNumber'] != null);
         assert(result['transactionIndex'] != null);
 

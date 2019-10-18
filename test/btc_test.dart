@@ -11,6 +11,7 @@ import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/test.dart';
 
 void main() {
+  /// See [BitcoinTester] and [BitcoinWalletTester] in lib/test.dart for the on-device unit tests.
   BitcoinTester(group, test, expect).run();
   BitcoinWalletTester(group, test, expect).run();
 

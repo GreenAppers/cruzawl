@@ -17,6 +17,7 @@ import 'package:cruzawl/websocket_html.dart'
     if (dart.library.io) 'package:cruzawl/websocket_io.dart';
 
 void main() {
+  /// See [CruzTester] and [CruzWalletTester] in lib/test.dart for the on-device unit tests.
   CruzTester(group, test, expect).run();
   CruzWalletTester(group, test, expect).run();
 

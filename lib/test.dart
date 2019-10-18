@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:convert/convert.dart';
+import 'package:ethereum_util/src/signature.dart' as Signature;
+import "package:pointycastle/src/utils.dart";
 
 import 'package:cruzawl/btc.dart' hide genesisBlockJson;
 import 'package:cruzawl/currency.dart';
@@ -184,7 +186,7 @@ class CruzTester extends TestRunner {
       : super(group, test, expect);
 
   void run() {
-    group('CRUZ TestVector1', () {
+    group('CRUZ Transaction TestVector1', () {
       /// Create [CruzTransaction] for Test Vector 1.
       /// Reference: https://github.com/cruzbit/cruzbit/blob/master/transaction_test.go#L59
       CruzPublicKey pubKey = CruzPublicKey.fromJson(
@@ -348,6 +350,43 @@ class EthereumTester extends TestRunner {
           genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());*/
       expect(genesis.header.transactionCount, null);
       expect(genesis.transactions.length, 0);
+    });
+
+    test('Ethereum transaction test', () {
+      /// https://goethereumbook.org/transaction-raw-send/
+      String txnHex =
+          'f86d8202b28477359400825208944592d8f8d7b001e72cb26a73e4fa1806a51ac79d880de0b6b3a7640000802ca05924bde7ef10aa88db9c66dd4f5fb16b46dff2319b9968be983118b57bb50562a001b24b31010004f13d9a26b320845257a6cfc2bf819a3d55e3fc86263c5f0772';
+      EthereumTransaction txn = EthereumTransaction.fromRlp(hex.decode(txnHex));
+      expect(txn.from.toJson(), '0x96216849c49358b10257cb55b28ea603c874b05e');
+      expect(txn.to.toJson(), '0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d');
+      expect(txn.id().toJson(),
+          '0xc429e5f128387d224ba8bed6885e86525e14bfdc2eb24b5e9c3351a1176fd81f');
+      expect(txn.nonce, 690);
+      expect(txn.gas, 21000);
+      expect(txn.gasPrice, eth.parse('0.000000002'));
+      expect(txn.value, eth.parse('1'));
+      expect(txn.input.length, 0);
+      expect(txn.sigR.length, 32);
+      expect(txn.sigS.length, 32);
+      expect(txn.verify(), true);
+      expect(EthereumAddressHash.compute(txn.recoverSenderPublicKey()).toJson(),
+          txn.from.toJson());
+
+      EthereumAddress address = EthereumAddress.generateRandom();
+      expect(address.publicAddress.data,
+          Signature.publicKeyToAddress(address.publicKey.data));
+      expect(address.publicAddress.data,
+          Signature.privateKeyToAddress(address.privateKey.data));
+      expect(address.publicKey.data,
+          Signature.privateKeyToPublicKey(address.privateKey.data));
+
+      txn.sign(address.privateKey);
+      expect(txn.verify(), true);
+      expect(txn.recoverSenderPublicKey().toJson(), address.publicKey.toJson());
+
+      EthereumTransaction txn2 = EthereumTransaction.fromRlp(txn.toRlp());
+      expect(txn2.from.toJson(), address.publicAddress.toJson());
+      expect(txn2.verify(), true);
     });
   }
 }
