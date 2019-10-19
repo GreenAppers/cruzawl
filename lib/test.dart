@@ -334,7 +334,7 @@ class EthereumTester extends TestRunner {
 
     test('Ethereum genesis test', () {
       EthereumBlock genesis = eth.genesisBlock();
-      EthereumBlockId genesisId = genesis.id();
+      EthereumBlockId genesisId = genesis.header.hash;
       expect(genesisId.toJson(),
           '0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3');
       expect(genesis.header.miner.toJson(),
@@ -343,13 +343,16 @@ class EthereumTester extends TestRunner {
       expect(genesis.header.difficulty.toInt(), 0x400000000);
       expect(genesis.header.target.toJson(),
           '0x0000000040000000000000000000000000000000000000000000000000000000');
-      //expect(genesisId.toBigInt() <= genesis.header.target.toBigInt(), true);
       expect(genesis.header.hashRoot.toJson(),
           '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421');
       /*expect(
           genesis.computeHashRoot().toJson(), genesis.header.hashRoot.toJson());*/
       expect(genesis.header.transactionCount, null);
       expect(genesis.transactions.length, 0);
+      expect(genesis.id().toJson(), genesisId.toJson());
+      expect(
+          EthereumBlock.fromJson(jsonDecode(jsonEncode(genesis))).id().toJson(),
+          genesisId.toJson());
     });
 
     test('Ethereum transaction test', () {
@@ -381,6 +384,8 @@ class EthereumTester extends TestRunner {
           Signature.privateKeyToPublicKey(address.privateKey.data));
 
       txn.sign(address.privateKey);
+      expect(txn.verify(), false);
+      txn.from = address.publicAddress;
       expect(txn.verify(), true);
       expect(txn.recoverSenderPublicKey().toJson(), address.publicKey.toJson());
 

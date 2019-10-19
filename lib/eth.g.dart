@@ -40,18 +40,18 @@ Map<String, dynamic> _$EthereumTransactionToJson(EthereumTransaction instance) {
   }
 
   writeNotNull('hash', instance.hash);
-  writeNotNull('transactionIndex', instance.index);
-  writeNotNull('blockNumber', instance.height);
-  writeNotNull('nonce', instance.nonce);
+  writeNotNull('transactionIndex', ETH.hexEncodeInt(instance.index));
+  writeNotNull('blockNumber', ETH.hexEncodeInt(instance.height));
+  writeNotNull('nonce', ETH.hexEncodeInt(instance.nonce));
   writeNotNull('from', instance.from);
   writeNotNull('to', instance.to);
-  writeNotNull('value', instance.value);
-  writeNotNull('gas', instance.gas);
-  writeNotNull('gasPrice', instance.gasPrice);
-  writeNotNull('input', instance.input);
-  writeNotNull('v', instance.sigV);
-  writeNotNull('r', instance.sigR);
-  writeNotNull('s', instance.sigS);
+  writeNotNull('value', ETH.hexEncodeInt(instance.value));
+  writeNotNull('gas', ETH.hexEncodeInt(instance.gas));
+  writeNotNull('gasPrice', ETH.hexEncodeInt(instance.gasPrice));
+  writeNotNull('input', ETH.hexEncode(instance.input));
+  writeNotNull('v', ETH.hexEncodeInt(instance.sigV));
+  writeNotNull('r', ETH.hexEncode(instance.sigR));
+  writeNotNull('s', ETH.hexEncode(instance.sigS));
   return val;
 }
 
@@ -165,22 +165,35 @@ EthereumBlockHeader _$EthereumBlockHeaderFromJson(Map<String, dynamic> json) {
     ..previous = json['parentHash'] == null
         ? null
         : EthereumBlockId.fromJson(json['parentHash'] as String)
+    ..unclesRoot = json['sha3Uncles'] == null
+        ? null
+        : EthereumBlockId.fromJson(json['sha3Uncles'] as String)
+    ..miner = json['miner'] == null
+        ? null
+        : EthereumAddressHash.fromJson(json['miner'] as String)
+    ..stateRoot = json['stateRoot'] == null
+        ? null
+        : EthereumTransactionId.fromJson(json['stateRoot'] as String)
     ..hashRoot = json['transactionsRoot'] == null
         ? null
         : EthereumTransactionId.fromJson(json['transactionsRoot'] as String)
-    ..time = ETH.hexDecodeInt(json['timestamp'] as String)
+    ..receiptsRoot = json['receiptsRoot'] == null
+        ? null
+        : EthereumTransactionId.fromJson(json['receiptsRoot'] as String)
+    ..logsBloom = ETH.hexDecode(json['logsBloom'] as String)
     ..difficulty = json['difficulty'] == null
         ? null
         : BigInt.parse(json['difficulty'] as String)
     ..totalDifficulty = json['totalDifficulty'] == null
         ? null
         : BigInt.parse(json['totalDifficulty'] as String)
-    ..nonceValue =
-        json['nonce'] == null ? null : BigInt.parse(json['nonce'] as String)
     ..height = ETH.hexDecodeInt(json['number'] as String)
-    ..miner = json['miner'] == null
-        ? null
-        : EthereumAddressHash.fromJson(json['miner'] as String)
+    ..gasLimit = ETH.hexDecodeInt(json['gasLimit'] as String)
+    ..gasUsed = ETH.hexDecodeInt(json['gasUsed'] as String)
+    ..time = ETH.hexDecodeInt(json['timestamp'] as String)
+    ..extraData = ETH.hexDecode(json['extraData'] as String)
+    ..mixHash = ETH.hexDecode(json['mixHash'] as String)
+    ..nonce = ETH.hexDecode(json['nonce'] as String)
     ..size = ETH.hexDecodeInt(json['size'] as String);
 }
 
@@ -195,13 +208,22 @@ Map<String, dynamic> _$EthereumBlockHeaderToJson(EthereumBlockHeader instance) {
 
   writeNotNull('hash', instance.hash);
   writeNotNull('parentHash', instance.previous);
-  writeNotNull('transactionsRoot', instance.hashRoot);
-  writeNotNull('timestamp', instance.time);
-  writeNotNull('difficulty', instance.difficulty?.toString());
-  writeNotNull('totalDifficulty', instance.totalDifficulty?.toString());
-  writeNotNull('nonce', instance.nonceValue?.toString());
-  writeNotNull('number', instance.height);
+  writeNotNull('sha3Uncles', instance.unclesRoot);
   writeNotNull('miner', instance.miner);
-  writeNotNull('size', instance.size);
+  writeNotNull('stateRoot', instance.stateRoot);
+  writeNotNull('transactionsRoot', instance.hashRoot);
+  writeNotNull('receiptsRoot', instance.receiptsRoot);
+  writeNotNull('logsBloom', ETH.hexEncode(instance.logsBloom));
+  writeNotNull('difficulty', ETH.hexEncodeBigInt(instance.difficulty));
+  writeNotNull(
+      'totalDifficulty', ETH.hexEncodeBigInt(instance.totalDifficulty));
+  writeNotNull('number', ETH.hexEncodeInt(instance.height));
+  writeNotNull('gasLimit', ETH.hexEncodeInt(instance.gasLimit));
+  writeNotNull('gasUsed', ETH.hexEncodeInt(instance.gasUsed));
+  writeNotNull('timestamp', ETH.hexEncodeInt(instance.time));
+  writeNotNull('extraData', ETH.hexEncode(instance.extraData));
+  writeNotNull('mixHash', ETH.hexEncode(instance.mixHash));
+  writeNotNull('nonce', ETH.hexEncode(instance.nonce));
+  writeNotNull('size', ETH.hexEncodeInt(instance.size));
   return val;
 }

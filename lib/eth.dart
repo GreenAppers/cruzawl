@@ -251,9 +251,12 @@ class ETH extends Currency {
       (prefix ? '0x' : '') + x.toRadixString(16);
 
   static int hexDecodeInt(String x) => x == null ? null : int.tryParse(x);
+
+  static String hexEncodeBigInt(BigInt x, [bool prefix = true]) =>
+      (prefix ? '0x' : '') + x.toRadixString(16);
 }
 
-/// Right 20 bytes of Keccack-256.
+/// Right 20 bytes of Keccak-256.
 @immutable
 class EthereumAddressHash extends PublicAddress {
   final Uint8List data;
@@ -416,17 +419,21 @@ class EthereumTransaction extends Transaction {
   EthereumTransactionId hash;
 
   /// Integer of the transactions index position in the block. null when its pending.
-  @JsonKey(name: 'transactionIndex', fromJson: ETH.hexDecodeInt)
+  @JsonKey(
+      name: 'transactionIndex',
+      fromJson: ETH.hexDecodeInt,
+      toJson: ETH.hexEncodeInt)
   int index;
 
   /// Used by [Wallet].
   @override
-  @JsonKey(name: 'blockNumber', fromJson: ETH.hexDecodeInt)
+  @JsonKey(
+      name: 'blockNumber', fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
   int height = 0;
 
   /// The number of transactions made by the sender prior to this one.
   @override
-  @JsonKey(fromJson: ETH.hexDecodeInt)
+  @JsonKey(fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
   int nonce;
 
   /// Address of the sender.
@@ -440,31 +447,31 @@ class EthereumTransaction extends Transaction {
   int get amount => value ?? 0;
 
   /// Value transferred in Wei.
-  @JsonKey(fromJson: ETH.hexDecodeInt)
+  @JsonKey(fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
   int value;
 
   /// Gas provided by the sender
-  @JsonKey(fromJson: ETH.hexDecodeInt)
+  @JsonKey(fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
   int gas;
 
   /// Gas price provided by the sender in Wei.
-  @JsonKey(fromJson: ETH.hexDecodeInt)
+  @JsonKey(fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
   int gasPrice;
 
   /// The data send along with the transaction.
-  @JsonKey(fromJson: ETH.hexDecode)
+  @JsonKey(fromJson: ETH.hexDecode, toJson: ETH.hexEncode)
   Uint8List input;
 
   /// The v component of the signature of this transaction.
-  @JsonKey(name: 'v', fromJson: ETH.hexDecodeInt)
+  @JsonKey(name: 'v', fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
   int sigV;
 
   /// The r component of the signature of this transaction.
-  @JsonKey(name: 'r', fromJson: ETH.hexDecode)
+  @JsonKey(name: 'r', fromJson: ETH.hexDecode, toJson: ETH.hexEncode)
   Uint8List sigR;
 
   /// The s component of the signature of this transaction.
-  @JsonKey(name: 's', fromJson: ETH.hexDecode)
+  @JsonKey(name: 's', fromJson: ETH.hexDecode, toJson: ETH.hexEncode)
   Uint8List sigS;
 
   /// e.g. 1 for mainnet and 4 for Rinkeby Testnet.
@@ -581,16 +588,9 @@ class EthereumTransaction extends Transaction {
   @override
   bool verify() {
     try {
-      if (from == null) {
-        recoverSenderPublicKey();
-        return true;
-      } else {
-        /// Tautology if [from] was from recovered from [sigR], [sigS].
-        return ecc.verify(
-            unsignedHash().data,
-            Uint8List.fromList([4] + recoverSenderPublicKey().data),
-            Uint8List.fromList(sigR + sigS));
-      }
+      EthereumPublicKey sender = recoverSenderPublicKey();
+      return from == null ||
+          equalUint8List(from.data, EthereumAddressHash.compute(sender).data);
     } catch (_) {
       return false;
     }
@@ -718,7 +718,8 @@ class EthereumBlockId extends BlockId {
   }
 
   /// Computes the hash of [blockHeaderJson].
-  EthereumBlockId.compute(String blockHeaderJson) : data = null;
+  EthereumBlockId.compute(Uint8List rlpEncodedBlock)
+      : data = SHA3Digest(256, true).process(rlpEncodedBlock);
 
   /// Decodes [BigInt] to [EthereumBlockId].
   EthereumBlockId.fromBigInt(BigInt x)
@@ -766,25 +767,33 @@ class EthereumBlockHeader extends BlockHeader {
   @JsonKey(name: 'parentHash')
   EthereumBlockId previous;
 
+  @JsonKey(name: 'sha3Uncles')
+  EthereumBlockId unclesRoot;
+
+  /// The address of the beneficiary to whom the mining rewards were given.
+  EthereumAddressHash miner;
+
+  EthereumTransactionId stateRoot;
+
   /// The root of the transaction trie of the block.
+  @override
   @JsonKey(name: 'transactionsRoot')
   EthereumTransactionId hashRoot;
 
-  /// The unix timestamp for when the block was collated.
-  @JsonKey(name: 'timestamp', fromJson: ETH.hexDecodeInt)
-  int time;
+  EthereumTransactionId receiptsRoot;
 
-  @override
-  DateTime get dateTime =>
-      DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toLocal();
+  @JsonKey(fromJson: ETH.hexDecode, toJson: ETH.hexEncode)
+  Uint8List logsBloom;
 
   /// Integer of the difficulty for this block.
+  @JsonKey(toJson: ETH.hexEncodeBigInt)
   BigInt difficulty;
 
   /// Integer of the total difficulty of the chain until this block.
+  @JsonKey(toJson: ETH.hexEncodeBigInt)
   BigInt totalDifficulty;
 
-  /// Threshold new [EthereumBlock] must hash under for Proof of Work.
+  /// Threshold new [EthereumBlock]'s Ethash value for Proof of Work.
   @override
   BlockId get target {
     BigInt twoTo256 = decodeBigInt(Uint8List(33)..[0] = 1);
@@ -795,26 +804,46 @@ class EthereumBlockHeader extends BlockHeader {
   @override
   EthereumBlockId get chainWork => EthereumBlockId.fromBigInt(totalDifficulty);
 
-  /// Parameter varied by miners for Proof of Work.
-  @override
-  @JsonKey(name: 'nonce')
-  BigInt nonceValue;
-
   /// Height is eventually unique.
   @override
-  @JsonKey(name: 'number', fromJson: ETH.hexDecodeInt)
+  @JsonKey(name: 'number', fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
   int height;
+
+  @JsonKey(fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
+  int gasLimit;
+
+  @JsonKey(fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
+  int gasUsed;
+
+  /// The unix timestamp for when the block was collated.
+  @JsonKey(
+      name: 'timestamp', fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
+  int time;
+
+  @override
+  DateTime get dateTime =>
+      DateTime.fromMillisecondsSinceEpoch(time * 1000, isUtc: true).toLocal();
+
+  @JsonKey(fromJson: ETH.hexDecode, toJson: ETH.hexEncode)
+  Uint8List extraData;
+
+  @JsonKey(fromJson: ETH.hexDecode, toJson: ETH.hexEncode)
+  Uint8List mixHash;
+
+  /// Parameter varied by miners for Proof of Work.
+  @JsonKey(fromJson: ETH.hexDecode, toJson: ETH.hexEncode)
+  Uint8List nonce;
+
+  @override
+  BigInt get nonceValue => decodeBigInt(nonce);
+
+  /// Integer the size of this block in bytes.
+  @JsonKey(fromJson: ETH.hexDecodeInt, toJson: ETH.hexEncodeInt)
+  int size;
 
   /// The number of transactions in this block.
   @override
   int get transactionCount => null;
-
-  /// The address of the beneficiary to whom the mining rewards were given.
-  EthereumAddressHash miner;
-
-  /// Integer the size of this block in bytes.
-  @JsonKey(fromJson: ETH.hexDecodeInt)
-  int size;
 
   /// Default constructor used by JSON deserializer.
   EthereumBlockHeader();
@@ -833,7 +862,23 @@ class EthereumBlockHeader extends BlockHeader {
 
   /// Computes an ID for this block.
   @override
-  EthereumBlockId id() => hash;
+  EthereumBlockId id() => EthereumBlockId.compute(Rlp.encode(<dynamic>[
+        previous.data,
+        unclesRoot.data,
+        miner.data,
+        stateRoot.data,
+        hashRoot.data,
+        receiptsRoot.data,
+        logsBloom,
+        encodeBigInt(difficulty),
+        height,
+        gasLimit,
+        gasUsed,
+        time,
+        extraData,
+        mixHash,
+        nonce
+      ]));
 }
 
 /// Represents a block in the block chain. It has a header and a list of transactions.
@@ -868,7 +913,7 @@ class EthereumBlock extends Block {
   @override
   EthereumBlockId id() => header.id();
 
-  /// Compute a Merkle tree root of all transaction hashes.
+  /// Compute a Merkle trie root of all transaction hashes.
   @override
   EthereumTransactionId computeHashRoot() => null;
 }
