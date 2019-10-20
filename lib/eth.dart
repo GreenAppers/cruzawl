@@ -254,6 +254,10 @@ class ETH extends Currency {
 
   static String hexEncodeBigInt(BigInt x, [bool prefix = true]) =>
       (prefix ? '0x' : '') + x.toRadixString(16);
+
+  /// Keccak-256 hash.
+  static Uint8List keccak(Uint8List input) =>
+      SHA3Digest(256, true).process(input);
 }
 
 /// Right 20 bytes of Keccak-256.
@@ -270,7 +274,7 @@ class EthereumAddressHash extends PublicAddress {
   /// For a given private key, pr, the Ethereum address A(pr) (a 160-bit value) to which it corresponds
   /// is defined as the right most 160-bits of the Keccak hash of the corresponding ECDSA public key.
   EthereumAddressHash.compute(EthereumPublicKey publicKey)
-      : data = keccak(publicKey.data).sublist(12);
+      : data = ETH.keccak(publicKey.data).sublist(12);
 
   /// Unmarshals a hex-encoded string to [EthereumAddressHash].
   factory EthereumAddressHash.fromJson(String x) {
@@ -285,10 +289,6 @@ class EthereumAddressHash extends PublicAddress {
   /// Marshals [EthereumAddressHash] as a hex-encoded string.
   @override
   String toJson() => ETH.hexEncode(data);
-
-  /// Keccak-256 hash.
-  static Uint8List keccak(Uint8List input) =>
-      SHA3Digest(256, true).process(input);
 }
 
 /// ECDSA public key, no-prefix byte: 64 bytes.
@@ -365,7 +365,7 @@ class EthereumTransactionId extends TransactionId {
 
   /// Computes the hash of [transaction] - not implemented.
   EthereumTransactionId.compute(Uint8List rlpEncodedTransaction)
-      : data = SHA3Digest(256, true).process(rlpEncodedTransaction);
+      : data = ETH.keccak(rlpEncodedTransaction);
 
   /// Unmarshals a hex string to [EthereumTransactionId].
   EthereumTransactionId.fromJson(String x) : this(ETH.hexDecode(x));
@@ -719,7 +719,7 @@ class EthereumBlockId extends BlockId {
 
   /// Computes the hash of [blockHeaderJson].
   EthereumBlockId.compute(Uint8List rlpEncodedBlock)
-      : data = SHA3Digest(256, true).process(rlpEncodedBlock);
+      : data = ETH.keccak(rlpEncodedBlock);
 
   /// Decodes [BigInt] to [EthereumBlockId].
   EthereumBlockId.fromBigInt(BigInt x)

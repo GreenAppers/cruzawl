@@ -53,7 +53,8 @@ class BitcoinTester extends TestRunner {
 
     test('Bitcoin genesis test', () {
       BitcoinBlock genesis = btc.genesisBlock();
-      BitcoinBlockId genesisId = genesis.id();
+      BitcoinBlockId genesisId =
+          BitcoinBlockId(Uint8List.fromList(genesis.header.hash.data));
       expect(genesisId.toJson(),
           '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f');
       expect(genesis.header.bits, 0x1d00ffff);
@@ -74,6 +75,11 @@ class BitcoinTester extends TestRunner {
           '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa');
       expect(genesis.transactions[0].outputs[0].value, btc.parse('50'));
       expect(genesis.transactions[0].fee, 0);
+      expect(genesis.transactions[0].hash.toJson(),
+          '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b');
+      expect(genesis.transactions[0].id().toJson(),
+          '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b');
+      expect(genesis.id().toJson(), genesisId.toJson());
     });
   }
 }

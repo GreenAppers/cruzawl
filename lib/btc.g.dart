@@ -199,6 +199,7 @@ BitcoinBlockHeader _$BitcoinBlockHeaderFromJson(Map<String, dynamic> json) {
     ..bits = json['bits'] as int
     ..nonce = json['nonce'] as int
     ..height = json['height'] as int
+    ..version = json['ver'] as int
     ..transactionCount = json['n_tx'] as int
     ..blockIndex = json['block_index'] as int
     ..prevBlockIndex = json['prevBlockIndex'] as int;
@@ -220,6 +221,7 @@ Map<String, dynamic> _$BitcoinBlockHeaderToJson(BitcoinBlockHeader instance) {
   writeNotNull('bits', instance.bits);
   writeNotNull('nonce', instance.nonce);
   writeNotNull('height', instance.height);
+  writeNotNull('ver', instance.version);
   writeNotNull('n_tx', instance.transactionCount);
   writeNotNull('block_index', instance.blockIndex);
   writeNotNull('prevBlockIndex', instance.prevBlockIndex);

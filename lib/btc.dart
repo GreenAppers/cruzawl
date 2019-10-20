@@ -249,6 +249,10 @@ class BTC extends Currency {
   static bip32.NetworkType network = bip32.NetworkType(
       wif: 0x80,
       bip32: bip32.Bip32Type(public: 0x0488b21e, private: 0x0488ade4));
+
+  /// Double SHA256 hash.
+  static Uint8List doubleSha256(Uint8List input) =>
+      SHA256Digest().process(SHA256Digest().process(input));
 }
 
 /// Checksummed Hash160.
@@ -261,7 +265,8 @@ class BitcoinAddressHash extends PublicAddress {
 
   /// https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses
   BitcoinAddressHash.fromExtendedIdentifier(Uint8List extended)
-      : data = Uint8List.fromList(extended + checksum(extended).sublist(0, 4));
+      : data = Uint8List.fromList(
+            extended + BTC.doubleSha256(extended).sublist(0, 4));
 
   /// https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses
   BitcoinAddressHash.compute(BitcoinAddressIdentifier input, [int version = 0])
@@ -280,10 +285,6 @@ class BitcoinAddressHash extends PublicAddress {
   /// Marshals [BitcoinAddressHash] as a base58-encoded string.
   @override
   String toJson() => bs58check.base58.encode(data);
-
-  /// Double SHA256 hash.
-  static Uint8List checksum(Uint8List input) =>
-      SHA256Digest().process(SHA256Digest().process(input));
 }
 
 /// Hash160, 20 bytes.
@@ -413,7 +414,9 @@ class BitcoinTransactionId extends TransactionId {
   }
 
   /// Computes the hash of [transaction] - not implemented.
-  BitcoinTransactionId.compute(BitcoinTransaction transaction) : data = null;
+  BitcoinTransactionId.compute(Uint8List transaction)
+      : this(Uint8List.fromList(
+            BTC.doubleSha256(transaction).reversed.toList()));
 
   /// Unmarshals a hex string to [BitcoinTransactionId].
   BitcoinTransactionId.fromJson(String x) : this(hex.decode(x));
@@ -452,12 +455,20 @@ class BitcoinTransactionInput extends TransactionInput {
   @override
   int value;
 
-  /// BLOCKCHAIN API transaction index.
-  int txIndex;
-
   /// Address of sender.
   @override
   BitcoinAddressHash address;
+
+  BitcoinTransactionId prevOut;
+
+  int prevOutIndex;
+
+  int sequence;
+
+  Uint8List witness;
+
+  /// BLOCKCHAIN API transaction index.
+  int txIndex;
 
   /// Describes the sender.
   @override
@@ -476,24 +487,47 @@ class BitcoinTransactionInput extends TransactionInput {
       String addrText = prevOut['addr'], hashText = prevOut['hash'];
       if (addrText != null) {
         address = BitcoinAddressHash.fromJson(addrText);
-      } else if (hashText != null) {
-        address = BitcoinAddressHash(hex.decode(hashText));
       }
+      if (hashText != null) {
+        this.prevOut = BitcoinTransactionId(hex.decode(hashText));
+      }
+      prevOutIndex = prevOut['n'];
     } else {
       isCoinbase = true;
       int height = json['height'];
       value = height == null ? 0 : btc.blockCreationReward(height);
     }
+    sequence = json['sequence'];
+    witness = hex.decode(json['witness']);
+    txIndex = json['tx_index'];
   }
 
-  /// Unmarshals a JSON-encoded string to [BitcoinTransactionInput].
-  Map<String, dynamic> toJson() => {
-        'script': script.toJson(),
-        'prevOut': {
-          'hash': hex.encode(address.data),
-          'value': value,
-        },
-      };
+  /// Marshals [BitcoinTransactionInput] as a JSON-encoded string.
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> ret = {
+      'script': script.toJson(),
+      'prevOut': {
+        'value': value,
+      },
+    };
+    if (prevOut != null) ret['prevOut']['hash'] = prevOut.toJson();
+    if (address != null) ret['prevOut']['addr'] = address.toJson();
+    return ret;
+  }
+
+  Uint8List toRaw() {
+    Uint8List scriptLen = encodeBigInt(BigInt.from(script.data.length));
+    Uint8List ret = Uint8List.fromList(
+        (prevOut != null ? prevOut.data.reversed.toList() : Uint8List(32)) +
+            Uint8List(4) +
+            scriptLen +
+            script.data +
+            Uint8List(4));
+    ByteData data = ByteData.view(ret.buffer);
+    data.setUint32(32, prevOutIndex ?? 0xffffffff, Endian.little);
+    data.setUint32(ret.length - 4, 0xffffffff, Endian.little);
+    return ret;
+  }
 }
 
 /// Bitcoin transaction output.
@@ -520,6 +554,14 @@ class BitcoinTransactionOutput extends TransactionOutput {
 
   /// Marshals [BitcoinTransactionOutput] as a JSON-encoded string.
   Map<String, dynamic> toJson() => _$BitcoinTransactionOutputToJson(this);
+
+  Uint8List toRaw() {
+    Uint8List scriptLen = encodeBigInt(BigInt.from(script.data.length));
+    Uint8List ret = Uint8List.fromList(Uint8List(8) + scriptLen + script.data);
+    ByteData data = ByteData.view(ret.buffer);
+    data.setUint64(0, value, Endian.little);
+    return ret;
+  }
 }
 
 /// A ledger transaction representation. It transfers value from one address to another.
@@ -605,7 +647,7 @@ class BitcoinTransaction extends Transaction {
 
   /// Computes an ID for this transaction.
   @override
-  BitcoinTransactionId id() => hash;
+  BitcoinTransactionId id() => BitcoinTransactionId.compute(toRaw());
 
   /// Signs this transaction.
   void sign(BitcoinPrivateKey key) {}
@@ -613,6 +655,44 @@ class BitcoinTransaction extends Transaction {
   /// Verify only that the transaction is properly signed.
   @override
   bool verify() => false;
+
+  Uint8List toRaw() {
+    List<Uint8List> inputData = inputs.map((e) => e.toRaw()).toList();
+    List<Uint8List> outputData = outputs.map((e) => e.toRaw()).toList();
+    int inputsLength = inputData.fold(0, (p, c) => p + c.length);
+    int outputsLength = outputData.fold(0, (p, c) => p + c.length);
+    Uint8List inputsLengthData = encodeBigInt(BigInt.from(inputs.length));
+    Uint8List outputsLengthData = encodeBigInt(BigInt.from(outputs.length));
+    bool witness = inputData.isNotEmpty && inputs[0].witness != null && inputs[0].witness.isNotEmpty;
+    int witnessLength =
+        !witness ? 0 : 2 + inputs.fold(0, (p, c) => c.witness.length);
+    Uint8List ret = Uint8List(8 +
+        inputsLengthData.length +
+        outputsLengthData.length +
+        inputsLength +
+        outputsLength +
+        witnessLength);
+    ByteData data = ByteData.view(ret.buffer);
+    data.setUint32(0, version, Endian.little);
+    if (witness) data.setUint16(4, 1, Endian.little);
+    int offset = 4 + (witness ? 2 : 0);
+    offset = setByteData(ret, offset, inputsLengthData);
+    for (Uint8List input in inputData) {
+      offset = setByteData(ret, offset, input);
+    }
+    offset = setByteData(ret, offset, outputsLengthData);
+    for (Uint8List output in outputData) {
+      offset = setByteData(ret, offset, output);
+    }
+    data.setUint32(offset, lockTime, Endian.little);
+    assert((offset + 4) == ret.length);
+    return ret;
+  }
+
+  static int setByteData(Uint8List data, int offset, Uint8List x) {
+    data.setRange(offset, offset + x.length, x);
+    return offset + x.length;
+  }
 }
 
 /// Bitcoin implementation of the [Wallet] entry [Address] abstraction.
@@ -764,7 +844,9 @@ class BitcoinBlockId extends BlockId {
   }
 
   /// Computes the hash of [blockHeaderJson].
-  BitcoinBlockId.compute(String blockHeaderJson) : data = null;
+  BitcoinBlockId.compute(Uint8List blockHeader)
+      : this(Uint8List.fromList(
+            BTC.doubleSha256(blockHeader).reversed.toList()));
 
   /// Decodes [BigInt] to [BitcoinBlockId].
   BitcoinBlockId.fromBigInt(BigInt x)
@@ -853,6 +935,9 @@ class BitcoinBlockHeader extends BlockHeader {
   @override
   int height;
 
+  @JsonKey(name: 'ver')
+  int version;
+
   /// The number of transactions in this block.
   @override
   @JsonKey(name: 'n_tx')
@@ -878,7 +963,20 @@ class BitcoinBlockHeader extends BlockHeader {
 
   /// Computes an ID for this block.
   @override
-  BitcoinBlockId id() => hash;
+  BitcoinBlockId id() => BitcoinBlockId.compute(toRaw());
+
+  Uint8List toRaw() {
+    Uint8List data = Uint8List.fromList(Uint8List(4) +
+        previous.data.reversed.toList() +
+        hashRoot.data.reversed.toList() +
+        Uint8List(12));
+    ByteData bytes = ByteData.view(data.buffer);
+    bytes.setUint32(0, version, Endian.little);
+    bytes.setUint32(68, time, Endian.little);
+    bytes.setUint32(72, bits, Endian.little);
+    bytes.setUint32(76, nonce, Endian.little);
+    return data;
+  }
 }
 
 /// Represents a block in the block chain. It has a header and a list of transactions.
@@ -922,7 +1020,7 @@ class BitcoinBlock extends Block {
   @override
   BitcoinTransactionId computeHashRoot() => BitcoinTransactionId(MerkleTree(
           leaves: transactions.map((t) => t.hash.data).toList(),
-          hashAlgo: BitcoinAddressHash.checksum,
+          hashAlgo: BTC.doubleSha256,
           isBitcoinTree: true)
       .root);
 }
