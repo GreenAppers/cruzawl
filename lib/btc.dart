@@ -8,19 +8,20 @@ import 'dart:typed_data';
 import 'package:bip32/bip32.dart' as bip32;
 import 'package:bip32/src/utils/ecurve.dart' as ecc;
 import 'package:bip32/src/utils/wif.dart' as wif;
-import "package:bs58check/bs58check.dart" as bs58check;
-import "package:convert/convert.dart";
+import 'package:bs58check/bs58check.dart' as bs58check;
+import 'package:convert/convert.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:merkletree/merkletree.dart';
 import 'package:meta/meta.dart';
-import "package:pointycastle/digests/ripemd160.dart";
-import "package:pointycastle/digests/sha256.dart";
-import "package:pointycastle/src/utils.dart";
+import 'package:pointycastle/digests/ripemd160.dart';
+import 'package:pointycastle/digests/sha256.dart';
+import 'package:pointycastle/src/utils.dart';
 
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
+import 'package:cruzawl/socket.dart';
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/websocket.dart';
 
@@ -663,7 +664,9 @@ class BitcoinTransaction extends Transaction {
     int outputsLength = outputData.fold(0, (p, c) => p + c.length);
     Uint8List inputsLengthData = encodeBigInt(BigInt.from(inputs.length));
     Uint8List outputsLengthData = encodeBigInt(BigInt.from(outputs.length));
-    bool witness = inputData.isNotEmpty && inputs[0].witness != null && inputs[0].witness.isNotEmpty;
+    bool witness = inputData.isNotEmpty &&
+        inputs[0].witness != null &&
+        inputs[0].witness.isNotEmpty;
     int witnessLength =
         !witness ? 0 : 2 + inputs.fold(0, (p, c) => c.witness.length);
     Uint8List ret = Uint8List(8 +
@@ -1023,6 +1026,150 @@ class BitcoinBlock extends Block {
           hashAlgo: BTC.doubleSha256,
           isBitcoinTree: true)
       .root);
+}
+
+/// https://en.bitcoin.it/wiki/Protocol_documentation
+class BitcoinNetwork extends PeerNetwork {
+  BitcoinNetwork(VoidCallback peerChanged, VoidCallback tipChanged)
+      : super(peerChanged, tipChanged);
+
+  @override
+  BTC get currency => btc;
+
+  /// Creates [Peer] ready to [Peer.connect()].
+  @override
+  Peer createPeerWithSpec(PeerPreference spec) =>
+      BitcoinPeer(spec, parseUri(spec.url));
+
+  /// Valid CRUZ URI: '10.0.0.1'.
+  String parseUri(String uriText) {
+    // if (!Uri.parse(uriText).hasScheme) uriText = 'tcp://' + uriText;
+    Uri uri = Uri.parse(uriText);
+    Uri url = uri.replace(port: uri.hasPort ? uri.port : 8333);
+    return url.toString();
+  }
+}
+
+/// Bitcoin implementation of the [PeerNetwork] entry [Peer] abstraction.
+class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
+  /// The [BitcoinAddress] we're monitoring [BitcoinNetwork] for.
+  Map<String, TransactionCallback> addressFilter =
+      Map<String, TransactionCallback>();
+
+  /// Height of tip [BitcoinBlock] according to this peer.
+  @override
+  int tipHeight;
+
+  /// ID of tip [BitcoinBlock] according to this peer.
+  @override
+  BitcoinBlockId tipId;
+
+  /// The minimum [BitcoinTransaction.amount] for the [BlockchainAPINetwork].
+  @override
+  num minAmount;
+
+  /// The minimum [BitcoinTransaction.fee] for the [BlockchainAPINetwork].
+  @override
+  num minFee;
+
+  /// Forward [Peer] constructor.
+  BitcoinPeer(PeerPreference spec, String address) : super(spec, address) {
+    //responseComplete = dispatchFromThrottleQueue;
+    //maxOutstanding = 10;
+  }
+
+  /// Network lost. Clear [tip] and [tipId].
+  @override
+  void handleDisconnected() {
+    addressFilter = Map<String, TransactionCallback>();
+    tipId = null;
+    tipHeight = null;
+  }
+
+  /// Network connected. Request [tip] and subscribe to new blocks.
+  @override
+  void handleConnected() {}
+
+  /// Balance: List the balance summary of each address listed.
+  @override
+  Future<num> getBalance(PublicAddress address) {
+    return Future.value(0);
+  }
+
+  @override
+  Future<TransactionIteratorResults> getTransactions(
+      PublicAddress address, TransactionIterator iterator,
+      {int limit = 50}) {
+    return null;
+  }
+
+  /// Single Address
+  Future<TransactionIteratorResults> getAddressTransactions(
+      PublicAddress address,
+      {int offset = 0,
+      int limit = 50}) {
+    return null;
+  }
+
+  @override
+  Future<TransactionId> putTransaction(Transaction transaction) {
+    return null;
+  }
+
+  /// Subscribing to an Address
+  /// Receive new transactions for a specific bitcoin address:
+  /// {"op":"addr_sub", "addr":"$bitcoin_address"}
+  @override
+  Future<bool> filterAdd(
+      PublicAddress address, TransactionCallback transactionCb) {
+    return Future.value(false);
+  }
+
+  @override
+  Future<bool> filterTransactionQueue() {
+    /// https://blockchain.info/unconfirmed-transactions?format=json
+    return Future.value(true);
+  }
+
+  @override
+  Future<BlockHeaderMessage> getBlockHeader({BlockId id, int height}) {
+    /// No way to only fetch header with blockchain API??
+    return null;
+  }
+
+  /// Blocks for one day: https://blockchain.info/blocks/$time_in_milliseconds?format=json
+  Future<List<BitcoinBlockHeader>> getBlockHeaders(DateTime time) {
+    return null;
+  }
+
+  /// Single Block
+  /// You can also request the block to return in binary form (Hex encoded) using ?format=hex
+  @override
+  Future<BlockMessage> getBlock({BlockId id, int height}) {
+    return null;
+  }
+
+  /// Estimated network hash rate.
+  Future<int> getHashRate({BlockId id, int height}) {
+    return null;
+  }
+
+  /// Single Transaction
+  /// You can also request the transaction to return in binary form (Hex encoded) using ?format=hex
+  @override
+  Future<TransactionMessage> getTransaction(TransactionId id) {
+    return null;
+  }
+
+  /// Handle the BLOCKCHAIN WebSocket API message frame consisting of [op] and [x].
+  void handleMessage(String message) {}
+
+  /// Handles every new [BitcoinBlock] on the [BlockchainAPINetwork].
+  /// [BitcoinBlock.transactions] is empty if no [BitcoinTransaction] match our [filterAdd()].
+  void handleFilterBlock(BitcoinBlockId id, BitcoinBlock block, bool undo) {}
+
+  /// Handles every new [BitcoinTransaction] matching our [filterAdd()]
+  void handleNewTransaction(BitcoinTransaction transaction) {}
 }
 
 /// https://www.blockchain.com/api/api_websocket

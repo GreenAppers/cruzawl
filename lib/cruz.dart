@@ -19,6 +19,7 @@ import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sha3.dart';
+import 'package:cruzawl/socket.dart';
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/websocket.dart';
 

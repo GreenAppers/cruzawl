@@ -11,8 +11,6 @@ export 'package:cruzawl/http_html.dart'
     if (dart.library.io) 'package:cruzawl/http_io.dart';
 import 'package:cruzawl/util.dart';
 
-typedef JsonCallback = void Function(Map<String, dynamic>);
-
 /// HTTP response integrating [io.HttpClient] and [html.HttpRequest].
 class HttpResponse {
   int status;

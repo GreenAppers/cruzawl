@@ -5,8 +5,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:convert/convert.dart';
-import 'package:ethereum_util/src/signature.dart' as Signature;
-import "package:pointycastle/src/utils.dart";
+import 'package:ethereum_util/src/signature.dart' as eth_signature;
 
 import 'package:cruzawl/btc.dart' hide genesisBlockJson;
 import 'package:cruzawl/currency.dart';
@@ -95,8 +94,8 @@ class BitcoinWalletTester extends TestRunner {
     group('BIP 0032 TestVector 1', () {
       Seed seed =
           Seed.anyLength(hex.decode('000102030405060708090a0b0c0d0e0f'));
-      Wallet wallet = Wallet.fromSeed(
-          null, null, null, 'BIP32TestVector1', btc.createNetwork(), seed);
+      Wallet wallet = Wallet.fromSeed(null, null, null, 'BIP32TestVector1',
+          btc.createNetwork(), 'mainnet', seed);
       BitcoinAddress addr1, addr2;
 
       test("BTC wallet", () {
@@ -265,6 +264,7 @@ class CruzWalletTester extends TestRunner {
           null,
           'SLIP10TestVector2',
           cruz.createNetwork(),
+          'mainnet',
           Seed(hex.decode(
               'fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542')));
       CruzAddress addr1, addr2;
@@ -383,11 +383,11 @@ class EthereumTester extends TestRunner {
 
       EthereumAddress address = EthereumAddress.generateRandom();
       expect(address.publicAddress.data,
-          Signature.publicKeyToAddress(address.publicKey.data));
+          eth_signature.publicKeyToAddress(address.publicKey.data));
       expect(address.publicAddress.data,
-          Signature.privateKeyToAddress(address.privateKey.data));
+          eth_signature.privateKeyToAddress(address.privateKey.data));
       expect(address.publicKey.data,
-          Signature.privateKeyToPublicKey(address.privateKey.data));
+          eth_signature.privateKeyToPublicKey(address.privateKey.data));
 
       txn.sign(address.privateKey);
       expect(txn.verify(), false);

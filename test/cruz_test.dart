@@ -2,7 +2,6 @@
 // Use of this source code is governed by a MIT-style license that can be found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:test/test.dart';
@@ -187,6 +186,7 @@ void main() {
         cruz1fee,
         null,
         seriesForHeight: cruz1height);
+    expect(aliceFundingTransaction1.amount, aliceSendsBobCruz1 + cruz1fee);
 
     /// Alice sends Bob [aliceRefundTransaction1] ---------------------------->.
     final CruzTransaction aliceRefundTransaction1 = CruzTransaction(
@@ -222,6 +222,7 @@ void main() {
         cruz2fee,
         null,
         seriesForHeight: cruz2height);
+    expect(bobFundingTransaction2.amount, bobSendsAliceCruz2 + cruz2fee);
 
     /// <------------ Bob sends Alice [bobRefundTransaction2].
     final CruzTransaction bobRefundTransaction2 = CruzTransaction(
@@ -675,6 +676,8 @@ void main() {
 
     /// The channel is closed.
     int sumAlicePaysBobCruzbits = alicePaysBobCruzbits.reduce((a, b) => a + b);
+    expect(
+        lastBobCloseChannelTransaction.amount, aliceFundingTransaction.amount);
     expect(lastBobReturnBalanceTransaction.amount, sumAlicePaysBobCruzbits);
     expect(aliceReturnBalanceTransactions.last.amount,
         aliceFundsChannelWithCruz - sumAlicePaysBobCruzbits);

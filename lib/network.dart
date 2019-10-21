@@ -3,7 +3,9 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/preferences.dart';
@@ -140,6 +142,59 @@ abstract class Peer {
     while (throttleQueue.isNotEmpty) {
       (throttleQueue.removeFirst()).complete(null);
     }
+  }
+}
+
+typedef RawCallback = void Function(Uint8List);
+typedef JsonCallback = void Function(Map<String, dynamic>);
+
+/// Interface for connections, e.g. Socket or WebSocket.
+abstract class ConnectionInterface {
+  void close();
+  void handleError(Function errorHandler);
+  void handleDone(Function doneHandler);
+  void listen(Function messageHandler);
+  void send(String text);
+}
+
+/// Socket based [Peer] interface.
+abstract class SocketClient extends Peer {
+  ConnectionInterface get socket;
+
+  /// The URI for [Peer.connect].
+  String address;
+
+  /// Automatically attempt reconnecting this [Peer].
+  int autoReconnectSeconds;
+
+  /// [address] is derived from [spec] with optional context, e.g. genesis [BlockId].
+  SocketClient(PeerPreference spec, this.address, {this.autoReconnectSeconds})
+      : super(spec);
+
+  /// Interface for newly established connection.
+  void handleConnected();
+
+  /// Interface for lost connection.
+  void handleDisconnected();
+
+  /// Interface for messages received from transport.
+  void handleMessage(String message);
+
+  /// Interface for managing response [JsonCallback].
+  void addOutstandingJson(Map<String, dynamic> x,
+      [JsonCallback responseCallback]);
+
+  /// Inteface for reseting in-flight queries.
+  void failOutstanding();
+
+  /// [ConnectionInterface.send] message [x] expecting an in-order response for [responseCallback]
+  void addJsonMessage(Map<String, dynamic> x, [JsonCallback responseCallback]) {
+    addOutstandingJson(x, responseCallback);
+    String message = jsonEncode(x);
+    if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
+      spec.debugPrint('sending message: $message');
+    }
+    socket.send(message);
   }
 }
 

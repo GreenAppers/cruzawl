@@ -124,8 +124,12 @@ abstract class WalletStorage {
   /// Wallet balance is sum of [accounts].[Account.balance].
   num balance = 0;
 
+  /// Optional chain for this wallet, e.g. 'testnet'.
+  String chain;
+
   /// Construct from Wallet vitals. Ready for [_readStorage()].
-  WalletStorage(this.name, this.currency, this.seed, [this.seedPhrase]);
+  WalletStorage(this.name, this.currency, this.chain, this.seed,
+      [this.seedPhrase]);
 
   /// Interface used by [_readStoredAccounts()].
   Future<Account> addAccount(Account x, {bool store = true});
@@ -181,6 +185,7 @@ abstract class WalletStorage {
           'seed': seed,
           'seedPhrase': seedPhrase,
           'currency': currency,
+          'chain': chain,
         })));
   }
 
@@ -191,6 +196,7 @@ abstract class WalletStorage {
     seed = Seed.fromJson(header['seed']);
     seedPhrase = header['seedPhrase'] as String;
     currency = Currency.fromJson(header['currency']);
+    chain = header['chain'] as String;
   }
 
   /// Write single [Account] to [accountStore].
@@ -301,13 +307,18 @@ class Wallet extends WalletStorage {
   CruzawlPreferences preferences;
 
   /// Generate new HD [Wallet].
-  Wallet.generate(sembast.DatabaseFactory databaseFactory,
-      FileSystem fileSystem, String filename, String name, PeerNetwork network,
-      [CruzawlPreferences prefileSystem,
+  Wallet.generate(
+      sembast.DatabaseFactory databaseFactory,
+      FileSystem fileSystem,
+      String filename,
+      String name,
+      PeerNetwork network,
+      String chain,
+      [CruzawlPreferences preferences,
       StringCallback debug,
       WalletCallback loaded])
       : this.fromSeedPhrase(databaseFactory, fileSystem, filename, name,
-            network, generateMnemonic(), prefileSystem, debug, loaded);
+            network, chain, generateMnemonic(), preferences, debug, loaded);
 
   /// Generate HD [Wallet] from BIP-0039 mnemonic code.
   Wallet.fromSeedPhrase(
@@ -316,8 +327,9 @@ class Wallet extends WalletStorage {
       String filename,
       String name,
       PeerNetwork network,
+      String chain,
       String seedPhrase,
-      [CruzawlPreferences prefileSystem,
+      [CruzawlPreferences preferences,
       StringCallback debug,
       WalletCallback loaded])
       : this.fromSeed(
@@ -326,9 +338,10 @@ class Wallet extends WalletStorage {
             filename,
             name,
             network,
+            chain,
             Seed(mnemonicToSeed(seedPhrase)),
             seedPhrase,
-            prefileSystem,
+            preferences,
             debug,
             loaded);
 
@@ -339,12 +352,13 @@ class Wallet extends WalletStorage {
       String filename,
       String name,
       this.network,
+      String chain,
       Seed seed,
       [String seedPhrase,
       this.preferences,
       this.debugPrint,
       WalletCallback loaded])
-      : super(name, network.currency, seed, seedPhrase) {
+      : super(name, network.currency, chain, seed, seedPhrase) {
     if (filename != null) {
       _openWalletStorage(databaseFactory, fileSystem, filename, true, loaded);
     }
@@ -357,12 +371,13 @@ class Wallet extends WalletStorage {
       String filename,
       String name,
       this.network,
+      String chain,
       Seed seed,
       List<PrivateKey> privateKeys,
       [this.preferences,
       this.debugPrint,
       WalletCallback loaded])
-      : super(name, network.currency, seed) {
+      : super(name, network.currency, chain, seed) {
     if (filename != null) {
       _openWalletStorage(
           databaseFactory, fileSystem, filename, true, loaded, privateKeys);
@@ -376,12 +391,13 @@ class Wallet extends WalletStorage {
       String filename,
       String name,
       this.network,
+      String chain,
       Seed seed,
       List<PublicAddress> publicKeys,
       [this.preferences,
       this.debugPrint,
       WalletCallback loaded])
-      : super(name, network.currency, seed) {
+      : super(name, network.currency, chain, seed) {
     if (filename != null) {
       _openWalletStorage(databaseFactory, fileSystem, filename, true, loaded,
           null, publicKeys);
@@ -398,7 +414,7 @@ class Wallet extends WalletStorage {
       [this.preferences,
       this.debugPrint,
       WalletCallback loaded])
-      : super('loading', loadingCurrency, seed) {
+      : super('loading', loadingCurrency, null, seed) {
     _openWalletStorage(databaseFactory, fileSystem, filename, false, loaded,
         null, null, networks);
   }

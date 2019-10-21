@@ -9,8 +9,8 @@ import 'dart:typed_data';
 import 'package:bip32/bip32.dart' as bip32;
 import 'package:bip32/src/utils/ecurve.dart' as ecc;
 import "package:convert/convert.dart";
-import 'package:ethereum_util/src/rlp.dart' as Rlp;
-import 'package:ethereum_util/src/signature.dart' as Signature;
+import 'package:ethereum_util/src/rlp.dart' as eth_rlp;
+import 'package:ethereum_util/src/signature.dart' as eth_signature;
 import "package:fixnum/fixnum.dart";
 import 'package:json_annotation/json_annotation.dart';
 import 'package:meta/meta.dart';
@@ -21,6 +21,7 @@ import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sha3.dart';
+import 'package:cruzawl/socket.dart';
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/websocket.dart';
 
@@ -519,7 +520,7 @@ class EthereumTransaction extends Transaction {
 
   /// Unmarshals a RLP-encoded Uint8List to [EthereumTransaction].
   factory EthereumTransaction.fromRlp(Uint8List rlp, {int chainId}) {
-    List<dynamic> t = Rlp.decode(rlp);
+    List<dynamic> t = eth_rlp.decode(rlp);
     if (t.length != 9) throw FormatException('Invalid length ${t.length}');
     int sigV = decodeBigInt(t[6]).toInt(), derivedChainId = (sigV - 35) ~/ 2;
     if (derivedChainId >= 0) chainId ??= derivedChainId;
@@ -551,8 +552,8 @@ class EthereumTransaction extends Transaction {
     return ((sigV != chainId * 2 + 35) &&
             (sigV != chainId * 2 + 36) &&
             withSignature == false)
-        ? Rlp.encode(<dynamic>[nonce, gasPrice, gas, to.data, value, input])
-        : Rlp.encode(<dynamic>[
+        ? eth_rlp.encode(<dynamic>[nonce, gasPrice, gas, to.data, value, input])
+        : eth_rlp.encode(<dynamic>[
             nonce,
             gasPrice,
             gas,
@@ -577,8 +578,8 @@ class EthereumTransaction extends Transaction {
 
   /// Signs this transaction.
   void sign(EthereumPrivateKey key) {
-    Signature.ECDSASignature sig =
-        Signature.sign(unsignedHash().data, key.data, chainId: chainId);
+    eth_signature.ECDSASignature sig =
+        eth_signature.sign(unsignedHash().data, key.data, chainId: chainId);
     sigR = encodeBigInt(sig.r);
     sigS = encodeBigInt(sig.s);
     sigV = sig.v;
@@ -597,8 +598,8 @@ class EthereumTransaction extends Transaction {
   }
 
   EthereumPublicKey recoverSenderPublicKey() =>
-      EthereumPublicKey(Signature.recoverPublicKeyFromSignature(
-          Signature.ECDSASignature(
+      EthereumPublicKey(eth_signature.recoverPublicKeyFromSignature(
+          eth_signature.ECDSASignature(
               decodeBigInt(sigR), decodeBigInt(sigS), sigV),
           unsignedHash().data,
           chainId: chainId));
@@ -862,7 +863,7 @@ class EthereumBlockHeader extends BlockHeader {
 
   /// Computes an ID for this block.
   @override
-  EthereumBlockId id() => EthereumBlockId.compute(Rlp.encode(<dynamic>[
+  EthereumBlockId id() => EthereumBlockId.compute(eth_rlp.encode(<dynamic>[
         previous.data,
         unclesRoot.data,
         miner.data,
@@ -996,8 +997,9 @@ mixin EtherscanAPI on HttpClientMixin {
   Future<TransactionIteratorResults> getTransactions(
       PublicAddress address, TransactionIterator iterator,
       {int limit = 50}) {
-    if (httpAddress == null)
+    if (httpAddress == null) {
       return Future.value(TransactionIteratorResults(0, 0, <Transaction>[]));
+    }
     Completer<TransactionIteratorResults> completer =
         Completer<TransactionIteratorResults>();
     int page = iterator != null ? iterator.index : 0;

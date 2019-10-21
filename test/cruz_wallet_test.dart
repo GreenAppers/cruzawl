@@ -69,7 +69,7 @@ void main() {
     peerPref.debugPrint = print;
     peerPref.debugLevel = debugLevelDebug;
     peer = network.addPeer(network.createPeerWithSpec(peerPref));
-    peer.ws = socket;
+    peer.socket = socket;
     expect(network.peerState, PeerState.disconnected);
     expect(network.peerAddress, peer.address);
   });
@@ -111,6 +111,7 @@ void main() {
         'wallet.cruzall',
         'wallet',
         network,
+        'mainnet',
         preferences,
         print,
         (_) => completer.complete(null));
@@ -214,6 +215,7 @@ void main() {
     await completer.future;
     expect(wallet.currency, cruz);
     expect(wallet.addresses.length, 3);
+    expect(wallet.chain, 'mainnet');
     for (var address in wallet.addresses.values) {
       address.state = AddressState.used;
       expect(address.verify(), true);
@@ -377,6 +379,7 @@ void main() {
         'non-hd-wallet.cruzall',
         'non-hd-wallet',
         network,
+        'mainnet',
         seed,
         <PrivateKey>[wallet.addresses[moneyAddr].privateKey],
         preferences,
@@ -416,6 +419,7 @@ void main() {
         'watch-only-wallet.cruzall',
         'watch-only-wallet',
         network,
+        'mainnet',
         seed,
         <PublicAddress>[wallet.addresses[moneyAddr].publicAddress],
         preferences,
