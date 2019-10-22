@@ -15,13 +15,13 @@ import "package:pointycastle/src/utils.dart";
 import 'package:tweetnacl/tweetnacl.dart' as tweetnacl;
 
 import 'package:cruzawl/currency.dart';
-import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/network/http.dart';
+import 'package:cruzawl/network/socket.dart';
+import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sha3.dart';
-import 'package:cruzawl/socket.dart';
 import 'package:cruzawl/util.dart';
-import 'package:cruzawl/websocket.dart';
 
 part 'cruz.g.dart';
 
@@ -118,7 +118,8 @@ class CRUZ extends Currency {
   CruzPeerNetwork createNetwork(
           {VoidCallback peerChanged,
           VoidCallback tipChanged,
-          HttpClient httpClient}) =>
+          HttpClient httpClient,
+          String userAgent}) =>
       CruzPeerNetwork(peerChanged, tipChanged);
 
   /// The first [Block] in the chain. e.g. https://www.cruzbase.com/#/height/0

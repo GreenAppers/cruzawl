@@ -7,8 +7,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart';
 
-export 'package:cruzawl/http_html.dart'
-    if (dart.library.io) 'package:cruzawl/http_io.dart';
+export 'package:cruzawl/network/http_html.dart'
+    if (dart.library.io) 'package:cruzawl/network/http_io.dart';
 import 'package:cruzawl/util.dart';
 
 /// HTTP response integrating [io.HttpClient] and [html.HttpRequest].

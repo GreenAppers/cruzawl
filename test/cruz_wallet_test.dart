@@ -8,12 +8,12 @@ import 'package:sembast/sembast_memory.dart';
 import 'package:test/test.dart';
 
 import 'package:cruzawl/currency.dart';
-import 'package:cruzawl/cruz.dart';
+import 'package:cruzawl/currency/cruz.dart';
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sembast.dart';
 import 'package:cruzawl/util.dart';
-import 'package:cruzawl/websocket.dart';
 import 'package:cruzawl/wallet.dart';
 
 String moneyAddr, pushedTransactionId;

@@ -13,6 +13,9 @@ dependencies:
   bs58check: ^1.0.1
   convert: ^2.1.1
   collection: ^1.14.11
+  dartssh:
+    git:
+      url: https://github.com/GreenAppers/dartssh
   ed25519_hd_key:
     git:
       url: https://github.com/GreenAppers/dart-ed25519-hd-key

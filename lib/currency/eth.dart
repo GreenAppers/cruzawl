@@ -17,13 +17,13 @@ import 'package:meta/meta.dart';
 import "package:pointycastle/src/utils.dart";
 
 import 'package:cruzawl/currency.dart';
-import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/network/http.dart';
+import 'package:cruzawl/network/socket.dart';
+import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sha3.dart';
-import 'package:cruzawl/socket.dart';
 import 'package:cruzawl/util.dart';
-import 'package:cruzawl/websocket.dart';
 
 part 'eth.g.dart';
 
@@ -113,7 +113,8 @@ class ETH extends Currency {
   SupplementedEthereumRPCNetwork createNetwork(
           {VoidCallback peerChanged,
           VoidCallback tipChanged,
-          HttpClient httpClient}) =>
+          HttpClient httpClient,
+          String userAgent}) =>
       SupplementedEthereumRPCNetwork(httpClient, peerChanged, tipChanged);
 
   /// The first [Block] in the chain. e.g. https://www.etherchain.org/block/0
@@ -998,7 +999,7 @@ mixin EtherscanAPI on HttpClientMixin {
       PublicAddress address, TransactionIterator iterator,
       {int limit = 50}) {
     if (httpAddress == null) {
-      return Future.value(TransactionIteratorResults(0, 0, <Transaction>[]));
+      return Future.value(TransactionIteratorResults.empty());
     }
     Completer<TransactionIteratorResults> completer =
         Completer<TransactionIteratorResults>();
@@ -1135,7 +1136,7 @@ class EthereumRPC extends PersistentWebSocketClient
       ],
     }, (Map<String, dynamic> response) {
       spec.debugPrint("got-logs ${jsonEncode(response)}");
-      completer.complete(TransactionIteratorResults(0, 0, <Transaction>[]));
+      completer.complete(TransactionIteratorResults.empty());
     });
     return completer.future;
   }

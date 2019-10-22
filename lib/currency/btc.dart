@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:bip32/bip32.dart' as bip32;
@@ -18,12 +19,12 @@ import 'package:pointycastle/digests/sha256.dart';
 import 'package:pointycastle/src/utils.dart';
 
 import 'package:cruzawl/currency.dart';
-import 'package:cruzawl/http.dart';
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/network/http.dart';
+import 'package:cruzawl/network/socket.dart';
+import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/preferences.dart';
-import 'package:cruzawl/socket.dart';
 import 'package:cruzawl/util.dart';
-import 'package:cruzawl/websocket.dart';
 
 part 'btc.g.dart';
 
@@ -119,13 +120,19 @@ class BTC extends Currency {
   @override
   PublicAddress get nullAddress => BitcoinPublicKey(Uint8List(33));
 
-  /// Create a [BlockchainAPINetwork] instance.
+  /// Supports Bitcoin Protocol, Bitcoin RPC, and blockchain.info API.
   @override
-  BlockchainAPINetwork createNetwork(
+  List<String> get supportedPeerTypes =>
+      ['Bitcoin', 'BitcoinRPC', 'BlockChainAPI'];
+
+  /// Create a [BitcoinNetwork] instance.
+  @override
+  BitcoinNetwork createNetwork(
           {VoidCallback peerChanged,
           VoidCallback tipChanged,
-          HttpClient httpClient}) =>
-      BlockchainAPINetwork(httpClient, peerChanged, tipChanged);
+          HttpClient httpClient,
+          String userAgent}) =>
+      BitcoinNetwork(httpClient, peerChanged, tipChanged, userAgent);
 
   /// The first [Block] in the chain. e.g. https://www.blockchain.com/btc/block-height/0
   @override
@@ -254,6 +261,48 @@ class BTC extends Currency {
   /// Double SHA256 hash.
   static Uint8List doubleSha256(Uint8List input) =>
       SHA256Digest().process(SHA256Digest().process(input));
+
+  /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_string
+  static void serializeVarString(SerializableOutput output, String x) =>
+      serializeVarStringBytes(output, x.codeUnits);
+
+  /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_string
+  static void serializeVarStringBytes(SerializableOutput output, Uint8List x) {
+    serializeVarInt(output, x.length);
+    output.addBytes(x);
+  }
+
+  /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_string
+  static int varStringLength(int x) => varIntLength(x) + x;
+
+  /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
+  static void serializeVarInt(SerializableOutput output, int x) {
+    if (x <= 0xFD) {
+      output.addUint8(x);
+    } else if (x <= 0xffff) {
+      output.addUint8(0xfd);
+      output.addUint16(x);
+    } else if (x <= 0xffffffff) {
+      output.addUint8(0xfe);
+      output.addUint32(x);
+    } else {
+      output.addUint8(0xff);
+      output.addUint64(x);
+    }
+  }
+
+  /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
+  static int varIntLength(int x) {
+    if (x <= 0xFD) {
+      return 1;
+    } else if (x <= 0xffff) {
+      return 3;
+    } else if (x <= 0xffffffff) {
+      return 5;
+    } else {
+      return 9;
+    }
+  }
 }
 
 /// Checksummed Hash160.
@@ -447,7 +496,7 @@ class BitcoinScript {
 }
 
 /// Bitcoin transaction input: https://en.bitcoin.it/wiki/Transaction
-class BitcoinTransactionInput extends TransactionInput {
+class BitcoinTransactionInput extends TransactionInput with Serializable {
   /// True if the transaction is a coinbase.
   @override
   bool isCoinbase = false;
@@ -516,24 +565,26 @@ class BitcoinTransactionInput extends TransactionInput {
     return ret;
   }
 
-  Uint8List toRaw() {
-    Uint8List scriptLen = encodeBigInt(BigInt.from(script.data.length));
-    Uint8List ret = Uint8List.fromList(
-        (prevOut != null ? prevOut.data.reversed.toList() : Uint8List(32)) +
-            Uint8List(4) +
-            scriptLen +
-            script.data +
-            Uint8List(4));
-    ByteData data = ByteData.view(ret.buffer);
-    data.setUint32(32, prevOutIndex ?? 0xffffffff, Endian.little);
-    data.setUint32(ret.length - 4, 0xffffffff, Endian.little);
-    return ret;
+  @override
+  int get serializedSize => 40 + BTC.varStringLength(script.data.length);
+
+  /// Marshals [BitcoinTransactionInput] as raw bytes.
+  @override
+  void serialize(SerializableOutput output) {
+    output.addBytes(
+        prevOut != null ? prevOut.data.reversed.toList() : Uint8List(32));
+    output.addUint32(prevOutIndex ?? 0xffffffff);
+    BTC.serializeVarStringBytes(output, script.data);
+    output.addUint32(0xffffffff);
   }
+
+  @override
+  void deserialize(SerializableInput input) {}
 }
 
 /// Bitcoin transaction output.
 @JsonSerializable(includeIfNull: false)
-class BitcoinTransactionOutput extends TransactionOutput {
+class BitcoinTransactionOutput extends TransactionOutput with Serializable {
   // Amount of BTC to this output.
   @override
   int value;
@@ -556,18 +607,23 @@ class BitcoinTransactionOutput extends TransactionOutput {
   /// Marshals [BitcoinTransactionOutput] as a JSON-encoded string.
   Map<String, dynamic> toJson() => _$BitcoinTransactionOutputToJson(this);
 
-  Uint8List toRaw() {
-    Uint8List scriptLen = encodeBigInt(BigInt.from(script.data.length));
-    Uint8List ret = Uint8List.fromList(Uint8List(8) + scriptLen + script.data);
-    ByteData data = ByteData.view(ret.buffer);
-    data.setUint64(0, value, Endian.little);
-    return ret;
+  @override
+  int get serializedSize => 8 + BTC.varStringLength(script.data.length);
+
+  /// Marshals [BitcoinTransactionOutput] as raw bytes.
+  @override
+  void serialize(SerializableOutput output) {
+    output.addUint64(value);
+    BTC.serializeVarStringBytes(output, script.data);
   }
+
+  @override
+  void deserialize(SerializableInput input) {}
 }
 
 /// A ledger transaction representation. It transfers value from one address to another.
 @JsonSerializable(includeIfNull: false)
-class BitcoinTransaction extends Transaction {
+class BitcoinTransaction extends Transaction with Serializable {
   /// Identifier for this transaction.
   @override
   BitcoinTransactionId hash;
@@ -635,6 +691,12 @@ class BitcoinTransaction extends Transaction {
   @override
   int get expires => null;
 
+  /// Returns true if this is a Segregated Witness transaction.
+  bool get segWit =>
+      inputs.isNotEmpty &&
+      inputs[0].witness != null &&
+      inputs[0].witness.isNotEmpty;
+
   /// Creates an arbitrary unsigned [BitcoinTransaction].
   BitcoinTransaction();
 
@@ -657,45 +719,34 @@ class BitcoinTransaction extends Transaction {
   @override
   bool verify() => false;
 
-  Uint8List toRaw() {
-    List<Uint8List> inputData = inputs.map((e) => e.toRaw()).toList();
-    List<Uint8List> outputData = outputs.map((e) => e.toRaw()).toList();
-    int inputsLength = inputData.fold(0, (p, c) => p + c.length);
-    int outputsLength = outputData.fold(0, (p, c) => p + c.length);
-    Uint8List inputsLengthData = encodeBigInt(BigInt.from(inputs.length));
-    Uint8List outputsLengthData = encodeBigInt(BigInt.from(outputs.length));
-    bool witness = inputData.isNotEmpty &&
-        inputs[0].witness != null &&
-        inputs[0].witness.isNotEmpty;
-    int witnessLength =
-        !witness ? 0 : 2 + inputs.fold(0, (p, c) => c.witness.length);
-    Uint8List ret = Uint8List(8 +
-        inputsLengthData.length +
-        outputsLengthData.length +
-        inputsLength +
-        outputsLength +
-        witnessLength);
-    ByteData data = ByteData.view(ret.buffer);
-    data.setUint32(0, version, Endian.little);
-    if (witness) data.setUint16(4, 1, Endian.little);
-    int offset = 4 + (witness ? 2 : 0);
-    offset = setByteData(ret, offset, inputsLengthData);
-    for (Uint8List input in inputData) {
-      offset = setByteData(ret, offset, input);
+  @override
+  int get serializedSize =>
+      8 +
+      inputs.fold(0, (p, c) => p + c.serializedSize) +
+      outputs.fold(0, (p, c) => p + c.serializedSize) +
+      BTC.varIntLength(inputs.length) +
+      BTC.varIntLength(outputs.length) +
+      (segWit ? (2 + inputs.fold(0, (p, c) => c.witness.length)) : 0);
+
+  /// Marshals [BitcoinTransaction] as raw bytes.
+  @override
+  void serialize(SerializableOutput output) {
+    bool segWit = this.segWit;
+    output.addUint32(version);
+    if (segWit) output.addUint16(1);
+    BTC.serializeVarInt(output, inputs.length);
+    for (Uint8List input in inputs.map((e) => e.toRaw())) {
+      output.addBytes(input);
     }
-    offset = setByteData(ret, offset, outputsLengthData);
-    for (Uint8List output in outputData) {
-      offset = setByteData(ret, offset, output);
+    BTC.serializeVarInt(output, outputs.length);
+    for (Uint8List out in outputs.map((e) => e.toRaw())) {
+      output.addBytes(out);
     }
-    data.setUint32(offset, lockTime, Endian.little);
-    assert((offset + 4) == ret.length);
-    return ret;
+    output.addUint32(lockTime);
   }
 
-  static int setByteData(Uint8List data, int offset, Uint8List x) {
-    data.setRange(offset, offset + x.length, x);
-    return offset + x.length;
-  }
+  @override
+  void deserialize(SerializableInput input) {}
 }
 
 /// Bitcoin implementation of the [Wallet] entry [Address] abstraction.
@@ -887,7 +938,7 @@ class BitcoinBlockIds {
 
 /// Data used to determine block validity and place in the block chain.
 @JsonSerializable(includeIfNull: false)
-class BitcoinBlockHeader extends BlockHeader {
+class BitcoinBlockHeader extends BlockHeader with Serializable {
   // Id for this block.
   BitcoinBlockId hash;
 
@@ -968,18 +1019,22 @@ class BitcoinBlockHeader extends BlockHeader {
   @override
   BitcoinBlockId id() => BitcoinBlockId.compute(toRaw());
 
-  Uint8List toRaw() {
-    Uint8List data = Uint8List.fromList(Uint8List(4) +
-        previous.data.reversed.toList() +
-        hashRoot.data.reversed.toList() +
-        Uint8List(12));
-    ByteData bytes = ByteData.view(data.buffer);
-    bytes.setUint32(0, version, Endian.little);
-    bytes.setUint32(68, time, Endian.little);
-    bytes.setUint32(72, bits, Endian.little);
-    bytes.setUint32(76, nonce, Endian.little);
-    return data;
+  @override
+  int get serializedSize => 16 + previous.data.length + hashRoot.data.length;
+
+  /// Marshals [BitcoinBlockHeader] as raw bytes.
+  @override
+  void serialize(SerializableOutput output) {
+    output.addUint32(version);
+    output.addBytes(Uint8List.fromList(previous.data.reversed.toList()));
+    output.addBytes(Uint8List.fromList(hashRoot.data.reversed.toList()));
+    output.addUint32(time);
+    output.addUint32(bits);
+    output.addUint32(nonce);
   }
+
+  @override
+  void deserialize(SerializableInput input) {}
 }
 
 /// Represents a block in the block chain. It has a header and a list of transactions.
@@ -1028,29 +1083,94 @@ class BitcoinBlock extends Block {
       .root);
 }
 
-/// https://en.bitcoin.it/wiki/Protocol_documentation
+/// Supports both Bitcoin Protocol and BLOCKCHAIN API.
 class BitcoinNetwork extends PeerNetwork {
-  BitcoinNetwork(VoidCallback peerChanged, VoidCallback tipChanged)
-      : super(peerChanged, tipChanged);
+  HttpClient httpClient;
+
+  BitcoinNetwork(this.httpClient, VoidCallback peerChanged,
+      VoidCallback tipChanged, String userAgent)
+      : super(peerChanged, tipChanged, userAgent: userAgent);
 
   @override
   BTC get currency => btc;
 
   /// Creates [Peer] ready to [Peer.connect()].
   @override
-  Peer createPeerWithSpec(PeerPreference spec) =>
-      BitcoinPeer(spec, parseUri(spec.url));
+  Peer createPeerWithSpec(PeerPreference spec) {
+    switch (spec.type) {
+      case 'BlockchainAPI':
+        return BlockchainAPI(
+            spec, parseBlockchainInfoUri(spec.url), httpClient, spec.root);
+      case 'BitcoinRPC':
+        return SupplementedBitcoinRPC(
+            spec, parseBitcoinRpcUri(spec.url), httpClient, spec.root);
+      default:
+        return SupplementedBitcoinPeer(
+            spec, parseBitcoinUri(spec.url), httpClient, spec.root)
+          ..userAgent = userAgent;
+    }
+  }
 
-  /// Valid CRUZ URI: '10.0.0.1'.
-  String parseUri(String uriText) {
+  /// Valid Bitcoin URI: '10.0.0.1'.
+  String parseBitcoinUri(String uriText) {
     // if (!Uri.parse(uriText).hasScheme) uriText = 'tcp://' + uriText;
     Uri uri = Uri.parse(uriText);
     Uri url = uri.replace(port: uri.hasPort ? uri.port : 8333);
     return url.toString();
   }
+
+  /// Valid Bitcoin RPC URI: '10.0.0.1'.
+  String parseBitcoinRpcUri(String uriText) {
+    // if (!Uri.parse(uriText).hasScheme) uriText = 'tcp://' + uriText;
+    Uri uri = Uri.parse(uriText);
+    Uri url = uri.replace(port: uri.hasPort ? uri.port : 8332);
+    return url.toString();
+  }
+
+  /// Valid Blockchain URI: 'ws.blockchain.info', 'wss://ws.blockchain.info/inv'.
+  String parseBlockchainInfoUri(String uriText) {
+    if (!Uri.parse(uriText).hasScheme) uriText = 'wss://' + uriText;
+    Uri uri = Uri.parse(uriText);
+    Uri url = uri.replace(path: uri.path.isEmpty ? '/inv' : uri.path);
+    return url.toString();
+  }
+}
+
+/// Supplements with Blockchain.info for historical transaction information.
+/// Bitcoin protocol is used for the rest.
+class SupplementedBitcoinPeer extends BitcoinPeer
+    with HttpClientMixin, SupplementalBlockchainAPI {
+  SupplementedBitcoinPeer(PeerPreference spec, String webSocketAddress,
+      HttpClient httpClient, String httpAddress)
+      : super(spec, webSocketAddress) {
+    this.httpClient = httpClient;
+    this.httpAddress = httpAddress;
+    responseComplete = dispatchFromThrottleQueue;
+  }
+
+  /// Throttles sum of outstanding Bitcoin Protocol and Blockchain API calls.
+  int get numOutstanding => rawResponseQueue.length + httpClient.numOutstanding;
+}
+
+/// Supplements with Blockchain.info for historical transaction information.
+/// Bitcoin RPC is used for the rest.
+class SupplementedBitcoinRPC extends BitcoinRPC
+    with HttpClientMixin, SupplementalBlockchainAPI {
+  SupplementedBitcoinRPC(PeerPreference spec, String webSocketAddress,
+      HttpClient httpClient, String httpAddress)
+      : super(spec, webSocketAddress) {
+    this.httpClient = httpClient;
+    this.httpAddress = httpAddress;
+    responseComplete = dispatchFromThrottleQueue;
+  }
+
+  /// Throttles sum of outstanding Bitcoin RPC and Blockchain API calls.
+  int get numOutstanding =>
+      jsonResponseQueue.length + httpClient.numOutstanding;
 }
 
 /// Bitcoin implementation of the [PeerNetwork] entry [Peer] abstraction.
+/// Reference: https://en.bitcoin.it/wiki/Protocol_documentation
 class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
   /// The [BitcoinAddress] we're monitoring [BitcoinNetwork] for.
   Map<String, TransactionCallback> addressFilter =
@@ -1064,16 +1184,136 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
   @override
   BitcoinBlockId tipId;
 
-  /// The minimum [BitcoinTransaction.amount] for the [BlockchainAPINetwork].
+  /// The minimum [BitcoinTransaction.amount] for the [BitcoinNetwork].
   @override
   num minAmount;
 
-  /// The minimum [BitcoinTransaction.fee] for the [BlockchainAPINetwork].
+  /// The minimum [BitcoinTransaction.fee] for the [BitcoinNetwork].
   @override
   num minFee;
 
   /// Forward [Peer] constructor.
-  BitcoinPeer(PeerPreference spec, String address) : super(spec, address) {
+  BitcoinPeer(PeerPreference spec, String address) : super(spec, address);
+
+  /// Network lost. Clear [tip] and [tipId].
+  @override
+  void handleDisconnected() {
+    addressFilter = Map<String, TransactionCallback>();
+    tipId = null;
+    tipHeight = null;
+  }
+
+  /// Network connected. Request [tip] and subscribe to new blocks.
+  @override
+  void handleConnected() {}
+
+  /// https://en.bitcoin.it/wiki/Protocol_documentation#Message_structure
+  void addMessage(String command,
+      [Uint8List payload, RawCallback responseCallback]) {
+    Uint8List message = Uint8List.fromList(Uint8List(24) + payload);
+    ByteData data = ByteData.view(message.buffer);
+    data.setUint32(0, 0xD9B4BEF9, Endian.little);
+    message.setRange(4, 4 + min(12, command.length), command.codeUnits);
+    data.setUint32(16, payload.length, Endian.little);
+    message.setRange(20, 24, BTC.doubleSha256(payload));
+    socket.sendRaw(message);
+    addOutstandingRaw(message, responseCallback);
+  }
+
+  /// Impossible to get balance with Bitcoin Protocol.
+  @override
+  Future<num> getBalance(PublicAddress address) => Future.value(0);
+
+  /// Impossible to get transactions with Bitcoin Protocol.
+  @override
+  Future<TransactionIteratorResults> getTransactions(
+          PublicAddress address, TransactionIterator iterator,
+          {int limit = 50}) =>
+      Future.value(TransactionIteratorResults.empty());
+
+  @override
+  Future<TransactionId> putTransaction(Transaction transaction) {
+    return null;
+  }
+
+  /// Subscribing to an Address
+  /// Receive new transactions for a specific bitcoin address:
+  /// {"op":"addr_sub", "addr":"$bitcoin_address"}
+  @override
+  Future<bool> filterAdd(
+      PublicAddress address, TransactionCallback transactionCb) {
+    return Future.value(false);
+  }
+
+  @override
+  Future<bool> filterTransactionQueue() {
+    /// https://blockchain.info/unconfirmed-transactions?format=json
+    return Future.value(true);
+  }
+
+  @override
+  Future<BlockHeaderMessage> getBlockHeader({BlockId id, int height}) {
+    /// No way to only fetch header with blockchain API??
+    return null;
+  }
+
+  /// Blocks for one day: https://blockchain.info/blocks/$time_in_milliseconds?format=json
+  Future<List<BitcoinBlockHeader>> getBlockHeaders(DateTime time) {
+    return null;
+  }
+
+  /// Single Block
+  /// You can also request the block to return in binary form (Hex encoded) using ?format=hex
+  @override
+  Future<BlockMessage> getBlock({BlockId id, int height}) {
+    return null;
+  }
+
+  /// Single Transaction
+  /// You can also request the transaction to return in binary form (Hex encoded) using ?format=hex
+  @override
+  Future<TransactionMessage> getTransaction(TransactionId id) {
+    return null;
+  }
+
+  /// Handle Bitcoin Protocol.
+  void handleMessage(String message) {
+    spec.debugPrint("got message $message");
+  }
+
+  /// Handles every new [BitcoinBlock] on the [BitcoinNetwork].
+  /// [BitcoinBlock.transactions] is empty if no [BitcoinTransaction] match our [filterAdd()].
+  void handleFilterBlock(BitcoinBlockId id, BitcoinBlock block, bool undo) {}
+
+  /// Handles every new [BitcoinTransaction] matching our [filterAdd()]
+  void handleNewTransaction(BitcoinTransaction transaction) {}
+}
+
+/// Bitcoin RPC implementation of the [PeerNetwork] entry [Peer] abstraction.
+/// Reference: https://bitcoincore.org/en/doc/0.18.0/
+class BitcoinRPC extends PersistentSocketClient with JsonResponseQueueMixin {
+  /// The [BitcoinAddress] we're monitoring [BitcoinNetwork] for.
+  Map<String, TransactionCallback> addressFilter =
+      Map<String, TransactionCallback>();
+
+  /// Height of tip [BitcoinBlock] according to this peer.
+  @override
+  int tipHeight;
+
+  /// ID of tip [BitcoinBlock] according to this peer.
+  @override
+  BitcoinBlockId tipId;
+
+  /// The minimum [BitcoinTransaction.amount] for the [BitcoinNetwork].
+  @override
+  num minAmount;
+
+  /// The minimum [BitcoinTransaction.fee] for the [BitcoinNetwork].
+  @override
+  num minFee;
+
+  /// Forward [Peer] constructor.
+  BitcoinRPC(PeerPreference spec, String address) : super(spec, address) {
     //responseComplete = dispatchFromThrottleQueue;
     //maxOutstanding = 10;
   }
@@ -1100,14 +1340,6 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
   Future<TransactionIteratorResults> getTransactions(
       PublicAddress address, TransactionIterator iterator,
       {int limit = 50}) {
-    return null;
-  }
-
-  /// Single Address
-  Future<TransactionIteratorResults> getAddressTransactions(
-      PublicAddress address,
-      {int offset = 0,
-      int limit = 50}) {
     return null;
   }
 
@@ -1164,7 +1396,7 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
   /// Handle the BLOCKCHAIN WebSocket API message frame consisting of [op] and [x].
   void handleMessage(String message) {}
 
-  /// Handles every new [BitcoinBlock] on the [BlockchainAPINetwork].
+  /// Handles every new [BitcoinBlock] on the [BitcoinNetwork].
   /// [BitcoinBlock.transactions] is empty if no [BitcoinTransaction] match our [filterAdd()].
   void handleFilterBlock(BitcoinBlockId id, BitcoinBlock block, bool undo) {}
 
@@ -1172,36 +1404,73 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
   void handleNewTransaction(BitcoinTransaction transaction) {}
 }
 
-/// https://www.blockchain.com/api/api_websocket
-class BlockchainAPINetwork extends PeerNetwork {
-  HttpClient httpClient;
+/// Provides [getBalance()], [getUnspentOutputs], and [getAddressTransactions].
+mixin SupplementalBlockchainAPI on HttpClientMixin {
+  /// Balance: List the balance summary of each address listed.
+  Future<num> getBalance(PublicAddress address) {
+    Completer<num> completer = Completer<num>();
+    String addressText = address.toJson();
 
-  BlockchainAPINetwork(
-      this.httpClient, VoidCallback peerChanged, VoidCallback tipChanged)
-      : super(peerChanged, tipChanged);
+    /// [addressText] can be base58 or xpub.
+    /// Multiple Addresses Allowed separated by "|".
+    httpClient
+        .request(httpAddress + '/balance?active=$addressText')
+        .then((resp) {
+      Map<String, dynamic> data = jsonDecode(resp.text);
+      Map<String, dynamic> addr = data == null ? null : data[addressText];
+      completeResponse(completer, addr == null ? null : addr['final_balance']);
+    });
+    return completer.future;
+  }
 
-  @override
-  BTC get currency => btc;
+  Future<TransactionIteratorResults> getTransactions(
+      PublicAddress address, TransactionIterator iterator,
+      {int limit = 50}) {
+    return getAddressTransactions(address,
+        offset: iterator != null ? iterator.index : 0, limit: limit);
+  }
 
-  /// Creates [Peer] ready to [Peer.connect()].
-  @override
-  Peer createPeerWithSpec(PeerPreference spec) =>
-      BlockchainAPI(spec, parseUri(spec.url), httpClient, spec.root);
+  /// Single Address
+  Future<TransactionIteratorResults> getAddressTransactions(
+      PublicAddress address,
+      {int offset = 0,
+      int limit = 50}) {
+    Completer<TransactionIteratorResults> completer =
+        Completer<TransactionIteratorResults>();
+    String addressText = address.toJson();
 
-  /// Valid Blockchain URI: 'ws.blockchain.info', 'wss://ws.blockchain.info/inv'.
-  String parseUri(String uriText) {
-    if (!Uri.parse(uriText).hasScheme) uriText = 'wss://' + uriText;
-    Uri uri = Uri.parse(uriText);
-    Uri url = uri.replace(path: uri.path.isEmpty ? '/inv' : uri.path);
-    return url.toString();
+    /// [addressText] can be base58 or hash160
+    /// Optional limit parameter to show n transactions e.g. &limit=50 (Default: 50, Max: 50)
+    /// Optional offset parameter to skip the first n transactions e.g. &offset=100 (Page 2 for limit 50)
+    httpClient
+        .request(
+            httpAddress + '/rawaddr/$addressText?offset=$offset&limit=$limit')
+        .then((resp) {
+      Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
+      var txs = data == null ? null : data['txs'];
+      if (txs == null) {
+        completeResponse(completer, null);
+        return;
+      }
+      checkEquals(addressText, data['address'], httpClient.debugPrint);
+
+      TransactionIteratorResults ret =
+          TransactionIteratorResults(0, offset + limit, List<Transaction>());
+      for (var t in txs) {
+        ret.transactions.add(BitcoinTransaction.fromJson(t));
+      }
+
+      completeResponse(completer, ret);
+    });
+    return completer.future;
   }
 }
 
 /// Blockchain.info implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://www.blockchain.com/api/api_websocket
 class BlockchainAPI extends PersistentWebSocketClient
-    with HttpClientMixin, NullJsonResponseMixin {
-  /// The [BitcoinAddress] we're monitoring [BlockchainAPINetwork] for.
+    with HttpClientMixin, SupplementalBlockchainAPI, NullJsonResponseMixin {
+  /// The [BitcoinAddress] we're monitoring [BitcoinNetwork] for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
 
@@ -1213,11 +1482,11 @@ class BlockchainAPI extends PersistentWebSocketClient
   @override
   BitcoinBlockId tipId;
 
-  /// The minimum [BitcoinTransaction.amount] for the [BlockchainAPINetwork].
+  /// The minimum [BitcoinTransaction.amount] for the [BitcoinNetwork].
   @override
   num minAmount;
 
-  /// The minimum [BitcoinTransaction.fee] for the [BlockchainAPINetwork].
+  /// The minimum [BitcoinTransaction.fee] for the [BitcoinNetwork].
   @override
   num minFee;
 
@@ -1255,67 +1524,6 @@ class BlockchainAPI extends PersistentWebSocketClient
         'op': 'ping_block',
       },
     );
-  }
-
-  /// Balance: List the balance summary of each address listed.
-  @override
-  Future<num> getBalance(PublicAddress address) {
-    Completer<num> completer = Completer<num>();
-    String addressText = address.toJson();
-
-    /// [addressText] can be base58 or xpub.
-    /// Multiple Addresses Allowed separated by "|".
-    httpClient
-        .request(httpAddress + '/balance?active=$addressText')
-        .then((resp) {
-      Map<String, dynamic> data = jsonDecode(resp.text);
-      Map<String, dynamic> addr = data == null ? null : data[addressText];
-      completeResponse(completer, addr == null ? null : addr['final_balance']);
-    });
-    return completer.future;
-  }
-
-  @override
-  Future<TransactionIteratorResults> getTransactions(
-      PublicAddress address, TransactionIterator iterator,
-      {int limit = 50}) {
-    return getAddressTransactions(address,
-        offset: iterator != null ? iterator.index : 0, limit: limit);
-  }
-
-  /// Single Address
-  Future<TransactionIteratorResults> getAddressTransactions(
-      PublicAddress address,
-      {int offset = 0,
-      int limit = 50}) {
-    Completer<TransactionIteratorResults> completer =
-        Completer<TransactionIteratorResults>();
-    String addressText = address.toJson();
-
-    /// [addressText] can be base58 or hash160
-    /// Optional limit parameter to show n transactions e.g. &limit=50 (Default: 50, Max: 50)
-    /// Optional offset parameter to skip the first n transactions e.g. &offset=100 (Page 2 for limit 50)
-    httpClient
-        .request(
-            httpAddress + '/rawaddr/$addressText?offset=$offset&limit=$limit')
-        .then((resp) {
-      Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
-      var txs = data == null ? null : data['txs'];
-      if (txs == null) {
-        completeResponse(completer, null);
-        return;
-      }
-      checkEquals(addressText, data['address'], spec.debugPrint);
-
-      TransactionIteratorResults ret =
-          TransactionIteratorResults(0, offset + limit, List<Transaction>());
-      for (var t in txs) {
-        ret.transactions.add(BitcoinTransaction.fromJson(t));
-      }
-
-      completeResponse(completer, ret);
-    });
-    return completer.future;
   }
 
   @override
@@ -1478,7 +1686,7 @@ class BlockchainAPI extends PersistentWebSocketClient
     }
   }
 
-  /// Handles every new [BitcoinBlock] on the [BlockchainAPINetwork].
+  /// Handles every new [BitcoinBlock] on the [BitcoinNetwork].
   /// [BitcoinBlock.transactions] is empty if no [BitcoinTransaction] match our [filterAdd()].
   void handleFilterBlock(BitcoinBlockId id, BitcoinBlock block, bool undo) {
     if (tipId == null) {

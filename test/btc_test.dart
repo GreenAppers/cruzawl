@@ -6,8 +6,8 @@ import 'dart:typed_data';
 import 'package:convert/convert.dart';
 import 'package:test/test.dart';
 
-import 'package:cruzawl/btc.dart';
 import 'package:cruzawl/currency.dart';
+import 'package:cruzawl/currency/btc.dart';
 import 'package:cruzawl/test.dart';
 
 void main() {

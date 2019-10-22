@@ -8,12 +8,12 @@ import 'package:test/test.dart';
 import 'package:tweetnacl_musig/tweetnacl_musig.dart';
 
 import 'package:cruzawl/currency.dart' hide PrivateKey;
-import 'package:cruzawl/cruz.dart';
+import 'package:cruzawl/currency/cruz.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/network/websocket_html.dart'
+    if (dart.library.io) 'package:cruzawl/network/websocket_io.dart';
 import 'package:cruzawl/test.dart';
-import 'package:cruzawl/websocket_html.dart'
-    if (dart.library.io) 'package:cruzawl/websocket_io.dart';
 
 void main() {
   /// See [CruzTester] and [CruzWalletTester] in lib/test.dart for the on-device unit tests.

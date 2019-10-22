@@ -4,7 +4,7 @@
 import 'dart:async';
 import 'dart:html' as html;
 
-import 'package:cruzawl/websocket.dart';
+import 'package:cruzawl/network/websocket.dart';
 
 /// dart:html [WebSocket] implementation.
 class WebSocketImpl extends WebSocket {

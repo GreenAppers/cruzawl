@@ -4,18 +4,18 @@
 import 'dart:convert';
 import 'dart:io' as io;
 
+import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/util.dart';
-import 'package:cruzawl/websocket.dart';
 
 /// dart:io [WebSocket] implementation.
 class WebSocketImpl extends WebSocket {
   static const String type = 'io';
 
-  io.WebSocket ws;
+  io.WebSocket socket;
 
   @override
   void close() {
-    if (ws != null) ws.close();
+    if (socket != null) socket.close();
   }
 
   @override
@@ -24,7 +24,7 @@ class WebSocketImpl extends WebSocket {
     if (!ignoreBadCert || !address.startsWith('wss://')) {
       return io.WebSocket.connect(address)
           .timeout(Duration(seconds: timeoutSeconds))
-          .then((io.WebSocket x) => onConnected((ws = x)),
+          .then((io.WebSocket x) => onConnected((socket = x)),
               onError: (error, _) => onError(error));
     }
 
@@ -45,9 +45,9 @@ class WebSocketImpl extends WebSocket {
       io.HttpClientResponse response = await request.close()
         ..timeout(Duration(seconds: timeoutSeconds));
 
-      ws = io.WebSocket.fromUpgradedSocket(await response.detachSocket(),
+      socket = io.WebSocket.fromUpgradedSocket(await response.detachSocket(),
           serverSide: false);
-      onConnected(ws);
+      onConnected(socket);
     } catch (error) {
       onError(error);
     }
@@ -55,14 +55,14 @@ class WebSocketImpl extends WebSocket {
 
   @override
   void handleError(Function errorHandler) =>
-      ws.handleError((error, _) => errorHandler(error));
+      socket.handleError((error, _) => errorHandler(error));
 
   @override
-  void handleDone(Function doneHandler) => ws.done.then(doneHandler);
+  void handleDone(Function doneHandler) => socket.done.then(doneHandler);
 
   @override
-  void listen(Function messageHandler) => ws.listen(messageHandler);
+  void listen(Function messageHandler) => socket.listen(messageHandler);
 
   @override
-  void send(String text) => ws.addUtf8Text(utf8.encode(text));
+  void send(String text) => socket.addUtf8Text(utf8.encode(text));
 }

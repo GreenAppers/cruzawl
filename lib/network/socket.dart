@@ -5,15 +5,21 @@ import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/network/socket_html.dart'
+    if (dart.library.io) 'package:cruzawl/network/socket_io.dart';
 import 'package:cruzawl/preferences.dart';
 
-import 'socket_html.dart' if (dart.library.io) 'socket_io.dart';
+export 'package:dartssh/serializable.dart';
+export 'package:dartssh/protocol.dart';
 
+/// Websocket style interface for BSD sockets.
 abstract class SocketInterface extends ConnectionInterface {
   void connect(String address, Function onConnected, Function onError,
-      {int timeoutSeconds = 15, bool ignoreBadCert = false});
+      {int timeoutSeconds = 15});
+  void sendRaw(Uint8List raw);
 }
 
+/// [Peer] connected on [socket].
 abstract class PersistentSocketClient extends SocketClient {
   /// Only avaiable with dart:io.
   @override
@@ -25,14 +31,17 @@ abstract class PersistentSocketClient extends SocketClient {
       : super(spec, address, autoReconnectSeconds: autoReconnectSeconds);
 
   @override
-  void disconnect(String reason) {}
-
-  @override
   void connect() {
-    //socket.connect(
+    setState(PeerState.connecting);
+    if (spec.debugPrint != null) {
+      spec.debugPrint('Connecting to $address');
+    }
+    socket.connect(
+        address, onConnected, (error) => disconnect('connect error'));
   }
 }
 
+/// Mixin for testing with shim [ConnectionInterface]s.
 mixin TestConnection {
   bool connected = false, closed = false;
   Function messageHandler, errorHandler, doneHandler;
@@ -45,13 +54,16 @@ mixin TestConnection {
   void send(String text) => sent.add(text);
 }
 
+/// Shim [Socket] for testing
 class TestSocket extends SocketInterface with TestConnection {
   void connect(String address, Function onConnected, Function onError,
       {int timeoutSeconds = 15, bool ignoreBadCert = false}) {
     connected = true;
     closed = false;
-    //onConnected(this);
+    onConnected(this);
   }
+
+  void sendRaw(Uint8List raw) => sent.add(String.fromCharCodes(raw));
 }
 
 /// [Peer] mixin handling raw responses in order.
@@ -71,6 +83,10 @@ mixin RawResponseQueueMixin {
     while (rawResponseQueue.isNotEmpty) {
       (rawResponseQueue.removeFirst())(null);
     }
+  }
+
+  void addOutstandingRaw(Uint8List x, [RawCallback responseCallback]) {
+    if (responseCallback != null) rawResponseQueue.add(responseCallback);
   }
 
   void addOutstandingJson(Map<String, dynamic> x,

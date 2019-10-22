@@ -7,11 +7,11 @@ import 'dart:typed_data';
 import 'package:convert/convert.dart';
 import 'package:ethereum_util/src/signature.dart' as eth_signature;
 
-import 'package:cruzawl/btc.dart' hide genesisBlockJson;
 import 'package:cruzawl/currency.dart';
-import 'package:cruzawl/cruz.dart' as cruz_impl show genesisBlockJson;
-import 'package:cruzawl/cruz.dart' hide genesisBlockJson;
-import 'package:cruzawl/eth.dart' hide genesisBlockJson;
+import 'package:cruzawl/currency/btc.dart' hide genesisBlockJson;
+import 'package:cruzawl/currency/cruz.dart' as cruz_impl show genesisBlockJson;
+import 'package:cruzawl/currency/cruz.dart' hide genesisBlockJson;
+import 'package:cruzawl/currency/eth.dart' hide genesisBlockJson;
 import 'package:cruzawl/util.dart';
 import 'package:cruzawl/wallet.dart';
 

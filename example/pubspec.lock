@@ -99,6 +99,15 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.2+dart2"
+  dartssh:
+    dependency: transitive
+    description:
+      path: "."
+      ref: HEAD
+      resolved-ref: f52beca2e424456464b27e61a9685622d2c70e70
+      url: "https://github.com/GreenAppers/dartssh"
+    source: git
+    version: "1.0.0+0"
   ed25519_hd_key:
     dependency: transitive
     description:

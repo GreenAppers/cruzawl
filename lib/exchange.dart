@@ -3,7 +3,7 @@
 
 import 'dart:convert';
 
-import 'package:cruzawl/http.dart';
+import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/util.dart';
 

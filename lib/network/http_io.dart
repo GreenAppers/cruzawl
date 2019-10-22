@@ -5,7 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 
-import 'package:cruzawl/http.dart';
+import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/util.dart';
 
 /// dart:io [HttpClient] implementation.

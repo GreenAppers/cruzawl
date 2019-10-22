@@ -6,11 +6,11 @@ import 'dart:typed_data';
 
 import "package:pointycastle/src/utils.dart";
 
-import 'package:cruzawl/btc.dart';
-import 'package:cruzawl/cruz.dart';
-import 'package:cruzawl/eth.dart';
-import 'package:cruzawl/http.dart';
+import 'package:cruzawl/currency/btc.dart';
+import 'package:cruzawl/currency/cruz.dart';
+import 'package:cruzawl/currency/eth.dart';
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/util.dart';
 
 /// Interface [Wallet] interacts with, potentially supports multiple cryptos
@@ -56,6 +56,9 @@ abstract class Currency {
   /// Address with the value of zero.
   PublicAddress get nullAddress;
 
+  /// Optional list of supported connections, e.g. [ 'Bitcoin', 'BitcoinRPC', 'BlockChainAPI' ].
+  List<String> get supportedPeerTypes => null;
+
   /// Marshals [Currency] as a JSON-encoded string.
   String toJson() => ticker;
 
@@ -84,7 +87,8 @@ abstract class Currency {
   PeerNetwork createNetwork(
       {VoidCallback peerChanged,
       VoidCallback tipChanged,
-      HttpClient httpClient});
+      HttpClient httpClient,
+      String userAgent});
 
   /// The [Block] with [Block.height] equal zero.
   Block genesisBlock();
@@ -144,7 +148,8 @@ class LoadingCurrency extends Currency {
   PeerNetwork createNetwork(
           {VoidCallback peerChanged,
           VoidCallback tipChanged,
-          HttpClient httpClient}) =>
+          HttpClient httpClient,
+          String userAgent}) =>
       null;
   Block genesisBlock() => null;
   Address deriveAddress(Uint8List seed, String path,

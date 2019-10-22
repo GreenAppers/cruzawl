@@ -2,17 +2,18 @@
 // Use of this source code is governed by a MIT-style license that can be found in the LICENSE file.
 
 import 'package:cruzawl/network.dart';
+import 'package:cruzawl/network/socket.dart';
+import 'package:cruzawl/network/websocket_html.dart'
+    if (dart.library.io) 'package:cruzawl/network/websocket_io.dart';
 import 'package:cruzawl/preferences.dart';
-import 'package:cruzawl/socket.dart';
-import 'websocket_html.dart' if (dart.library.io) 'websocket_io.dart';
 
-/// Interface for RFC6455 WebSocket protocol
+/// Interface for RFC6455 WebSocket protocol.
 abstract class WebSocket extends ConnectionInterface {
   void connect(String address, Function onConnected, Function onError,
       {int timeoutSeconds = 15, bool ignoreBadCert = false});
 }
 
-/// [Peer] integrating [html.Websocket] and [io.WebSocket]
+/// [Peer] integrating [html.Websocket] and [io.WebSocket].
 abstract class PersistentWebSocketClient extends SocketClient {
   /// The wrapped dart:html or dart:io [WebSocket].
   @override
@@ -24,17 +25,6 @@ abstract class PersistentWebSocketClient extends SocketClient {
       : super(spec, address, autoReconnectSeconds: autoReconnectSeconds);
 
   @override
-  void disconnect(String reason) {
-    socket.close();
-    if (spec.debugPrint != null) spec.debugPrint('disconnected: ' + reason);
-    setState(PeerState.disconnected);
-    handleDisconnected();
-    failOutstanding();
-    failThrottleQueue();
-    if (autoReconnectSeconds != null) connectAfter(autoReconnectSeconds);
-  }
-
-  @override
   void connect() {
     setState(PeerState.connecting);
     if (spec.debugPrint != null) {
@@ -43,16 +33,6 @@ abstract class PersistentWebSocketClient extends SocketClient {
     }
     socket.connect(address, onConnected, (error) => disconnect('connect error'),
         ignoreBadCert: spec.ignoreBadCert);
-  }
-
-  void onConnected(dynamic x) {
-    socket.handleError((error) => disconnect('socket error'));
-    socket.handleDone((v) => disconnect('socket done'));
-    socket.listen((message) => handleMessage(message));
-
-    setState(PeerState.connected);
-    if (spec.debugPrint != null) spec.debugPrint('onConnected');
-    handleConnected();
   }
 }
 

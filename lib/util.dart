@@ -48,8 +48,10 @@ bool equalUint8List(Uint8List x, Uint8List y) {
   return true;
 }
 
+/// Prepend '0' if [x.length] is odd.
 String zeroPadOddLengthString(String x) => x.length % 2 == 0 ? x : '0' + x;
 
+/// Prepend '0' (after '0x') if [x.length] is odd.
 String zeroPadOddLengthHexString(String x) => x.length % 2 == 0
     ? x
     : (x.startsWith('0x') ? ('0x0' + x.substring(2)) : ('0' + x));

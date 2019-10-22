@@ -35,6 +35,9 @@ abstract class Peer {
   // Maximum number of in-flight queries.
   int maxOutstanding = 20;
 
+  /// Optional user agent to identify local version.
+  String userAgent;
+
   /// [Queue] of subscribers waiting for [numOutstanding] to decrease.
   Queue<Completer<void>> throttleQueue = Queue<Completer<void>>();
 
@@ -187,6 +190,27 @@ abstract class SocketClient extends Peer {
   /// Inteface for reseting in-flight queries.
   void failOutstanding();
 
+  @override
+  void disconnect(String reason) {
+    socket.close();
+    if (spec.debugPrint != null) spec.debugPrint('disconnected: ' + reason);
+    setState(PeerState.disconnected);
+    handleDisconnected();
+    failOutstanding();
+    failThrottleQueue();
+    if (autoReconnectSeconds != null) connectAfter(autoReconnectSeconds);
+  }
+
+  void onConnected(dynamic x) {
+    socket.handleError((error) => disconnect('socket error'));
+    socket.handleDone((v) => disconnect('socket done'));
+    socket.listen((message) => handleMessage(message));
+
+    setState(PeerState.connected);
+    if (spec.debugPrint != null) spec.debugPrint('onConnected');
+    handleConnected();
+  }
+
   /// [ConnectionInterface.send] message [x] expecting an in-order response for [responseCallback]
   void addJsonMessage(Map<String, dynamic> x, [JsonCallback responseCallback]) {
     addOutstandingJson(x, responseCallback);
@@ -222,8 +246,11 @@ abstract class PeerNetwork {
   /// Triggers [reconnectPeer] on [PeerState.disconnected].
   int autoReconnectSeconds;
 
+  /// Optional user agent to identify local version.
+  String userAgent;
+
   PeerNetwork(this.peerChanged, this.tipChanged,
-      {this.autoReconnectSeconds = 15});
+      {this.autoReconnectSeconds = 15, this.userAgent});
 
   /// True if a [Peer] is connected.
   bool get hasPeer => peers.isNotEmpty;
@@ -383,6 +410,7 @@ class TransactionIteratorResults extends TransactionIterator {
   List<Transaction> transactions;
   TransactionIteratorResults(int height, int index, this.transactions)
       : super(height, index);
+  TransactionIteratorResults.empty() : this(0, 0, List<Transaction>());
 }
 
 /// Filters [networks] for a [PeerNetwork] with [Currency] matching [x].

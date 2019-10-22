@@ -3,8 +3,8 @@
 
 import 'package:test/test.dart';
 
-import 'package:cruzawl/eth.dart';
 import 'package:cruzawl/currency.dart';
+import 'package:cruzawl/currency/eth.dart';
 import 'package:cruzawl/test.dart';
 
 void main() {

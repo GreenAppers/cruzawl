@@ -13,6 +13,7 @@ PeerPreference _$PeerPreferenceFromJson(Map<String, dynamic> json) {
     json['currency'] as String,
     json['options'] as String,
     root: json['root'] as String,
+    type: json['type'] as String,
   )..priority = json['priority'] as int;
 }
 
@@ -30,6 +31,7 @@ Map<String, dynamic> _$PeerPreferenceToJson(PeerPreference instance) {
   writeNotNull('root', instance.root);
   writeNotNull('currency', instance.currency);
   writeNotNull('options', instance.options);
+  writeNotNull('type', instance.type);
   writeNotNull('priority', instance.priority);
   return val;
 }

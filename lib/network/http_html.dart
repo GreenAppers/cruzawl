@@ -4,7 +4,7 @@
 import 'dart:async';
 import 'dart:html' as html;
 
-import 'package:cruzawl/http.dart';
+import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/util.dart';
 
 /// dart:html [HttpClient] implementation.
