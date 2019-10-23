@@ -7,13 +7,18 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:dartssh/socket.dart';
+
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/util.dart';
 
-enum PeerState { ready, connected, connecting, disconnected }
+typedef RawCallback = void Function(Uint8List);
+typedef JsonCallback = void Function(Map<String, dynamic>);
 
 typedef PeerStateChangedCallback = void Function(Peer, PeerState, PeerState);
+
+enum PeerState { ready, connected, connecting, disconnected }
 
 /// Interface for [PeerNetwork] element providing Peer API.
 abstract class Peer {
@@ -146,18 +151,6 @@ abstract class Peer {
       (throttleQueue.removeFirst()).complete(null);
     }
   }
-}
-
-typedef RawCallback = void Function(Uint8List);
-typedef JsonCallback = void Function(Map<String, dynamic>);
-
-/// Interface for connections, e.g. Socket or WebSocket.
-abstract class ConnectionInterface {
-  void close();
-  void handleError(Function errorHandler);
-  void handleDone(Function doneHandler);
-  void listen(Function messageHandler);
-  void send(String text);
 }
 
 /// Socket based [Peer] interface.

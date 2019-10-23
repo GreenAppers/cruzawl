@@ -4,20 +4,11 @@
 import 'dart:collection';
 import 'dart:typed_data';
 
-import 'package:cruzawl/network.dart';
-import 'package:cruzawl/network/socket_html.dart'
-    if (dart.library.io) 'package:cruzawl/network/socket_io.dart';
-import 'package:cruzawl/preferences.dart';
-
 export 'package:dartssh/serializable.dart';
-export 'package:dartssh/protocol.dart';
+import 'package:dartssh/socket.dart';
 
-/// Websocket style interface for BSD sockets.
-abstract class SocketInterface extends ConnectionInterface {
-  void connect(String address, Function onConnected, Function onError,
-      {int timeoutSeconds = 15});
-  void sendRaw(Uint8List raw);
-}
+import 'package:cruzawl/network.dart';
+import 'package:cruzawl/preferences.dart';
 
 /// [Peer] connected on [socket].
 abstract class PersistentSocketClient extends SocketClient {
@@ -39,31 +30,6 @@ abstract class PersistentSocketClient extends SocketClient {
     socket.connect(
         address, onConnected, (error) => disconnect('connect error'));
   }
-}
-
-/// Mixin for testing with shim [ConnectionInterface]s.
-mixin TestConnection {
-  bool connected = false, closed = false;
-  Function messageHandler, errorHandler, doneHandler;
-  Queue<String> sent = Queue<String>();
-
-  void close() => closed = true;
-  void handleError(Function errorHandler) => this.errorHandler = errorHandler;
-  void handleDone(Function doneHandler) => this.doneHandler = doneHandler;
-  void listen(Function messageHandler) => this.messageHandler = messageHandler;
-  void send(String text) => sent.add(text);
-}
-
-/// Shim [Socket] for testing
-class TestSocket extends SocketInterface with TestConnection {
-  void connect(String address, Function onConnected, Function onError,
-      {int timeoutSeconds = 15, bool ignoreBadCert = false}) {
-    connected = true;
-    closed = false;
-    onConnected(this);
-  }
-
-  void sendRaw(Uint8List raw) => sent.add(String.fromCharCodes(raw));
 }
 
 /// [Peer] mixin handling raw responses in order.

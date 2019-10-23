@@ -104,7 +104,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: f52beca2e424456464b27e61a9685622d2c70e70
+      resolved-ref: f54a78eab077b65b6bbf14bdf64dc9e6c1c409a8
       url: "https://github.com/GreenAppers/dartssh"
     source: git
     version: "1.0.0+0"
@@ -146,7 +146,7 @@ packages:
       name: fluri
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.2.5"
+    version: "1.2.8"
   glob:
     dependency: transitive
     description:
@@ -216,7 +216,7 @@ packages:
       name: matcher
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.12.5"
+    version: "0.12.6"
   merkletree:
     dependency: transitive
     description:
@@ -300,7 +300,7 @@ packages:
       name: sass
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.23.0"
+    version: "1.23.1"
   sembast:
     dependency: transitive
     description:
@@ -394,7 +394,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "523ac35ae76629933e4b2bfeed9cd4629e98801b"
+      resolved-ref: "25a071fb6378ea54f61c012e02519c8c4419e0e2"
       url: "https://github.com/GreenAppers/tweetnacl-musig"
     source: git
     version: "1.0.0+0"
