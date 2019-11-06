@@ -4,8 +4,14 @@
 import 'dart:collection';
 import 'dart:typed_data';
 
-export 'package:dartssh/serializable.dart';
+import 'package:dartssh/client.dart';
+export 'package:dartssh/serializable.dart' hide equalUint8List;
 import 'package:dartssh/socket.dart';
+import 'package:dartssh/socket_html.dart'
+    if (dart.library.io) 'package:dartssh/socket_io.dart';
+import 'package:dartssh/websocket_html.dart'
+    if (dart.library.io) 'package:dartssh/websocket_io.dart';
+import 'package:dartssh/ssh.dart' as ssh show parseUri;
 
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/preferences.dart';
@@ -17,18 +23,32 @@ abstract class PersistentSocketClient extends SocketClient {
   SocketInterface socket;
 
   /// [address] is derived from [spec] with optional context, e.g. genesis [BlockId].
-  PersistentSocketClient(PeerPreference spec, String address,
+  PersistentSocketClient(PeerPreference spec, Uri uri,
       {int autoReconnectSeconds})
-      : super(spec, address, autoReconnectSeconds: autoReconnectSeconds);
+      : super(spec, uri, autoReconnectSeconds: autoReconnectSeconds);
 
   @override
   void connect() {
+    if (socket == null) {
+      if (spec.sshUrl != null &&
+          spec.sshUser != null &&
+          (spec.sshKey != null || spec.sshPassword != null)) {
+        socket = SSHTunneledSocketImpl(ssh.parseUri(spec.sshUrl), spec.sshUser,
+            spec.sshKey, spec.sshPassword);
+      } else if (address.hasScheme &&
+          (address.scheme == 'ws' || address.scheme == 'wss')) {
+        socket = WebSocketImpl();
+      } else {
+        socket = SocketImpl();
+      }
+    }
     setState(PeerState.connecting);
     if (spec.debugPrint != null) {
-      spec.debugPrint('Connecting to $address');
+      spec.debugPrint(
+          'Connecting to $address ' + (spec.ignoreBadCert ? '' : 'securely'));
     }
-    socket.connect(
-        address, onConnected, (error) => disconnect('connect error'));
+    socket.connect(address, onConnected, (error) => disconnect('connect error'),
+        ignoreBadCert: spec.ignoreBadCert);
   }
 }
 

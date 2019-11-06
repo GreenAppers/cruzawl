@@ -66,7 +66,7 @@ mixin HttpClientMixin {
   HttpClient httpClient;
 
   /// e.g. https://blockchain.info
-  String httpAddress;
+  Uri httpAddress;
 
   /// Number of outstanding requests for throttling.
   int get numOutstanding => httpClient.numOutstanding;

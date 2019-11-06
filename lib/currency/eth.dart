@@ -20,7 +20,6 @@ import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/network/socket.dart';
-import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sha3.dart';
 import 'package:cruzawl/util.dart';
@@ -933,23 +932,22 @@ class SupplementedEthereumRPCNetwork extends PeerNetwork {
 
   /// Creates [Peer] ready to [Peer.connect()].
   @override
-  Peer createPeerWithSpec(PeerPreference spec) =>
-      SupplementedEthereumRPC(spec, parseUri(spec.url), httpClient, spec.root);
+  Peer createPeerWithSpec(PeerPreference spec) => SupplementedEthereumRPC(
+      spec, parseUri(spec.url), httpClient, Uri.parse(spec.root));
 
   /// Valid URI: '10.0.0.1/ws', 'ws://10.0.01/ws', 'mainnet.infura.io',
   /// 'wss://mainnet.infura.io/ws/v3/YOUR-PROJECT-ID'.
-  String parseUri(String uriText) {
+  Uri parseUri(String uriText) {
     Uri uri = Uri.parse(uriText);
     bool infura = uri.host.toLowerCase().endsWith('infura.io');
     if (!uri.hasScheme) {
       uri = Uri.parse(infura ? 'wss://' : 'ws://' + uriText);
     }
-    Uri url = uri.replace(
+    return uri.replace(
         port: (uri.hasPort || infura) ? uri.port : 8546,
         path: (uri.path.isEmpty && infura)
             ? '/ws/v3/3b9c62d39b5f4dc5b0d78f2c717fb2f1'
             : uri.path);
-    return url.toString();
   }
 }
 
@@ -957,8 +955,8 @@ class SupplementedEthereumRPCNetwork extends PeerNetwork {
 /// Ethereum RPC is used (https://infura.io/docs/ethereum/wss/introduction.md) for the rest.
 /// Tested with geth and INFURA.
 class SupplementedEthereumRPC extends EthereumRPC with EtherscanAPI {
-  SupplementedEthereumRPC(PeerPreference spec, String webSocketAddress,
-      HttpClient httpClient, String httpAddress)
+  SupplementedEthereumRPC(PeerPreference spec, Uri webSocketAddress,
+      HttpClient httpClient, Uri httpAddress)
       : super(spec, webSocketAddress) {
     this.httpClient = httpClient;
     this.httpAddress = httpAddress;
@@ -977,8 +975,8 @@ mixin EtherscanAPI on HttpClientMixin {
   Future<BlockHeaderMessage> getBlockByHeight(int height) {
     Completer<BlockHeaderMessage> completer = Completer<BlockHeaderMessage>();
     httpClient
-        .request(httpAddress +
-            '/api?module=proxy&action=eth_getBlockByNumber&tag=${ETH.hexEncodeInt(height)}&boolean=true&apikey=$apiKey')
+        .request(
+            '$httpAddress/api?module=proxy&action=eth_getBlockByNumber&tag=${ETH.hexEncodeInt(height)}&boolean=true&apikey=$apiKey')
         .then((resp) {
       Map<String, dynamic> response = jsonDecode(resp.text);
       Map<String, dynamic> block = response == null ? null : response['result'];
@@ -1005,8 +1003,8 @@ mixin EtherscanAPI on HttpClientMixin {
         Completer<TransactionIteratorResults>();
     int page = iterator != null ? iterator.index : 0;
     httpClient
-        .request(httpAddress +
-            '/api?module=account&action=txlist&address=${address.toJson()}&sort=dsc&offset=$limit&page=$page&apikey=$apiKey')
+        .request(
+            '$httpAddress/api?module=account&action=txlist&address=${address.toJson()}&sort=dsc&offset=$limit&page=$page&apikey=$apiKey')
         .then((resp) {
       Map<String, dynamic> response = jsonDecode(resp.text);
       List<dynamic> transactions = response == null ? null : response['result'];
@@ -1026,7 +1024,7 @@ mixin EtherscanAPI on HttpClientMixin {
 }
 
 /// https://github.com/ethereum/wiki/wiki/JSON-RPC
-class EthereumRPC extends PersistentWebSocketClient
+class EthereumRPC extends PersistentSocketClient
     with JsonResponseMapMixin, HttpClientMixin {
   /// The [EthereumAddress] we're monitoring for.
   Map<String, TransactionCallback> addressFilter =
@@ -1052,7 +1050,7 @@ class EthereumRPC extends PersistentWebSocketClient
   String headsSubscription;
 
   /// Forward [Peer] constructor.
-  EthereumRPC(PeerPreference spec, String webSocketAddress)
+  EthereumRPC(PeerPreference spec, Uri webSocketAddress)
       : super(spec, webSocketAddress) {
     queryNumberField = 'id';
   }

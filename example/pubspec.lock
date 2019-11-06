@@ -8,6 +8,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.5.2"
+  asn1lib:
+    dependency: transitive
+    description:
+      name: asn1lib
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "0.5.13"
   async:
     dependency: transitive
     description:
@@ -104,7 +111,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: f54a78eab077b65b6bbf14bdf64dc9e6c1c409a8
+      resolved-ref: d5176c44a5df83253eb38cc45264a213151a0420
       url: "https://github.com/GreenAppers/dartssh"
     source: git
     version: "1.0.0+0"
@@ -139,7 +146,7 @@ packages:
       name: fixnum
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.10.9"
+    version: "0.10.11"
   fluri:
     dependency: transitive
     description:
@@ -230,7 +237,7 @@ packages:
       name: meta
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.1.7"
+    version: "1.1.8"
   mime:
     dependency: transitive
     description:
@@ -293,21 +300,21 @@ packages:
       name: quiver
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.0.5"
+    version: "2.1.2"
   sass:
     dependency: transitive
     description:
       name: sass
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.23.1"
+    version: "1.23.3"
   sembast:
     dependency: transitive
     description:
       name: sembast
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.1.0"
+    version: "2.1.0+1"
   sockjs_client:
     dependency: transitive
     description:
@@ -419,6 +426,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "0.9.0+5"
+  validators:
+    dependency: transitive
+    description:
+      name: validators
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "2.0.0+1"
   w_common:
     dependency: transitive
     description:

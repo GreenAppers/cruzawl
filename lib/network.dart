@@ -50,7 +50,7 @@ abstract class Peer {
   Peer(this.spec);
 
   /// URI for [Peer].
-  String get address;
+  Uri get address;
 
   /// Number of in-flight queries.
   int get numOutstanding;
@@ -155,10 +155,10 @@ abstract class Peer {
 
 /// Socket based [Peer] interface.
 abstract class SocketClient extends Peer {
-  ConnectionInterface get socket;
+  SocketInterface get socket;
 
   /// The URI for [Peer.connect].
-  String address;
+  Uri address;
 
   /// Automatically attempt reconnecting this [Peer].
   int autoReconnectSeconds;
@@ -269,9 +269,9 @@ abstract class PeerNetwork {
       : (connecting.isNotEmpty ? connecting[0].state : PeerState.disconnected);
 
   /// [Peer.address] from [peers] or empty [String] if none.
-  String get peerAddress => hasPeer
+  Uri get peerAddress => hasPeer
       ? peers[0].address
-      : (connecting.isNotEmpty ? connecting[0].address : '');
+      : (connecting.isNotEmpty ? connecting[0].address : null);
 
   /// [Peer] factory interface.
   Peer createPeerWithSpec(PeerPreference spec);

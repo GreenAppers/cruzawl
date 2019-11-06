@@ -22,7 +22,6 @@ import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/network/socket.dart';
-import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/util.dart';
 
@@ -710,7 +709,8 @@ class BitcoinTransaction extends Transaction with Serializable {
 
   /// Computes an ID for this transaction.
   @override
-  BitcoinTransactionId id() => BitcoinTransactionId.compute(toRaw());
+  BitcoinTransactionId id() =>
+      BitcoinTransactionId.compute(toRaw(endian: Endian.little));
 
   /// Signs this transaction.
   void sign(BitcoinPrivateKey key) {}
@@ -735,11 +735,11 @@ class BitcoinTransaction extends Transaction with Serializable {
     output.addUint32(version);
     if (segWit) output.addUint16(1);
     BTC.serializeVarInt(output, inputs.length);
-    for (Uint8List input in inputs.map((e) => e.toRaw())) {
+    for (Uint8List input in inputs.map((e) => e.toRaw(endian: Endian.little))) {
       output.addBytes(input);
     }
     BTC.serializeVarInt(output, outputs.length);
-    for (Uint8List out in outputs.map((e) => e.toRaw())) {
+    for (Uint8List out in outputs.map((e) => e.toRaw(endian: Endian.little))) {
       output.addBytes(out);
     }
     output.addUint32(lockTime);
@@ -1017,7 +1017,7 @@ class BitcoinBlockHeader extends BlockHeader with Serializable {
 
   /// Computes an ID for this block.
   @override
-  BitcoinBlockId id() => BitcoinBlockId.compute(toRaw());
+  BitcoinBlockId id() => BitcoinBlockId.compute(toRaw(endian: Endian.little));
 
   @override
   int get serializedSize => 16 + previous.data.length + hashRoot.data.length;
@@ -1097,42 +1097,40 @@ class BitcoinNetwork extends PeerNetwork {
   /// Creates [Peer] ready to [Peer.connect()].
   @override
   Peer createPeerWithSpec(PeerPreference spec) {
+    Uri root = spec.root == null ? null : Uri.parse(spec.root);
     switch (spec.type) {
       case 'BlockchainAPI':
         return BlockchainAPI(
-            spec, parseBlockchainInfoUri(spec.url), httpClient, spec.root);
+            spec, parseBlockchainInfoUri(spec.url), httpClient, root);
       case 'BitcoinRPC':
         return SupplementedBitcoinRPC(
-            spec, parseBitcoinRpcUri(spec.url), httpClient, spec.root);
+            spec, parseBitcoinRpcUri(spec.url), httpClient, root);
       default:
         return SupplementedBitcoinPeer(
-            spec, parseBitcoinUri(spec.url), httpClient, spec.root)
+            spec, parseBitcoinUri(spec.url), httpClient, root)
           ..userAgent = userAgent;
     }
   }
 
   /// Valid Bitcoin URI: '10.0.0.1'.
-  String parseBitcoinUri(String uriText) {
+  Uri parseBitcoinUri(String uriText) {
     // if (!Uri.parse(uriText).hasScheme) uriText = 'tcp://' + uriText;
     Uri uri = Uri.parse(uriText);
-    Uri url = uri.replace(port: uri.hasPort ? uri.port : 8333);
-    return url.toString();
+    return uri.replace(port: uri.hasPort ? uri.port : 8333);
   }
 
   /// Valid Bitcoin RPC URI: '10.0.0.1'.
-  String parseBitcoinRpcUri(String uriText) {
+  Uri parseBitcoinRpcUri(String uriText) {
     // if (!Uri.parse(uriText).hasScheme) uriText = 'tcp://' + uriText;
     Uri uri = Uri.parse(uriText);
-    Uri url = uri.replace(port: uri.hasPort ? uri.port : 8332);
-    return url.toString();
+    return uri.replace(port: uri.hasPort ? uri.port : 8332);
   }
 
   /// Valid Blockchain URI: 'ws.blockchain.info', 'wss://ws.blockchain.info/inv'.
-  String parseBlockchainInfoUri(String uriText) {
+  Uri parseBlockchainInfoUri(String uriText) {
     if (!Uri.parse(uriText).hasScheme) uriText = 'wss://' + uriText;
     Uri uri = Uri.parse(uriText);
-    Uri url = uri.replace(path: uri.path.isEmpty ? '/inv' : uri.path);
-    return url.toString();
+    return uri.replace(path: uri.path.isEmpty ? '/inv' : uri.path);
   }
 }
 
@@ -1140,8 +1138,8 @@ class BitcoinNetwork extends PeerNetwork {
 /// Bitcoin protocol is used for the rest.
 class SupplementedBitcoinPeer extends BitcoinPeer
     with HttpClientMixin, SupplementalBlockchainAPI {
-  SupplementedBitcoinPeer(PeerPreference spec, String webSocketAddress,
-      HttpClient httpClient, String httpAddress)
+  SupplementedBitcoinPeer(PeerPreference spec, Uri webSocketAddress,
+      HttpClient httpClient, Uri httpAddress)
       : super(spec, webSocketAddress) {
     this.httpClient = httpClient;
     this.httpAddress = httpAddress;
@@ -1156,8 +1154,8 @@ class SupplementedBitcoinPeer extends BitcoinPeer
 /// Bitcoin RPC is used for the rest.
 class SupplementedBitcoinRPC extends BitcoinRPC
     with HttpClientMixin, SupplementalBlockchainAPI {
-  SupplementedBitcoinRPC(PeerPreference spec, String webSocketAddress,
-      HttpClient httpClient, String httpAddress)
+  SupplementedBitcoinRPC(PeerPreference spec, Uri webSocketAddress,
+      HttpClient httpClient, Uri httpAddress)
       : super(spec, webSocketAddress) {
     this.httpClient = httpClient;
     this.httpAddress = httpAddress;
@@ -1193,7 +1191,7 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
   num minFee;
 
   /// Forward [Peer] constructor.
-  BitcoinPeer(PeerPreference spec, String address) : super(spec, address);
+  BitcoinPeer(PeerPreference spec, Uri uri) : super(spec, uri);
 
   /// Network lost. Clear [tip] and [tipId].
   @override
@@ -1313,7 +1311,7 @@ class BitcoinRPC extends PersistentSocketClient with JsonResponseQueueMixin {
   num minFee;
 
   /// Forward [Peer] constructor.
-  BitcoinRPC(PeerPreference spec, String address) : super(spec, address) {
+  BitcoinRPC(PeerPreference spec, Uri uri) : super(spec, uri) {
     //responseComplete = dispatchFromThrottleQueue;
     //maxOutstanding = 10;
   }
@@ -1413,9 +1411,7 @@ mixin SupplementalBlockchainAPI on HttpClientMixin {
 
     /// [addressText] can be base58 or xpub.
     /// Multiple Addresses Allowed separated by "|".
-    httpClient
-        .request(httpAddress + '/balance?active=$addressText')
-        .then((resp) {
+    httpClient.request('$httpAddress/balance?active=$addressText').then((resp) {
       Map<String, dynamic> data = jsonDecode(resp.text);
       Map<String, dynamic> addr = data == null ? null : data[addressText];
       completeResponse(completer, addr == null ? null : addr['final_balance']);
@@ -1444,7 +1440,7 @@ mixin SupplementalBlockchainAPI on HttpClientMixin {
     /// Optional offset parameter to skip the first n transactions e.g. &offset=100 (Page 2 for limit 50)
     httpClient
         .request(
-            httpAddress + '/rawaddr/$addressText?offset=$offset&limit=$limit')
+            '$httpAddress/rawaddr/$addressText?offset=$offset&limit=$limit')
         .then((resp) {
       Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
       var txs = data == null ? null : data['txs'];
@@ -1468,7 +1464,7 @@ mixin SupplementalBlockchainAPI on HttpClientMixin {
 
 /// Blockchain.info implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://www.blockchain.com/api/api_websocket
-class BlockchainAPI extends PersistentWebSocketClient
+class BlockchainAPI extends PersistentSocketClient
     with HttpClientMixin, SupplementalBlockchainAPI, NullJsonResponseMixin {
   /// The [BitcoinAddress] we're monitoring [BitcoinNetwork] for.
   Map<String, TransactionCallback> addressFilter =
@@ -1491,8 +1487,8 @@ class BlockchainAPI extends PersistentWebSocketClient
   num minFee;
 
   /// Forward [Peer] constructor.
-  BlockchainAPI(PeerPreference spec, String webSocketAddress,
-      HttpClient httpClient, String httpAddress)
+  BlockchainAPI(PeerPreference spec, Uri webSocketAddress,
+      HttpClient httpClient, Uri httpAddress)
       : super(spec, webSocketAddress) {
     this.httpClient = httpClient;
     this.httpAddress = httpAddress;
@@ -1532,7 +1528,7 @@ class BlockchainAPI extends PersistentWebSocketClient
 
     httpClient
         .request(
-      httpAddress + '/pushtx?cors=true',
+      '$httpAddress/pushtx?cors=true',
       method: 'POST',
       data: jsonEncode(transaction),
       /*headers: {'Content-Type', 'application/x-www-form-urlencoded'}*/
@@ -1576,8 +1572,8 @@ class BlockchainAPI extends PersistentWebSocketClient
     Completer<List<BitcoinBlockHeader>> completer =
         Completer<List<BitcoinBlockHeader>>();
     httpClient
-        .request(httpAddress +
-            '/blocks/${time.toUtc().millisecondsSinceEpoch}?format=json')
+        .request(
+            '$httpAddress/blocks/${time.toUtc().millisecondsSinceEpoch}?format=json')
         .then(
       (resp) {
         Map<String, dynamic> data = resp == null ? null : jsonDecode(resp.text);
@@ -1603,7 +1599,7 @@ class BlockchainAPI extends PersistentWebSocketClient
   Future<BlockMessage> getBlock({BlockId id, int height}) {
     Completer<BlockMessage> completer = Completer<BlockMessage>();
     httpClient
-        .request(httpAddress +
+        .request('$httpAddress' +
             (id != null
                 ? '/rawblock/${id.toJson()}'
                 : '/block-height/$height?format=json'))
@@ -1628,7 +1624,7 @@ class BlockchainAPI extends PersistentWebSocketClient
   /// Estimated network hash rate.
   Future<int> getHashRate({BlockId id, int height}) {
     Completer<int> completer = Completer<int>();
-    httpClient.request(httpAddress + '/q/hashrate?format=json').then((resp) {
+    httpClient.request('$httpAddress/q/hashrate?format=json').then((resp) {
       int rate = jsonDecode(resp.text);
       completeResponse(
           completer,
@@ -1644,7 +1640,7 @@ class BlockchainAPI extends PersistentWebSocketClient
   @override
   Future<TransactionMessage> getTransaction(TransactionId id) {
     Completer<TransactionMessage> completer = Completer<TransactionMessage>();
-    httpClient.request(httpAddress + '/rawtx/${id.toJson()}').then(
+    httpClient.request('$httpAddress/rawtx/${id.toJson()}').then(
       (resp) {
         Map<String, dynamic> transaction =
             resp == null ? null : jsonDecode(resp.text);

@@ -4,13 +4,13 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dartssh/socket.dart';
 import 'package:sembast/sembast_memory.dart';
 import 'package:test/test.dart';
 
 import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/currency/cruz.dart';
 import 'package:cruzawl/network.dart';
-import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sembast.dart';
 import 'package:cruzawl/util.dart';
@@ -46,7 +46,7 @@ void main() {
   Wallet wallet;
   CruzPeer peer;
   CruzawlPreferences preferences;
-  TestWebSocket socket = TestWebSocket();
+  TestSocket socket = TestSocket();
   PeerNetwork network = cruz.createNetwork(tipChanged: () {
     if (wallet != null) wallet.updateTip();
   });
@@ -64,7 +64,7 @@ void main() {
 
   test('Create CruzPeer', () {
     expect(network.peerState, PeerState.disconnected);
-    expect(network.peerAddress, '');
+    expect(network.peerAddress, null);
     PeerPreference peerPref = preferences.peers[0];
     peerPref.debugPrint = print;
     peerPref.debugLevel = debugLevelDebug;
@@ -98,7 +98,7 @@ void main() {
     expect(network.minFee, 1000000);
     expect(network.minAmount, 1000000);
     expect(network.peerState, PeerState.ready);
-    expect(network.peerAddress,
+    expect('${network.peerAddress}',
         'wss://wallet.cruzbit.xyz:8831/00000000e29a7850088d660489b7b9ae2da763bc3bd83324ecc54eee04840adb');
     expect(getPeer, completion(equals(peer)));
   });
@@ -486,8 +486,7 @@ void expectTransactionEqual(Transaction txn1, Transaction txn2) {
   expect(txn1.expires, txn2.expires);
 }
 
-void expectWalletLoadProtocol(
-    Map<String, Address> addresses, TestWebSocket socket,
+void expectWalletLoadProtocol(Map<String, Address> addresses, TestSocket socket,
     {bool setMoneyAddr = false, bool filterTxnQueue = true}) async {
   int length = addresses.length;
   expect(length > 0, true);

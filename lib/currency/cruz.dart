@@ -18,7 +18,6 @@ import 'package:cruzawl/currency.dart';
 import 'package:cruzawl/network.dart';
 import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/network/socket.dart';
-import 'package:cruzawl/network/websocket.dart';
 import 'package:cruzawl/preferences.dart';
 import 'package:cruzawl/sha3.dart';
 import 'package:cruzawl/util.dart';
@@ -771,17 +770,18 @@ class CruzPeerNetwork extends PeerNetwork {
       CruzPeer(spec, parseUri(spec.url, cruz.genesisBlock().id().toJson()));
 
   /// Valid CRUZ URI: 'wallet.cruzbit.xyz', 'wallet:8832', 'wss://wallet:8832'.
-  String parseUri(String uriText, String genesisId) {
+  Uri parseUri(String uriText, String genesisId) {
     if (!Uri.parse(uriText).hasScheme) uriText = 'wss://' + uriText;
     Uri uri = Uri.parse(uriText);
-    Uri url = uri.replace(port: uri.hasPort ? uri.port : 8831);
-    return url.toString() + '/' + genesisId;
+    return uri.replace(
+        port: uri.hasPort ? uri.port : 8831,
+        path: uri.hasEmptyPath ? genesisId : uri.path);
   }
 }
 
 /// CRUZ implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://github.com/cruzbit/cruzbit/blob/master/protocol.go
-class CruzPeer extends PersistentWebSocketClient with JsonResponseQueueMixin {
+class CruzPeer extends PersistentSocketClient with JsonResponseQueueMixin {
   /// The [CruzAddress] we're monitoring [CruzPeerNetwork] for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
@@ -807,7 +807,7 @@ class CruzPeer extends PersistentWebSocketClient with JsonResponseQueueMixin {
   num minFee;
 
   /// Forward [Peer] constructor.
-  CruzPeer(PeerPreference spec, String address) : super(spec, address);
+  CruzPeer(PeerPreference spec, Uri uri) : super(spec, uri);
 
   /// Network lost. Clear [tip] and [tipId].
   @override
