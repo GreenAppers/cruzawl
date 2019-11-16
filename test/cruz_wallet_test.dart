@@ -83,14 +83,14 @@ void main() {
     var msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_tip_header');
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"tip_header","body":{"block_id":"$firstBlockId","header":{"previous":"0000000000003e69ff6f9e82aed1edf4fbeff282f483a155f15993a1d5b388f1","hash_list_root":"e621df23f3d1cbf31ff55eb35b58f149e1119f9bcaaeddbfd50a0492d761b3fe","time":$firstBlockTime,"target":"0000000000005a51944cead8d0ecf64b7b699564debb11582725296e08f6907b","chain_work":"$firstBlockWork","nonce":1339749016450629,"height":$startingTipHeight,"transaction_count":20},"time_seen":1567226903}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"tip_header","body":{"block_id":"$firstBlockId","header":{"previous":"0000000000003e69ff6f9e82aed1edf4fbeff282f483a155f15993a1d5b388f1","hash_list_root":"e621df23f3d1cbf31ff55eb35b58f149e1119f9bcaaeddbfd50a0492d761b3fe","time":$firstBlockTime,"target":"0000000000005a51944cead8d0ecf64b7b699564debb11582725296e08f6907b","chain_work":"$firstBlockWork","nonce":1339749016450629,"height":$startingTipHeight,"transaction_count":20},"time_seen":1567226903}}'));
 
     msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_transaction_relay_policy');
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"transaction_relay_policy","body":{"min_fee":1000000,"min_amount":1000000}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"transaction_relay_policy","body":{"min_fee":1000000,"min_amount":1000000}}'));
 
     expect(network.length, 1);
     expect(network.tipHeight, startingTipHeight);
@@ -175,8 +175,8 @@ void main() {
 
     pushedTransactionId = pushedTransaction.id().toJson();
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"push_transaction_result","body":{"transaction_id":"$pushedTransactionId"}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"push_transaction_result","body":{"transaction_id":"$pushedTransactionId"}}'));
     await pumpEventQueue();
     expect(socket.sent.length, 0);
     expect((await sendTransactionId).toJson(), pushedTransactionId);
@@ -187,8 +187,8 @@ void main() {
     expectTransactionEqual(wallet.transactions.first, sendTransaction);
     expect(wallet.transactions.first.height, 0);
 
-    socket.messageHandler(
-        '{"type":"push_transaction","body":{"transaction":${jsonEncode(sendTransaction)}}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"push_transaction","body":{"transaction":${jsonEncode(sendTransaction)}}}'));
     await pumpEventQueue();
     expect(socket.sent.length, 0);
     expect(wallet.pendingCount, 1);
@@ -245,10 +245,10 @@ void main() {
     expect(wallet.maturesBalance, rewardMoneyBalance);
     CruzBlockIds blockIds =
         CruzBlockIds.fromJson(jsonDecode('{"block_ids":["$newBlockId"]}'));
-    socket
-        .messageHandler('{"type":"inv_block","body":${jsonEncode(blockIds)}}');
     socket.messageHandler(
-        '{"type":"filter_block","body":{"block_id":"$newBlockId","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":$newBlockTime,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"$newBlockWork","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}');
+        utf8.encode('{"type":"inv_block","body":${jsonEncode(blockIds)}}'));
+    socket.messageHandler(utf8.encode(
+        '{"type":"filter_block","body":{"block_id":"$newBlockId","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":$newBlockTime,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"$newBlockWork","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}'));
     await pumpEventQueue();
     expect(network.tipHeight, startingTipHeight + 1);
     expect(wallet.pendingCount, 0);
@@ -265,8 +265,8 @@ void main() {
     var msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_block_by_height');
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"block","body":{"block_id":"$firstBlockId","block":{"header":{"previous":"0000000000003e69ff6f9e82aed1edf4fbeff282f483a155f15993a1d5b388f1","hash_list_root":"e621df23f3d1cbf31ff55eb35b58f149e1119f9bcaaeddbfd50a0492d761b3fe","time":$firstBlockTime,"target":"0000000000005a51944cead8d0ecf64b7b699564debb11582725296e08f6907b","chain_work":"$firstBlockWork","nonce":1339749016450629,"height":$startingTipHeight,"transaction_count":1},"transactions":[{"time":1568684206,"nonce":754321990,"to":"vsiyJaIGuqnllrktuSaF5eI5Oo962jdM2FUm6tOfqnI=","amount":5000000000,"memo":"cruzpool v0.31 🐛","series":29}]}}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"block","body":{"block_id":"$firstBlockId","block":{"header":{"previous":"0000000000003e69ff6f9e82aed1edf4fbeff282f483a155f15993a1d5b388f1","hash_list_root":"e621df23f3d1cbf31ff55eb35b58f149e1119f9bcaaeddbfd50a0492d761b3fe","time":$firstBlockTime,"target":"0000000000005a51944cead8d0ecf64b7b699564debb11582725296e08f6907b","chain_work":"$firstBlockWork","nonce":1339749016450629,"height":$startingTipHeight,"transaction_count":1},"transactions":[{"time":1568684206,"nonce":754321990,"to":"vsiyJaIGuqnllrktuSaF5eI5Oo962jdM2FUm6tOfqnI=","amount":5000000000,"memo":"cruzpool v0.31 🐛","series":29}]}}}'));
     await pumpEventQueue();
     expect(socket.sent.length, 0);
     BlockMessage block = await blockFuture;
@@ -278,8 +278,8 @@ void main() {
     msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_block_header_by_height');
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"block_header","body":{"block_id":"$newBlockId","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":$newBlockTime,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"$newBlockWork","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"block_header","body":{"block_id":"$newBlockId","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":$newBlockTime,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"$newBlockWork","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}'));
     await pumpEventQueue();
     expect(socket.sent.length, 0);
     BlockHeaderMessage blockHeader = await blockHeaderFuture;
@@ -297,8 +297,8 @@ void main() {
     msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_transaction');
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"transaction","body":{"block_id":"$newBlockId","height":${startingTipHeight + 1},"transaction_id":"$pushedTransactionId","transaction":${jsonEncode(sendTransaction)}}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"transaction","body":{"block_id":"$newBlockId","height":${startingTipHeight + 1},"transaction_id":"$pushedTransactionId","transaction":${jsonEncode(sendTransaction)}}}'));
     await pumpEventQueue();
     expect(socket.sent.length, 0);
     TransactionMessage transaction = await transactionFuture;
@@ -319,17 +319,17 @@ void main() {
     expect(wallet.transactions.length, 3);
 
     // undo block
-    socket.messageHandler(
-        '{"type":"filter_block_undo","body":{"block_id":"$newBlockId","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":$newBlockTime,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"$newBlockWork","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"filter_block_undo","body":{"block_id":"$newBlockId","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":$newBlockTime,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"$newBlockWork","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}'));
     await pumpEventQueue();
     expect(wallet.transactions.length, 2);
     expect(wallet.balance, moneyBalance + rewardMoneyBalance);
 
     // then redo it
-    socket.messageHandler(
-        '{"type":"inv_block","body":{"block_ids":["$newBlockId"]}}');
-    socket.messageHandler(
-        '{"type":"filter_block","body":{"block_id":"$newBlockId","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":$newBlockTime,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"$newBlockWork","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}');
+    socket.messageHandler(utf8
+        .encode('{"type":"inv_block","body":{"block_ids":["$newBlockId"]}}'));
+    socket.messageHandler(utf8.encode(
+        '{"type":"filter_block","body":{"block_id":"$newBlockId","header":{"previous":"0000000000000b6a264d8b65fb9be5b7d8e9624e51b3d384c9859cadb8328b59","hash_list_root":"8ddde311055b51e4c0336c2f02f5233fce6c58e726d87ede9e9566179a043b45","time":$newBlockTime,"target":"0000000000002e8e541746a412fea54fb1cfba570f238922ed91f5a51cd9a881","chain_work":"$newBlockWork","nonce":197164610255140,"height":${startingTipHeight + 1},"transaction_count":2},"transactions":[${jsonEncode(sendTransaction)}]}}'));
     await pumpEventQueue();
     expect(socket.sent.length, 0);
     expect(wallet.pendingCount, 0);
@@ -429,8 +429,8 @@ void main() {
 
     // Finally answer our query
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"transaction","body":{"block_id":"$newBlockId","height":${startingTipHeight + 1},"transaction_id":"$pushedTransactionId","transaction":${jsonEncode(sendTransaction)}}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"transaction","body":{"block_id":"$newBlockId","height":${startingTipHeight + 1},"transaction_id":"$pushedTransactionId","transaction":${jsonEncode(sendTransaction)}}}'));
     await pumpEventQueue();
     expect(socket.sent.length, 1);
     TransactionMessage transaction = await transactionFuture;
@@ -499,7 +499,7 @@ void expectWalletLoadProtocol(Map<String, Address> addresses, TestSocket socket,
     expect(msg['type'], 'filter_add');
     expect(addresses.containsKey(msg['body']['public_keys'][0]), true);
     socket.sent.removeFirst();
-    socket.messageHandler('{"type":"filter_result"}');
+    socket.messageHandler(utf8.encode('{"type":"filter_result"}'));
   }
 
   // get_balance
@@ -513,8 +513,8 @@ void expectWalletLoadProtocol(Map<String, Address> addresses, TestSocket socket,
     int balance = i == 0 ? moneyBalance : 0;
     expect(addresses.containsKey(addr), true);
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"balance","body":{"block_id":"$firstBlockId","height":$startingTipHeight,"public_key":"$addr","balance":$balance}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"balance","body":{"block_id":"$firstBlockId","height":$startingTipHeight,"public_key":"$addr","balance":$balance}}'));
   }
 
   // get_public_key_transactions
@@ -529,11 +529,11 @@ void expectWalletLoadProtocol(Map<String, Address> addresses, TestSocket socket,
     if (addr == moneyAddr) {
       /// Give [moneyAddr] 13 CRUZ with 50 CRUZ maturing the next block.
       int blockHeight = startingTipHeight - 99;
-      socket.messageHandler(
-          '{"type":"public_key_transactions","body":{"public_key":"$addr","start_height":$startingTipHeight,"stop_height":0,"stop_index":0,"filter_blocks":[{"block_id":"00000000000555de1d28a55fd2d5d2069c61fd46c4618cfea16c5adf6d902f4d","header":{"previous":"000000000001e0313c0536e700a8e6c02b2fc6bbddb755d749d6e00746d52b2b","hash_list_root":"3c1b3f728653444e8bca498bf5a6d76a259637e592f749ad881f1f1da0087db0","time":1564553276,"target":"000000000007a38c469f3be96898a11435ea27592c2bae351147392e9cd3408d","chain_work":"00000000000000000000000000000000000000000000000000faa7649c97e894","nonce":1989109050083893,"height":$blockHeight,"transaction_count":2},"transactions":[${moneyTransaction1(addr)},${moneyTransaction2(addr)}]}]}}');
+      socket.messageHandler(utf8.encode(
+          '{"type":"public_key_transactions","body":{"public_key":"$addr","start_height":$startingTipHeight,"stop_height":0,"stop_index":0,"filter_blocks":[{"block_id":"00000000000555de1d28a55fd2d5d2069c61fd46c4618cfea16c5adf6d902f4d","header":{"previous":"000000000001e0313c0536e700a8e6c02b2fc6bbddb755d749d6e00746d52b2b","hash_list_root":"3c1b3f728653444e8bca498bf5a6d76a259637e592f749ad881f1f1da0087db0","time":1564553276,"target":"000000000007a38c469f3be96898a11435ea27592c2bae351147392e9cd3408d","chain_work":"00000000000000000000000000000000000000000000000000faa7649c97e894","nonce":1989109050083893,"height":$blockHeight,"transaction_count":2},"transactions":[${moneyTransaction1(addr)},${moneyTransaction2(addr)}]}]}}'));
     } else {
-      socket.messageHandler(
-          '{"type":"public_key_transactions","body":{"public_key":"$addr","start_height":$startingTipHeight,"stop_height":0,"stop_index":0,"filter_blocks":null}}');
+      socket.messageHandler(utf8.encode(
+          '{"type":"public_key_transactions","body":{"public_key":"$addr","start_height":$startingTipHeight,"stop_height":0,"stop_index":0,"filter_blocks":null}}'));
     }
   }
 
@@ -544,7 +544,7 @@ void expectWalletLoadProtocol(Map<String, Address> addresses, TestSocket socket,
     var msg = jsonDecode(socket.sent.first);
     expect(msg['type'], 'get_filter_transaction_queue');
     socket.sent.removeFirst();
-    socket.messageHandler(
-        '{"type":"filter_transaction_queue","body":{"transactions":null}}');
+    socket.messageHandler(utf8.encode(
+        '{"type":"filter_transaction_queue","body":{"transactions":null}}'));
   }
 }

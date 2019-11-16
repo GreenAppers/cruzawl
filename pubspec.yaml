@@ -28,7 +28,7 @@ dependencies:
   merkletree: ^1.0.3
   meta: ^1.1.6
   pedantic: ^1.8.0
-  pointycastle: ^1.0.1
+  pointycastle: ^1.0.2
   sembast: ^2.0.1
   tweetnacl:
     git:

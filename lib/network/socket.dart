@@ -34,7 +34,7 @@ abstract class PersistentSocketClient extends SocketClient {
           spec.sshUser != null &&
           (spec.sshKey != null || spec.sshPassword != null)) {
         socket = SSHTunneledSocketImpl(ssh.parseUri(spec.sshUrl), spec.sshUser,
-            spec.sshKey, spec.sshPassword);
+            spec.sshKey, spec.sshPassword, print: spec.debugPrint, debugPrint: spec.debugPrint);
       } else if (address.hasScheme &&
           (address.scheme == 'ws' || address.scheme == 'wss')) {
         socket = WebSocketImpl();

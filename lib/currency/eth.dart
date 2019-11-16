@@ -14,6 +14,7 @@ import 'package:ethereum_util/src/signature.dart' as eth_signature;
 import "package:fixnum/fixnum.dart";
 import 'package:json_annotation/json_annotation.dart';
 import 'package:meta/meta.dart';
+import "package:pointycastle/digests/sha3.dart";
 import "package:pointycastle/src/utils.dart";
 
 import 'package:cruzawl/currency.dart';
@@ -21,7 +22,6 @@ import 'package:cruzawl/network.dart';
 import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/network/socket.dart';
 import 'package:cruzawl/preferences.dart';
-import 'package:cruzawl/sha3.dart';
 import 'package:cruzawl/util.dart';
 
 part 'eth.g.dart';
@@ -1291,7 +1291,8 @@ class EthereumRPC extends PersistentSocketClient
   }
 
   /// Handle the Ethereum WebSocket message frame.
-  void handleMessage(String message) {
+  void handleMessage(Uint8List messageBytes) {
+    String message = utf8.decode(messageBytes);
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
       debugPrintLong(
           'got Ethereum WebSocket message ' + message, spec.debugPrint);

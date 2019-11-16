@@ -11,6 +11,7 @@ import 'package:bip32/src/utils/ecurve.dart' as ecc;
 import 'package:bip32/src/utils/wif.dart' as wif;
 import 'package:bs58check/bs58check.dart' as bs58check;
 import 'package:convert/convert.dart';
+import 'package:dartssh/serializable.dart' hide equalUint8List;
 import 'package:json_annotation/json_annotation.dart';
 import 'package:merkletree/merkletree.dart';
 import 'package:meta/meta.dart';
@@ -261,9 +262,12 @@ class BTC extends Currency {
   static Uint8List doubleSha256(Uint8List input) =>
       SHA256Digest().process(SHA256Digest().process(input));
 
+  static String deserializeVarString(SerializableInput input) =>
+      String.fromCharCodes(input.getBytes(deserializeVarInt(input)));
+
   /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_string
   static void serializeVarString(SerializableOutput output, String x) =>
-      serializeVarStringBytes(output, x.codeUnits);
+      serializeVarStringBytes(output, Uint8List.fromList(x.codeUnits));
 
   /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_string
   static void serializeVarStringBytes(SerializableOutput output, Uint8List x) {
@@ -275,8 +279,23 @@ class BTC extends Currency {
   static int varStringLength(int x) => varIntLength(x) + x;
 
   /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
+  static int deserializeVarInt(SerializableInput input) {
+    int x = input.getUint8();
+    switch (x) {
+      case 0xff:
+        return input.getUint64();
+      case 0xfe:
+        return input.getUint32();
+      case 0xfd:
+        return input.getUint16();
+      default:
+        return x;
+    }
+  }
+
+  /// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
   static void serializeVarInt(SerializableOutput output, int x) {
-    if (x <= 0xFD) {
+    if (x <= 0xfd) {
       output.addUint8(x);
     } else if (x <= 0xffff) {
       output.addUint8(0xfd);
@@ -1114,14 +1133,14 @@ class BitcoinNetwork extends PeerNetwork {
 
   /// Valid Bitcoin URI: '10.0.0.1'.
   Uri parseBitcoinUri(String uriText) {
-    // if (!Uri.parse(uriText).hasScheme) uriText = 'tcp://' + uriText;
+    if (!Uri.parse(uriText).hasScheme) uriText = 'bitcoin://' + uriText;
     Uri uri = Uri.parse(uriText);
     return uri.replace(port: uri.hasPort ? uri.port : 8333);
   }
 
   /// Valid Bitcoin RPC URI: '10.0.0.1'.
   Uri parseBitcoinRpcUri(String uriText) {
-    // if (!Uri.parse(uriText).hasScheme) uriText = 'tcp://' + uriText;
+    // if (!Uri.parse(uriText).hasScheme) uriText = 'http://' + uriText;
     Uri uri = Uri.parse(uriText);
     return uri.replace(port: uri.hasPort ? uri.port : 8332);
   }
@@ -1190,6 +1209,8 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
   @override
   num minFee;
 
+  QueueBuffer messageBuffer = QueueBuffer(Uint8List(0));
+
   /// Forward [Peer] constructor.
   BitcoinPeer(PeerPreference spec, Uri uri) : super(spec, uri);
 
@@ -1201,19 +1222,25 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
     tipHeight = null;
   }
 
-  /// Network connected. Request [tip] and subscribe to new blocks.
+  /// BeNetwork connected. Request [tip] and subscribe to new blocks.
   @override
-  void handleConnected() {}
+  void handleConnected() {
+    int ver = 60000;
+    addMessage(VersionMessage(
+        ver,
+        0,
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        BitcoinNetworkAddress(),
+        BitcoinNetworkAddress(),
+        70723,
+        'useragent',
+        0,
+        false));
+  }
 
   /// https://en.bitcoin.it/wiki/Protocol_documentation#Message_structure
-  void addMessage(String command,
-      [Uint8List payload, RawCallback responseCallback]) {
-    Uint8List message = Uint8List.fromList(Uint8List(24) + payload);
-    ByteData data = ByteData.view(message.buffer);
-    data.setUint32(0, 0xD9B4BEF9, Endian.little);
-    message.setRange(4, 4 + min(12, command.length), command.codeUnits);
-    data.setUint32(16, payload.length, Endian.little);
-    message.setRange(20, 24, BTC.doubleSha256(payload));
+  void addMessage(BitcoinMessage command, [RawCallback responseCallback]) {
+    Uint8List message = command.toBytes();
     socket.sendRaw(message);
     addOutstandingRaw(message, responseCallback);
   }
@@ -1275,8 +1302,40 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
   }
 
   /// Handle Bitcoin Protocol.
-  void handleMessage(String message) {
-    spec.debugPrint("got message $message");
+  void handleMessage(Uint8List message) {
+    messageBuffer.add(message);
+    while (messageBuffer.data.length >= BitcoinMessage.messageHeaderLength) {
+      SerializableInput input = SerializableInput(
+          viewUint8List(message, 0, BitcoinMessage.messageHeaderLength),
+          endian: Endian.little);
+      int magic = input.getUint32();
+      Uint8List command = input.getBytes(12);
+      int payloadLength = input.getUint32();
+
+      Uint8List checksum = input.getBytes(4);
+      if (messageBuffer.data.length <
+          payloadLength + BitcoinMessage.messageHeaderLength) break;
+      input = SerializableInput(viewUint8List(
+          message, BitcoinMessage.messageHeaderLength, payloadLength));
+      handleCommand(command, input);
+      messageBuffer.flush(BitcoinMessage.messageHeaderLength + payloadLength);
+    }
+  }
+
+  void handleCommand(Uint8List commandBytes, SerializableInput input) {
+    int length = 0;
+    while (commandBytes.length > length && commandBytes[length] != 0) length++;
+    if (length == 0) {
+      if (spec.debugPrint != null) {
+        spec.debugPrint('invalid command $commandBytes');
+      }
+      return;
+    }
+    String command =
+        String.fromCharCodes(viewUint8List(commandBytes, 0, length));
+    if (spec.debugPrint != null) {
+      spec.debugPrint('BTC command: $command');
+    }
   }
 
   /// Handles every new [BitcoinBlock] on the [BitcoinNetwork].
@@ -1392,7 +1451,9 @@ class BitcoinRPC extends PersistentSocketClient with JsonResponseQueueMixin {
   }
 
   /// Handle the BLOCKCHAIN WebSocket API message frame consisting of [op] and [x].
-  void handleMessage(String message) {}
+  void handleMessage(Uint8List messageBytes) {
+    String message = utf8.decode(messageBytes);
+  }
 
   /// Handles every new [BitcoinBlock] on the [BitcoinNetwork].
   /// [BitcoinBlock.transactions] is empty if no [BitcoinTransaction] match our [filterAdd()].
@@ -1660,7 +1721,8 @@ class BlockchainAPI extends PersistentSocketClient
   }
 
   /// Handle the BLOCKCHAIN WebSocket API message frame consisting of [op] and [x].
-  void handleMessage(String message) {
+  void handleMessage(Uint8List messageBytes) {
+    String message = utf8.decode(messageBytes);
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
       debugPrintLong('got blockchain API message ' + message, spec.debugPrint);
     }
@@ -1749,6 +1811,154 @@ class BlockchainAPI extends PersistentSocketClient
     data['mrkl_root'] = data['mrklRoot'];
     data['n_tx'] = data['nTx'];
     return data;
+  }
+}
+
+/// https://en.bitcoin.it/wiki/Protocol_documentation#Message_structure
+abstract class BitcoinMessage extends Serializable {
+  String get command;
+
+  static int messageHeaderLength = 24;
+
+  Uint8List toBytes() {
+    Uint8List commandBytes = Uint8List(12);
+    commandBytes.setRange(0, min(11, command.length), command.codeUnits);
+    Uint8List payload = toRaw(endian: Endian.little);
+    Uint8List message = Uint8List.fromList(Uint8List(messageHeaderLength) + payload);
+
+    SerializableOutput output =
+        SerializableOutput(message, endian: Endian.little);
+    output.addUint32(0xD9B4BEF9);
+    output.addBytes(commandBytes);
+    output.addUint32(payload.length);
+    output.addBytes(viewUint8List(BTC.doubleSha256(payload), 0, 4));
+    output.addBytes(payload);
+    assert(output.done);
+    return message;
+  }
+}
+
+/// When a network address is needed somewhere, this structure is used.
+/// Network addresses are not prefixed with a timestamp in the version message.
+class BitcoinNetworkAddress extends Serializable {
+  int version, timestamp, services = 0, port = 0;
+  Uint8List ipv6Address = Uint8List(16);
+  BitcoinNetworkAddress([this.version]);
+
+  @override
+  int get serializedHeaderSize => 26;
+
+  @override
+  int get serializedSize =>
+      serializedHeaderSize + ((version ?? 0) >= 31402 ? 4 : 0);
+
+  @override
+  void serialize(SerializableOutput output) {
+    if ((version ?? 0) >= 31402) {
+      output.addUint32(DateTime.now().millisecondsSinceEpoch ~/ 1000);
+    }
+    output.addUint64(services);
+    output.addBytes(ipv6Address);
+    output.addUint16(port);
+  }
+
+  @override
+  void deserialize(SerializableInput input) {
+    if ((version ?? 0) >= 31402) {
+      timestamp = input.getUint32();
+    }
+    services = input.getUint64();
+    ipv6Address = input.getBytes(16);
+    port = input.getUint16();
+  }
+}
+
+/// When a node creates an outgoing connection, it will immediately advertise its version.
+/// The remote node will respond with its version. No further communication is possible until
+/// both peers have exchanged their version.
+class VersionMessage extends BitcoinMessage {
+  VersionMessage(
+      [this.version,
+      this.services,
+      this.timestamp,
+      this.addrRecv,
+      this.addrFrom,
+      this.nonce,
+      this.userAgent,
+      this.startHeight,
+      this.relay]);
+
+  /// Identifies protocol version being used by the node.
+  int version;
+
+  /// bitfield of features to be enabled for this connection.
+  int services;
+
+  /// standard UNIX timestamp in seconds.
+  int timestamp;
+
+  /// The network address of the node receiving this message.
+  BitcoinNetworkAddress addrRecv;
+
+  /// The network address of the node emitting this message.
+  BitcoinNetworkAddress addrFrom;
+
+  /// Node random nonce, randomly generated every time a version packet is sent. This nonce is used to detect connections to self.
+  int nonce;
+
+  /// User Agent (0x00 if string is 0 bytes long).
+  String userAgent;
+
+  /// The last block received by the emitting node.
+  int startHeight;
+
+  /// Whether the remote peer should announce relayed transactions or not, see BIP 0037.
+  bool relay;
+
+  @override
+  String get command => 'version';
+
+  @override
+  int get serializedHeaderSize => 20 + 26;
+
+  @override
+  int get serializedSize =>
+      serializedHeaderSize +
+      (version >= 106 ? 16 + 26 + BTC.varStringLength(userAgent.length) : 0) +
+      (version >= 70001 ? 1 : 0);
+
+  @override
+  void serialize(SerializableOutput output) {
+    output.addUint32(version);
+    output.addUint64(services);
+    output.addUint64(timestamp);
+    addrRecv.serialize(output);
+    if (version >= 106) {
+      addrFrom.serialize(output);
+      output.addUint64(nonce);
+      BTC.serializeVarString(output, userAgent);
+      output.addUint64(startHeight);
+    }
+    if (version >= 70001) {
+      output.addUint8(relay ? 1 : 0);
+    }
+  }
+
+  @override
+  void deserialize(SerializableInput input) {
+    version = input.getUint32();
+    services = input.getUint64();
+    timestamp = input.getUint64();
+    addrRecv.deserialize(input);
+    if (version >= 106) {
+      addrFrom.deserialize(input);
+      nonce = input.getUint64();
+      userAgent = BTC.deserializeVarString(input);
+      startHeight = input.getUint64();
+    }
+    if (version >= 70001) {
+      relay = input.getUint8() != 0;
+    }
   }
 }
 

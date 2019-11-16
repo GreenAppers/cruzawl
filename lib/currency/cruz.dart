@@ -11,6 +11,7 @@ import 'package:ed25519_hd_key/ed25519_hd_key.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:meta/meta.dart';
 import "package:pointycastle/digests/sha256.dart";
+import "package:pointycastle/digests/sha3.dart";
 import "package:pointycastle/src/utils.dart";
 import 'package:tweetnacl/tweetnacl.dart' as tweetnacl;
 
@@ -19,7 +20,6 @@ import 'package:cruzawl/network.dart';
 import 'package:cruzawl/network/http.dart';
 import 'package:cruzawl/network/socket.dart';
 import 'package:cruzawl/preferences.dart';
-import 'package:cruzawl/sha3.dart';
 import 'package:cruzawl/util.dart';
 
 part 'cruz.g.dart';
@@ -1174,7 +1174,8 @@ class CruzPeer extends PersistentSocketClient with JsonResponseQueueMixin {
   }
 
   /// Handle the cruzbit.1 JSON message frame consisting of [type] and [body].
-  void handleMessage(String message) {
+  void handleMessage(Uint8List messageBytes) {
+    String message = utf8.decode(messageBytes);
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
       debugPrintLong('got cruzabit.1 message ' + message, spec.debugPrint);
     }

@@ -167,7 +167,13 @@ class PeerPreference {
   int debugLevel = debugLevelInfo;
 
   PeerPreference(this.name, this.url, this.currency, this.options,
-      {this.root, this.type, this.debugPrint});
+      {this.root,
+      this.type,
+      this.debugPrint,
+      this.sshUrl,
+      this.sshUser,
+      this.sshKey,
+      this.sshPassword});
 
   factory PeerPreference.fromJson(Map<String, dynamic> json) =>
       _$PeerPreferenceFromJson(json);

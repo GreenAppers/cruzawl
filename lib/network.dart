@@ -174,7 +174,7 @@ abstract class SocketClient extends Peer {
   void handleDisconnected();
 
   /// Interface for messages received from transport.
-  void handleMessage(String message);
+  void handleMessage(Uint8List message);
 
   /// Interface for managing response [JsonCallback].
   void addOutstandingJson(Map<String, dynamic> x,
