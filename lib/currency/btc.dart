@@ -1824,7 +1824,8 @@ abstract class BitcoinMessage extends Serializable {
     Uint8List commandBytes = Uint8List(12);
     commandBytes.setRange(0, min(11, command.length), command.codeUnits);
     Uint8List payload = toRaw(endian: Endian.little);
-    Uint8List message = Uint8List.fromList(Uint8List(messageHeaderLength) + payload);
+    Uint8List message =
+        Uint8List.fromList(Uint8List(messageHeaderLength) + payload);
 
     SerializableOutput output =
         SerializableOutput(message, endian: Endian.little);
