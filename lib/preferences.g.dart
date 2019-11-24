@@ -14,12 +14,13 @@ PeerPreference _$PeerPreferenceFromJson(Map<String, dynamic> json) {
     json['options'] as String,
     root: json['root'] as String,
     type: json['type'] as String,
-  )
-    ..sshUrl = json['sshUrl'] as String
-    ..sshUser = json['sshUser'] as String
-    ..sshKey = json['sshKey'] as String
-    ..sshPassword = json['sshPassword'] as String
-    ..priority = json['priority'] as int;
+    user: json['user'] as String,
+    password: json['password'] as String,
+    sshUrl: json['sshUrl'] as String,
+    sshUser: json['sshUser'] as String,
+    sshKey: json['sshKey'] as String,
+    sshPassword: json['sshPassword'] as String,
+  )..priority = json['priority'] as int;
 }
 
 Map<String, dynamic> _$PeerPreferenceToJson(PeerPreference instance) {
@@ -37,6 +38,8 @@ Map<String, dynamic> _$PeerPreferenceToJson(PeerPreference instance) {
   writeNotNull('currency', instance.currency);
   writeNotNull('options', instance.options);
   writeNotNull('type', instance.type);
+  writeNotNull('user', instance.user);
+  writeNotNull('password', instance.password);
   writeNotNull('sshUrl', instance.sshUrl);
   writeNotNull('sshUser', instance.sshUser);
   writeNotNull('sshKey', instance.sshKey);

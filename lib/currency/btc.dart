@@ -1113,6 +1113,9 @@ class BitcoinNetwork extends PeerNetwork {
   @override
   BTC get currency => btc;
 
+  @override
+  List<String> get peerTypes => ['Stratum', 'BitcoinRPC', 'BlockchainAPI'];
+
   /// Creates [Peer] ready to [Peer.connect()].
   @override
   Peer createPeerWithSpec(PeerPreference spec) {
@@ -1140,7 +1143,7 @@ class BitcoinNetwork extends PeerNetwork {
 
   /// Valid Bitcoin RPC URI: '10.0.0.1'.
   Uri parseBitcoinRpcUri(String uriText) {
-    // if (!Uri.parse(uriText).hasScheme) uriText = 'http://' + uriText;
+    if (!Uri.parse(uriText).hasScheme) uriText = 'http://' + uriText;
     Uri uri = Uri.parse(uriText);
     return uri.replace(port: uri.hasPort ? uri.port : 8332);
   }
@@ -1175,7 +1178,7 @@ class SupplementedBitcoinRPC extends BitcoinRPC
     with HttpClientMixin, SupplementalBlockchainAPI {
   SupplementedBitcoinRPC(PeerPreference spec, Uri webSocketAddress,
       HttpClient httpClient, Uri httpAddress)
-      : super(spec, webSocketAddress) {
+      : super(spec, webSocketAddress, httpClient) {
     this.httpClient = httpClient;
     this.httpAddress = httpAddress;
     responseComplete = dispatchFromThrottleQueue;
@@ -1183,7 +1186,7 @@ class SupplementedBitcoinRPC extends BitcoinRPC
 
   /// Throttles sum of outstanding Bitcoin RPC and Blockchain API calls.
   int get numOutstanding =>
-      jsonResponseQueue.length + httpClient.numOutstanding;
+      peerClient.numOutstanding + httpClient.numOutstanding;
 }
 
 /// Bitcoin implementation of the [PeerNetwork] entry [Peer] abstraction.
@@ -1348,7 +1351,7 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
 
 /// Bitcoin RPC implementation of the [PeerNetwork] entry [Peer] abstraction.
 /// Reference: https://bitcoincore.org/en/doc/0.18.0/
-class BitcoinRPC extends PersistentSocketClient with JsonResponseQueueMixin {
+class BitcoinRPC extends HttpClientPeer {
   /// The [BitcoinAddress] we're monitoring [BitcoinNetwork] for.
   Map<String, TransactionCallback> addressFilter =
       Map<String, TransactionCallback>();
@@ -1370,9 +1373,9 @@ class BitcoinRPC extends PersistentSocketClient with JsonResponseQueueMixin {
   num minFee;
 
   /// Forward [Peer] constructor.
-  BitcoinRPC(PeerPreference spec, Uri uri) : super(spec, uri) {
+  BitcoinRPC(PeerPreference spec, Uri uri, HttpClient httpClient)
+      : super(spec, uri, httpClient) {
     //responseComplete = dispatchFromThrottleQueue;
-    //maxOutstanding = 10;
   }
 
   /// Network lost. Clear [tip] and [tipId].
@@ -1385,7 +1388,26 @@ class BitcoinRPC extends PersistentSocketClient with JsonResponseQueueMixin {
 
   /// Network connected. Request [tip] and subscribe to new blocks.
   @override
-  void handleConnected() {}
+  void handleConnected() {
+    peerClient
+        .request(
+      '$address',
+      method: 'POST',
+      data: jsonEncode(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'method': 'getinfo',
+      }),
+      headers: (spec.user != null && spec.password != null)
+          ? addBasicAuthenticationHeader(
+              Map<String, String>(), spec.user, spec.password)
+          : null,
+    )
+        .then(
+      (resp) {
+        print('got resp ${resp.status} ${resp.text}');
+      },
+    );
+  }
 
   /// Balance: List the balance summary of each address listed.
   @override

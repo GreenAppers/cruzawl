@@ -158,6 +158,7 @@ abstract class SocketClient extends Peer {
   SocketInterface get socket;
 
   /// The URI for [Peer.connect].
+  @override
   Uri address;
 
   /// Automatically attempt reconnecting this [Peer].
@@ -244,6 +245,9 @@ abstract class PeerNetwork {
 
   PeerNetwork(this.peerChanged, this.tipChanged,
       {this.autoReconnectSeconds = 15, this.userAgent});
+
+  /// Supported connection types.
+  List<String> get peerTypes => null;
 
   /// True if a [Peer] is connected.
   bool get hasPeer => peers.isNotEmpty;

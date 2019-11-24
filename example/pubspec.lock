@@ -111,7 +111,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "6749af44d65586e7b1c9595a7533207a1f34f8f2"
+      resolved-ref: "51d3c62761704f53a3906d540d3fb0534f1756d2"
       url: "https://github.com/GreenAppers/dartssh"
     source: git
     version: "1.0.0+0"
@@ -314,7 +314,7 @@ packages:
       name: sembast
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.1.0+1"
+    version: "2.1.1"
   sockjs_client:
     dependency: transitive
     description:
@@ -372,7 +372,7 @@ packages:
       name: synchronized
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.1.0+1"
+    version: "2.1.0+2"
   term_glyph:
     dependency: transitive
     description:
@@ -453,6 +453,6 @@ packages:
       name: watcher
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.9.7+12"
+    version: "0.9.7+13"
 sdks:
   dart: ">=2.4.0 <3.0.0"

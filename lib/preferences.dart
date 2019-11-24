@@ -156,7 +156,7 @@ class CruzawlPreferences {
 
 @JsonSerializable(includeIfNull: false)
 class PeerPreference {
-  String name, url, root, currency, options, type;
+  String name, url, root, currency, options, type, user, password;
   String sshUrl, sshUser, sshKey, sshPassword;
   int priority = 100;
 
@@ -169,6 +169,8 @@ class PeerPreference {
   PeerPreference(this.name, this.url, this.currency, this.options,
       {this.root,
       this.type,
+      this.user,
+      this.password,
       this.debugPrint,
       this.sshUrl,
       this.sshUser,
