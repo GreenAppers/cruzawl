@@ -45,7 +45,7 @@ abstract class HttpClientPeer extends Peer {
 
   @override
   void disconnect(String reason) {
-    if (spec.debugPrint != null) spec.debugPrint('disconnected: ' + reason);
+    if (spec.debugPrint != null) spec.debugPrint('disconnected: $reason');
     peerClient = rootClient;
   }
 

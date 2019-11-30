@@ -28,6 +28,14 @@ abstract class PersistentSocketClient extends SocketClient {
       : super(spec, uri, autoReconnectSeconds: autoReconnectSeconds);
 
   @override
+  void disconnect(String reason) {
+    if (socket != null) {
+      super.disconnect(reason);
+      socket = null;
+    }
+  }
+
+  @override
   void connect() {
     if (socket == null) {
       if (spec.sshUrl != null &&
@@ -36,6 +44,10 @@ abstract class PersistentSocketClient extends SocketClient {
         socket = SSHTunneledSocketImpl(ssh.parseUri(spec.sshUrl), spec.sshUser,
             spec.sshKey, spec.sshPassword,
             print: spec.debugPrint, debugPrint: spec.debugPrint);
+        //socket = SocketImpl(SSHTunneledSocket(socket));
+        if (address.hasScheme && address.scheme == 'ws') {
+          socket = SSHTunneledWebSocketImpl(socket);
+        }
       } else if (address.hasScheme &&
           (address.scheme == 'ws' || address.scheme == 'wss')) {
         socket = WebSocketImpl();

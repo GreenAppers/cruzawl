@@ -933,7 +933,10 @@ class SupplementedEthereumRPCNetwork extends PeerNetwork {
   /// Creates [Peer] ready to [Peer.connect()].
   @override
   Peer createPeerWithSpec(PeerPreference spec) => SupplementedEthereumRPC(
-      spec, parseUri(spec.url), httpClient, Uri.parse(spec.root));
+      spec,
+      parseUri(spec.url),
+      httpClient,
+      spec.root == null ? null : Uri.parse(spec.root));
 
   /// Valid URI: '10.0.0.1/ws', 'ws://10.0.01/ws', 'mainnet.infura.io',
   /// 'wss://mainnet.infura.io/ws/v3/YOUR-PROJECT-ID'.

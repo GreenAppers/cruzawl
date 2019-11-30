@@ -2,7 +2,7 @@
 # See https://dart.dev/tools/pub/glossary#lockfile
 packages:
   args:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: args
       url: "https://pub.dartlang.org"
@@ -78,6 +78,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.0.0"
+  console:
+    dependency: "direct main"
+    description:
+      name: console
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "3.1.0"
   convert:
     dependency: transitive
     description:
@@ -111,10 +118,10 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "51d3c62761704f53a3906d540d3fb0534f1756d2"
+      resolved-ref: "1ff5ff24c15204c2269fdfd5da69b6cc92e88a9e"
       url: "https://github.com/GreenAppers/dartssh"
     source: git
-    version: "1.0.0+0"
+    version: "1.0.2+2"
   ed25519_hd_key:
     dependency: transitive
     description:
@@ -433,6 +440,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.0.0+1"
+  vector_math:
+    dependency: transitive
+    description:
+      name: vector_math
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "2.0.8"
   w_common:
     dependency: transitive
     description:

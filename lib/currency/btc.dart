@@ -1327,7 +1327,9 @@ class BitcoinPeer extends PersistentSocketClient with RawResponseQueueMixin {
 
   void handleCommand(Uint8List commandBytes, SerializableInput input) {
     int length = 0;
-    while (commandBytes.length > length && commandBytes[length] != 0) length++;
+    while (commandBytes.length > length && commandBytes[length] != 0) {
+      length++;
+    }
     if (length == 0) {
       if (spec.debugPrint != null) {
         spec.debugPrint('invalid command $commandBytes');

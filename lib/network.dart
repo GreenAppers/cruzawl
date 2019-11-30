@@ -147,6 +147,9 @@ abstract class Peer {
 
   /// Complete [throttleQueue] with null and discard it.
   void failThrottleQueue() {
+    if (spec.debugPrint != null) {
+      spec.debugPrint('$address: failThrottleQueue');
+    }
     while (throttleQueue.isNotEmpty) {
       (throttleQueue.removeFirst()).complete(null);
     }
@@ -187,7 +190,7 @@ abstract class SocketClient extends Peer {
   @override
   void disconnect(String reason) {
     socket.close();
-    if (spec.debugPrint != null) spec.debugPrint('disconnected: ' + reason);
+    if (spec.debugPrint != null) spec.debugPrint('Peer disconnected: $reason');
     setState(PeerState.disconnected);
     handleDisconnected();
     failOutstanding();
@@ -195,13 +198,13 @@ abstract class SocketClient extends Peer {
     if (autoReconnectSeconds != null) connectAfter(autoReconnectSeconds);
   }
 
-  void onConnected(dynamic x) {
-    socket.handleError((error) => disconnect('socket error'));
-    socket.handleDone((v) => disconnect('socket done'));
+  void onConnected() {
+    socket.handleError((error) => disconnect('SocketClient.error: $error'));
+    socket.handleDone((v) => disconnect('SocketClient.done: $v'));
     socket.listen((message) => handleMessage(message));
 
     setState(PeerState.connected);
-    if (spec.debugPrint != null) spec.debugPrint('onConnected');
+    if (spec.debugPrint != null) spec.debugPrint('SocketClient.onConnected');
     handleConnected();
   }
 
@@ -210,7 +213,7 @@ abstract class SocketClient extends Peer {
     addOutstandingJson(x, responseCallback);
     String message = jsonEncode(x);
     if (spec.debugPrint != null && spec.debugLevel >= debugLevelDebug) {
-      spec.debugPrint('sending message: $message');
+      spec.debugPrint('SocketClient.send: $message');
     }
     socket.send(message);
   }
