@@ -16,9 +16,14 @@ import 'package:cruzawl/preferences.dart';
 // Height: 19527
 void main(List<String> arguments) async {
   final argParser = ArgParser()
-    ..addOption('currency', abbr: 'c')
-    ..addOption('url', abbr: 'u')
-    ..addOption('root', abbr: 'r')
+    ..addFlag('help', negatable: false, help: 'Display usage')
+    ..addOption('currency',
+        abbr: 'c',
+        help: 'Supported currencies: ' +
+            currencies.map((e) => e.ticker).join(', '))
+    ..addOption('peertype', help: 'e.g. Stratum or BitcoinRPC')
+    ..addOption('url', abbr: 'u', help: 'URL of peer')
+    ..addOption('root', abbr: 'r', help: 'URL for any supplemental API')
     ..addOption('sshUrl')
     ..addOption('sshUser')
     ..addOption('sshPassword')
@@ -27,6 +32,11 @@ void main(List<String> arguments) async {
   final ArgResults args = argParser.parse(arguments);
   final String currencyName = (args['currency'] ?? 'CRUZ').toUpperCase();
   final Currency currency = Currency.fromJson(currencyName);
+
+  if (args['help']) {
+    print(argParser.usage);
+    exit(0);
+  }
 
   if (currency == null) {
     print(format('{color.red}Unsupported currency{color.end}: $currencyName'));

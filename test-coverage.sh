@@ -7,8 +7,6 @@ dart --disable-service-auth-codes \
   --pause-isolates-on-exit \
   test/test_all.dart &
 
-sleep 60
-
 pub global run coverage:collect_coverage \
   --port=$OBS_PORT \
   --out=coverage/coverage.json \

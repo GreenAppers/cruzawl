@@ -223,7 +223,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "1ff5ff24c15204c2269fdfd5da69b6cc92e88a9e"
+      resolved-ref: "58dac3ccf5179fd1ec17e500ca549da9864cccff"
       url: "https://github.com/GreenAppers/dartssh"
     source: git
     version: "1.0.2+2"
