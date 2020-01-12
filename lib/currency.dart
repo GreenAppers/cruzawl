@@ -481,4 +481,4 @@ const CRUZ cruz = CRUZ();
 
 const ETH eth = ETH();
 
-const List<Currency> currencies = <Currency>[cruz, btc, eth];
+const List<Currency> currencies = <Currency>[cruz]; //, btc, eth];

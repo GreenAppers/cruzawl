@@ -110,13 +110,18 @@ class CruzawlPreferences {
   List<PeerPreference> get peers {
     var peers = storage.getPreference('peers');
     if (peers == null) {
-      return <PeerPreference>[
+      List<PeerPreference> ret = <PeerPreference>[
         PeerPreference('Satoshi Locomoco', 'wallet.cruzbit.xyz', 'CRUZ', ''),
-        PeerPreference('BLOCKCHAIN', 'ws.blockchain.info', 'BTC', '',
-            root: btc.supplementalApiUrl, type: 'BlockchainAPI'),
-        PeerPreference('INFURA', 'mainnet.infura.io', 'ETH', '',
-            root: eth.supplementalApiUrl),
       ];
+      if (currencies.contains(btc)) {
+        ret.add(PeerPreference('BLOCKCHAIN', 'ws.blockchain.info', 'BTC', '',
+            root: btc.supplementalApiUrl, type: 'BlockchainAPI'));
+      }
+      if (currencies.contains(eth)) {
+        ret.add(PeerPreference('INFURA', 'mainnet.infura.io', 'ETH', '',
+            root: eth.supplementalApiUrl));
+      }
+      return ret;
     }
     return peers.map<PeerPreference>((v) => PeerPreference.fromJson(v)).toList()
       ..sort(PeerPreference.comparePriority);
